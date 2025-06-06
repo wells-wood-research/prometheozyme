@@ -1,0 +1,24 @@
+2025-05-13 14:56:55,084 - INFO - 
+Starting workflow with config: /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/config.yaml
+2025-05-13 14:56:55,084 - INFO - 
+Number of steps in the workflow: 1
+2025-05-13 14:56:55,084 - INFO - 
+Executing step 1: LMF_opt_unrest
+2025-05-13 14:56:55,084 - DEBUG - Executing ORCA task: /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/LMF_opt_unrest.inp with args: [] and {'title': 'QM Unrestrained Optimization for LMF', 'inputFile': '/home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/lmf.xyz', 'moleculeInfo': {'charge': -1, 'multiplicity': 3}, 'qmMethod': 'XTB2', 'parallelize': 8, 'maxcore': 2500}
+2025-05-13 14:56:55,084 - DEBUG - Extracting ORCA arguments
+2025-05-13 14:56:55,084 - DEBUG - 
+                 ORCA arguments:
+                 title=QM Unrestrained Optimization for LMF, inputFormat=xyzfile, inputFile=/home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/lmf.xyz,
+                 moleculeInfo={'charge': -1, 'multiplicity': 3}, qmmm={}, qmMethod=XTB2,
+                 geom={}, parallelize=8, maxcore=2500, neb={}, scf={}
+2025-05-13 14:56:55,084 - DEBUG - Handling ORCA input: /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/LMF_opt_unrest.inp
+2025-05-13 14:56:55,084 - DEBUG - Ensuring directory exists: /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/0_LMF_opt_unrest
+2025-05-13 14:56:55,084 - DEBUG - Directory ensured: /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/0_LMF_opt_unrest
+2025-05-13 14:56:55,084 - DEBUG - Copied /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/LMF_opt_unrest.inp to /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/0_LMF_opt_unrest
+2025-05-13 14:56:55,084 - DEBUG - Running command: /home/mchrnwsk/orca_6_0_1_linux_x86-64_shared_openmpi416/orca /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/0_LMF_opt_unrest/LMF_opt_unrest.inp /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/LMF_opt_unrest.out in /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/0_LMF_opt_unrest
+2025-05-13 14:56:55,084 - DEBUG - Ensuring directory exists: /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/0_LMF_opt_unrest
+2025-05-13 14:56:55,084 - DEBUG - Directory ensured: /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/0_LMF_opt_unrest
+2025-05-13 14:56:55,829 - DEBUG - Handling ORCA output for step: LMF_opt_unrest
+2025-05-13 14:56:55,830 - ERROR - PDB file /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/0_LMF_opt_unrest/LMF_opt_unrest.pdb not found, skipping copy
+2025-05-13 14:56:55,830 - INFO - 
+Workflow completed successfully

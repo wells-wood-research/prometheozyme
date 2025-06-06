@@ -1,0 +1,9 @@
+ # ----------------------------------------- #
+ # QM Unrestrained Optimization for LMF      #
+ # ----------------------------------------- #
+
+! XTB2 Opt PAL8
+%maxcore 2500
+
+*xyzfile -1 3 /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/quinoline/optimise/lmf/lmf.xyz
+

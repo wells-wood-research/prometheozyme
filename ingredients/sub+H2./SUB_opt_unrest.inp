@@ -1,0 +1,9 @@
+ # ------------------------------------------------------------------------------------- #
+ # QM Unrestrained Optimization for singly-oxidised 4,7-dimethyl-5-anilinoquinoline      #
+ # ------------------------------------------------------------------------------------- #
+
+! XTB2 Opt PAL8
+%maxcore 2500
+
+*xyzfile 1 3 /home/mchrnwsk/qmmm/runs/expanding_reaction_scope/ellipticine/optimise/sub+H2./sub+H2.xyz
+
