@@ -1,0 +1,210 @@
+# Define substrate and objects
+ingredients:
+  - &sub
+    name: sub
+    path: /home/mchrnwsk/theozymes/ingredients/adduct.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 7
+      h_donor: 5
+      n5: 44
+      n3: 31
+      o1: 22
+      o2: 23
+      ringMDL: [0, 1, 2, 3, 4, 6]
+      ringIAZ: [26, 16, 20, 21, 15, 27, 18, 17]
+  
+  - &arg
+    name: arg
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz
+    charge: 1
+    multiplicity: 1
+    indices:
+      h_donor: [3, 5, 7]
+
+  - &lys
+    name: lys
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_lysine.xyz
+    charge: 1
+    multiplicity: 1
+    indices:
+      h_donor: 4
+
+  - &his
+    name: his
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 6
+      h_donor: 3
+
+  - &cys
+    name: cys
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_cysteine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 1
+      h_donor: 1
+
+  - &ser
+    name: ser
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 1
+      h_donor: 1
+
+  - &thr
+    name: thr
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_threonine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 4
+      h_donor: 4
+
+  - &tyr
+    name: tyr
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_tyrosine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 5
+      h_donor: 5
+
+  - &phe
+    name: phe
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz
+    charge: 0
+    multiplicity: 1
+    indices: {}
+
+  - &glu
+    name: glu
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamate.xyz
+    charge: -1
+    multiplicity: 1
+    indices:
+      h_acceptor: [4, 5]
+
+  - &gln
+    name: gln
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 3
+      h_donor: 4
+
+  - &asp
+    name: asp
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_aspartate.xyz
+    charge: -1
+    multiplicity: 1
+    indices:
+      h_acceptor: 2
+      h_donor: 3
+
+  - &asn
+    name: asn
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_asparagine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 5
+      h_donor: 2
+
+roles:
+  - name: base
+    candidates:
+      - *his
+      - *ser
+      - *thr
+      - *cys
+    constraints:
+      - guestIdx: h_acceptor
+        hostIdx: h_donor
+        val: 1.5
+    priority: -1
+  - name: stabSubO
+    candidates:
+      - *arg
+      - *lys
+      - *his
+      - *tyr
+      - *gln
+      - *asn
+    constraints:
+      - guestIdx: h_donor
+        hostIdx: h_acceptor
+        val: 3.0
+    priority: 3
+  - name: stabN
+    candidates:
+      - *arg
+      - *lys
+      - *his
+    constraints:
+      - guestIdx: h_donor
+        hostIdx: n5
+        val: 3.0
+    priority: 2
+  - name: protN
+    candidates:
+      - *his
+      - *cys
+    constraints:
+      - guestIdx: h_donor
+        hostIdx: n5
+        val: 3.0
+    priority: 2
+  - name: stabIAZpolarO1
+    candidates:
+      - *arg
+      - *ser
+    constraints:
+      - guestIdx: h_donor
+        hostIdx: o1
+        val: 3.0
+    priority: 1
+  - name: stabIAZpolarO2
+    candidates:
+      - *arg
+      - *ser
+    constraints:
+      - guestIdx: h_donor
+        hostIdx: o2
+        val: 3.0
+    priority: 1
+  - name: stabIAZpolarN
+    candidates:
+      - *gln
+    constraints:
+      - guestIdx: h_acceptor
+        hostIdx: n3
+        val: 3.0
+    priority: 1
+  - name: stabIAZgreasy
+    candidates:
+      - *phe
+    constraints:
+      - guestIdx: all
+        guestType: com
+        hostIdx: ringIAZ
+        hostType: com
+        val: 3.0
+    priority: 1
+  - name: stabSubRing
+    candidates:
+      - *phe
+    constraints:
+      - guestIdx: all
+        guestType: com
+        hostIdx: ringMDL
+        hostType: com
+        val: 3.0
+    priority: 1
