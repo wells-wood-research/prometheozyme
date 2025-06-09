@@ -1,6 +1,6 @@
 import yaml
 import logging
-from utils import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests
+from utils import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 
 # Configure logging to output to both console and file
 logger = logging.getLogger(__name__)
@@ -96,8 +96,5 @@ unique_guests = reduce_guests(updated_guests)
 logger.debug(f"""Unique guests are:
             {unique_guests}""")
 
-missing = set(updated_guests) - set(unique_guests)
-p = [m.path for m in missing][0]
-c = [m.constraints for m in missing][0]
-print(p)
-print(c)
+print_reduced(updated_guests, unique_guests)
+
