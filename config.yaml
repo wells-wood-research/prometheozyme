@@ -1,7 +1,10 @@
+paths:
+  workdir: "/home/mchrnwsk/theozymes/docking"
+
 # Define substrate and objects
 ingredients:
-  - &sub
-    name: sub
+  - &host
+    name: host
     path: /home/mchrnwsk/theozymes/ingredients/adduct.xyz
     charge: 0
     multiplicity: 1
