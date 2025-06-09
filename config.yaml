@@ -16,7 +16,7 @@ ingredients:
       o1: 22
       o2: 23
       ringMDL: [0, 1, 2, 3, 4, 6]
-      ringIAZ: [26, 16, 20, 21, 15, 27, 18, 17]
+      ringIAZ: [18, 21, 15, 27, 26, 14, 20, 17]
   
   - &arg
     name: arg
@@ -67,8 +67,8 @@ ingredients:
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 4
-      h_donor: 4
+      h_acceptor: 2
+      h_donor: 2
 
   - &tyr
     name: tyr
