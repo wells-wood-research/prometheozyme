@@ -136,17 +136,16 @@ def reduce_guests(guests):
             unique_guests[key] = guest
     return list(unique_guests.values())
 
-def print_reduced(updated_guests, unique_guests):
+def print_reduced(updated_guests, unique_guests, logger=None):
     """Print the differences between updated guests and unique guests."""
     missing = set(updated_guests) - set(unique_guests)
     
     if not missing:
-        print("After reducing, no guests were removed.")
+        logger.debug("After reducing, no guests were dropped.")
         return
     
-    print("After reducing, the following guests were removed:")
+    logger.debug("After reducing, the following guests were dropped:")
     for guest in missing:
-        print(f"Path: {guest.path}")
-        print(f"Constraints: {guest.constraints}")
-        print()  # Empty line for readability
-    print(f"Total missing guests: {len(missing)}")
+        logger.debug("Path: %s", guest.path)
+        logger.debug("Constraints: %s", guest.constraints)
+    logger.debug("Total dropped duplicates: %d", len(missing))
