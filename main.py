@@ -3,10 +3,12 @@ import logging
 import os
 from datetime import datetime
 import subprocess
+import shutil
 
 from utils import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 from docking_box import calculate_docking_box
-from merge_xyzs import merge_xyz
+from merge_xyzs import read_xyz, merge_xyz
+from evaluate_constraints import filter_conformations
 
 # Configure logging to output to both console and file
 logger = logging.getLogger(__name__)
@@ -111,9 +113,10 @@ def dock(host, ingredient, outdir):
     scoring = "vina"
     cnn_scoring = None
     addH = False
+    stripH = False
     exh = 8
     num_modes = 10000
-    cmd = f"/opt/gnina -r {receptor} -l {ligand} --center_x {center_x} --center_y {center_y} --center_z {center_z} --size_x {size_x} --size_y {size_y} --size_z {size_z} --scoring {scoring} --cnn_scoring {cnn_scoring} --pose_sort_order Energy -o {outdir}/out.xyz --atom_terms {outdir}/atom_terms --addH {addH} --exhaustiveness {exh} --num_modes {num_modes} --quiet"
+    cmd = f"/opt/gnina -r {receptor} -l {ligand} --center_x {center_x} --center_y {center_y} --center_z {center_z} --size_x {size_x} --size_y {size_y} --size_z {size_z} --scoring {scoring} --cnn_scoring {cnn_scoring} --pose_sort_order Energy -o {outdir}/out.xyz --atom_terms {outdir}/atom_terms --addH {addH} --stripH {stripH} --exhaustiveness {exh} --num_modes {num_modes} --quiet"
     subprocess.run(cmd.split(), check=True)
     logger.info(f"Docking for {ingredient.name} completed. Results saved in {outdir}\n")
     return f"{outdir}/out.xyz"  # Return the path to the docked output file
@@ -133,15 +136,32 @@ def main(configPath):
     roles, host, ingredient_map, unique_guests_constraints = setup(config)
 
     # Run gnina for each ingredients (constraints not evaluated here)
+    docked_guests = []
     for ingredient in ingredient_map.values():
         if ingredient.name == 'host':
             continue
         logger.info(f"Running gnina for ingredient: {ingredient.name}")
         docked_output = dock(host, ingredient, outdir)
-        merge_xyz(host.path, docked_output, os.path.join(outdir, f"docked_{ingredient.name}.xyz"))
+        merged_path = os.path.join(outdir, f"docked_{ingredient.name}.xyz")
+        merge_xyz(host.path, docked_output, merged_path)
+        docked_guests.append(merged_path)
     logger.info(f"Docking completed. Results saved in {outdir}\n")
 
     # Evaluate constraints for each ingredient (list of unique guests)
+    # for ingredient in unique_guests_constraints, delete in copy conformations that don't satisfy constraints
+    for ing in unique_guests_constraints:
+        logger.info(f"Evaluating constraints for ingredient: {ing.name}, role: {ing.role_title}")
+
+        merged_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
+        if not os.path.exists(merged_path):
+            logger.error(f"Docked output for {ing.name} not found at {merged_path}. Skipping constraint evaluation.")
+            continue
+
+        # Filter conformations that don't satisfy constraints - only valid written to filtered_path
+        if not ing.constraints:
+            logger.info(f"No constraints for ingredient {ing.name}, skipping evaluation.")
+            continue
+        filter_conformations(merged_path, host.path, ing.id, ing.constraints, logger)
 
     # Satisfy roles according to their priorities
 

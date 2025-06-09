@@ -36,11 +36,20 @@ class Ingredient:
         hostType = constraint.hostType
 
         # Helper function to get all atom indices from an XYZ file
+        # Edit: cannot keep all atoms, as non-polar hydrogens are removed by gnina
         def get_all_atom_indices(ingredient):
             try:
                 with open(ingredient.path, 'r') as f:
                     atom_count = int(f.readline().strip())
-                return list(range(atom_count))  # Indices start at 0
+                    f.readline()  # Skip the comment line
+                    non_hydrogen_indices = []
+                    for i in range(atom_count):
+                        line = f.readline().strip()
+                        if line:
+                            atom_type = line.split()[0]
+                            if atom_type.upper() != 'H':
+                                non_hydrogen_indices.append(i)
+                    return non_hydrogen_indices
             except FileNotFoundError:
                 print(f"XYZ file {ingredient.path} not found")
                 return []
