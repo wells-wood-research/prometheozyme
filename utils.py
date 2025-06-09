@@ -135,3 +135,18 @@ def reduce_guests(guests):
         if key not in unique_guests:
             unique_guests[key] = guest
     return list(unique_guests.values())
+
+def print_reduced(updated_guests, unique_guests):
+    """Print the differences between updated guests and unique guests."""
+    missing = set(updated_guests) - set(unique_guests)
+    
+    if not missing:
+        print("After reducing, no guests were removed.")
+        return
+    
+    print("After reducing, the following guests were removed:")
+    for guest in missing:
+        print(f"Path: {guest.path}")
+        print(f"Constraints: {guest.constraints}")
+        print()  # Empty line for readability
+    print(f"Total missing guests: {len(missing)}")
