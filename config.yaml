@@ -167,7 +167,7 @@ roles:
       - guestIdx: h_donor
         hostIdx: h_acceptor
         val: 3.0
-    priority: 3
+    priority: 1
   - name: stabN
     candidates:
       - *arg
@@ -178,58 +178,58 @@ roles:
         hostIdx: n5
         val: 3.0
     priority: 2
-  - name: protN
-    candidates:
-      - *his
-      - *cys
-    constraints:
-      - guestIdx: h_donor
-        hostIdx: n5
-        val: 3.0
-    priority: 2
-  - name: stabIAZpolarO1
-    candidates:
-      - *arg
-      - *ser
-    constraints:
-      - guestIdx: h_donor
-        hostIdx: o1
-        val: 3.0
-    priority: 1
-  - name: stabIAZpolarO2
-    candidates:
-      - *arg
-      - *ser
-    constraints:
-      - guestIdx: h_donor
-        hostIdx: o2
-        val: 3.0
-    priority: 1
-  - name: stabIAZpolarN
-    candidates:
-      - *gln
-    constraints:
-      - guestIdx: h_acceptor
-        hostIdx: n3
-        val: 3.0
-    priority: 1
-  - name: stabIAZgreasy
-    candidates:
-      - *phe
-    constraints:
-      - guestIdx: all
-        guestType: com
-        hostIdx: ringIAZ
-        hostType: com
-        val: 4.5
-    priority: 1
-  - name: stabSubRing
-    candidates:
-      - *phe
-    constraints:
-      - guestIdx: all
-        guestType: com
-        hostIdx: ringMDL
-        hostType: com
-        val: 4.5
-    priority: 1
+#  - name: protN
+#    candidates:
+#      - *his
+#      - *cys
+#    constraints:
+#      - guestIdx: h_donor
+#        hostIdx: n5
+#        val: 3.0
+#    priority: 2
+#  - name: stabIAZpolarO1
+#    candidates:
+#      - *arg
+#      - *ser
+#    constraints:
+#      - guestIdx: h_donor
+#        hostIdx: o1
+#        val: 3.0
+#    priority: 3
+#  - name: stabIAZpolarO2
+#    candidates:
+#      - *arg
+#      - *ser
+#    constraints:
+#      - guestIdx: h_donor
+#        hostIdx: o2
+#        val: 3.0
+#    priority: 3
+#  - name: stabIAZpolarN
+#    candidates:
+#      - *gln
+#    constraints:
+#      - guestIdx: h_acceptor
+#        hostIdx: n3
+#        val: 3.0
+#    priority: 3
+#  - name: stabIAZgreasy
+#    candidates:
+#      - *phe
+#    constraints:
+#      - guestIdx: all
+#        guestType: com
+#        hostIdx: ringIAZ
+#        hostType: com
+#        val: 4.5
+#    priority: 3
+#  - name: stabSubRing
+#    candidates:
+#      - *phe
+#    constraints:
+#      - guestIdx: all
+#        guestType: com
+#        hostIdx: ringMDL
+#        hostType: com
+#        val: 4.5
+#    priority: 3
