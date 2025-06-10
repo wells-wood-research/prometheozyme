@@ -157,4 +157,4 @@ def print_reduced(updated_guests, unique_guests, logger=None):
     for guest in missing:
         logger.debug("Path: %s", guest.path)
         logger.debug("Constraints: %s", guest.constraints)
-    logger.debug("Total dropped duplicates: %d", len(missing))
+    logger.debug(f"Total dropped duplicates: {len(missing)}\n")
