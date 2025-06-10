@@ -60,7 +60,7 @@ def evaluate_constraint(coordinates, atom_types, guest_indices, guestType, host_
         logger.error(f"Invalid constraint types: guestType={guestType}, hostType={hostType}")
         return False
 
-def filter_conformations(merged_path, host_path, id, name, role, constraints, logger):
+def filter_conformations(merged_path, host_path, name, role, constraints, logger):
     """Filter conformations in XYZ file based on multiple distance constraints."""
     # Get atom counts
     total_atoms = get_atom_count(merged_path)
@@ -98,7 +98,7 @@ def filter_conformations(merged_path, host_path, id, name, role, constraints, lo
     filtered_path = None
     if len(valid_structures) != 0:
         # Write filtered conformations to new file to ensure docked output that might be needed later is not affected
-        filtered_path = os.path.join(os.path.dirname(merged_path), f"{name}_{role}_{id}.xyz")
+        filtered_path = os.path.join(os.path.dirname(merged_path), f"{name}_{role}.xyz")
         with open(filtered_path, 'w') as f:
             for atom_count, comment, coordinates, atom_types in valid_structures:
                 f.write(f"{atom_count}\n")
