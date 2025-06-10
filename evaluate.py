@@ -186,14 +186,15 @@ def filter_conformations(merged_path, host_path, id, name, role, constraints, lo
         if all_constraints_satisfied:
             valid_structures.append((atom_count, comment, coordinates, atom_types))
 
-    # Write filtered conformations to new file to ensure docked output that might be needed later is not affected
-    filtered_path = os.path.join(os.path.dirname(merged_path), f"{name}_{role}_{id}.xyz")
-    with open(filtered_path, 'w') as f:
-        for atom_count, comment, coordinates, atom_types in valid_structures:
-            f.write(f"{atom_count}\n")
-            f.write(f"{comment}\n")
-            for atom_type, coord in zip(atom_types, coordinates):
-                f.write(f"{atom_type} {coord[0]:27.17f} {coord[1]:27.17f} {coord[2]:27.17f}\n")
-    
     logger.info(f"Filtered {len(structures)} conformations to {len(valid_structures)} valid conformations")
-    return valid_structures, filtered_path
+    if len(valid_structures) != 0:
+        # Write filtered conformations to new file to ensure docked output that might be needed later is not affected
+        filtered_path = os.path.join(os.path.dirname(merged_path), f"{name}_{role}_{id}.xyz")
+        with open(filtered_path, 'w') as f:
+            for atom_count, comment, coordinates, atom_types in valid_structures:
+                f.write(f"{atom_count}\n")
+                f.write(f"{comment}\n")
+                for atom_type, coord in zip(atom_types, coordinates):
+                    f.write(f"{atom_type} {coord[0]:27.17f} {coord[1]:27.17f} {coord[2]:27.17f}\n")
+    
+    return valid_structures, None if not filtered_path else filtered_path
