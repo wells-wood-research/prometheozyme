@@ -3,7 +3,7 @@ import uuid
 import copy
 
 class Ingredient:
-    def __init__(self, path, charge, multiplicity, indices=None, constraints=[], role_title=None, name=None):
+    def __init__(self, path, charge, multiplicity, indices=None, constraints=[], role_title=None, name=None, conformations=None):
         self.path = path
         self.charge = charge
         self.multiplicity = multiplicity
@@ -12,6 +12,7 @@ class Ingredient:
         self.role_title = role_title
         self.name = name or os.path.splitext(os.path.basename(path))[0]
         self.id = str(uuid.uuid4())
+        self.conformations = conformations
 
     def rewrite_xyz(self):
         """Rewrite the XYZ file with updated charge and multiplicity."""
@@ -86,6 +87,11 @@ class Ingredient:
     def update_role_title(self, role_title):
         """Update the role title of the ingredient."""
         self.role_title = role_title
+        return self
+    
+    def update_conformations(self, conformations):
+        """Update the role title of the ingredient."""
+        self.conformations = conformations
         return self
 
 class Role:
