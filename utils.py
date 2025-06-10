@@ -88,6 +88,14 @@ def get_atom_count(path):
             return 0
         return int(lines[0].strip())  # First line is atom count
 
+def write_xyz(filename, comment, coords, atom_types):
+    """Write coordinates to an XYZ file."""
+    with open(filename, 'w') as f:
+        f.write(f"{len(coords)}\n")
+        f.write(f"{comment}\n")
+        for atom, (x, y, z) in zip(atom_types, coords):
+            f.write(f"{atom} {x:.6f} {y:.6f} {z:.6f}\n")
+
 def calculate_distance(coord1, coord2):
     """Calculate Euclidean distance between two 3D coordinates."""
     return np.sqrt(np.sum((coord1 - coord2) ** 2))

@@ -8,6 +8,7 @@ from define import Indices, Ingredient, Constraint, Role, update_guest_constrain
 from docking_box import calculate_docking_box
 from merge_xyzs import merge_xyz
 from evaluate import filter_conformations
+from arrange import arrange_guests
 
 # Configure logging to output to both console and file
 logger = logging.getLogger(__name__)
@@ -175,6 +176,8 @@ def main(configPath):
 
     # Prepare ingredients and roles from the configuration    
     roles, host, ingredient_map, unique_guests_constraints = setup(config)
+    # Sort roles by priority (lower number = higher priority, e.g., -1 is highest)
+    roles = sorted(roles, key=lambda x: x.priority)
 
     # Run gnina for each ingredients (constraints not evaluated here)
     docked_guests = []
@@ -182,12 +185,13 @@ def main(configPath):
         if ingredient.name == 'host':
             continue
         logger.info(f"Running gnina for ingredient: {ingredient.name}")
-        docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
+        #docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
         merged_path = os.path.join(outdir, f"docked_{ingredient.name}.xyz")
-        merge_xyz(host.path, docked_output, merged_path)
+        # merge_xyz(host.path, docked_output, merged_path)
         docked_guests.append(merged_path)
     logger.info(f"Docking completed. Results saved in {outdir}\n")
 
+    outdir = "/home/mchrnwsk/theozymes/docking/output_2025-06-10_14-31-33"
     # Evaluate constraints for each ingredient (list of unique guests)
     # for ingredient in unique_guests_constraints, delete in copy conformations that don't satisfy constraints
     for ing in unique_guests_constraints:
@@ -202,7 +206,7 @@ def main(configPath):
         if not ing.constraints:
             logger.info(f"No constraints for ingredient {ing.name}, skipping evaluation.")
             continue
-        valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.id, ing.name, ing.role_title, ing.constraints, logger)
+        valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.constraints, logger)
         if len(valid_structures) == 0:
             # Repeat docking with redocking parameters
             logger.warning(f"No poses that satisfy constraints found on first docking attempt. More granular redocking...")
@@ -212,13 +216,15 @@ def main(configPath):
             docked_output = dock(host, ingredient_map[ing.name], outdir, redock_dock_params, redocking=True)
             merged_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
             merge_xyz(host.path, docked_output, merged_path)
-            valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.id, ing.name, ing.role_title, ing.constraints, logger)
+            valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.constraints, logger)
             if len(valid_structures) == 0:
                 logger.error(f"No poses that satisfy constraints {ing.constraints} for {ing.name}, role: {ing.role_title} found on repeat docking.")
                 continue
+        ing.update_conformations(filtered_path)
         logger.info(f"Filtered conformations are saved in {filtered_path}")
 
     # Satisfy roles according to their priorities
+    arrange_guests(roles, unique_guests_constraints, host.path, outdir, logger)
 
 if __name__ == "__main__":
     import argparse
