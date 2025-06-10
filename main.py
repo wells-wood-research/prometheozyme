@@ -27,16 +27,14 @@ fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
-logger.info("Starting main script.\n")
-
 def setup(config):
     ingredients = config.get("ingredients", [])
     roles = config.get("roles", [])
 
     logger.debug(f"""Ingredients are:
-                {ingredients}\n""")
+                {ingredients}""")
     logger.debug(f"""Roles are:
-                {roles}\n""")
+                {roles}""")
 
     ingredient_objects = []
     ingredient_map = {}  # Map ingredient names to objects for role processing
@@ -53,7 +51,7 @@ def setup(config):
         ingredient_objects.append(ingredient_obj)
         ingredient_map[ing['name']] = ingredient_obj
     logger.debug(f"""Ingredient map is:
-                {ingredient_map}\n""")
+                {ingredient_map}""")
 
     # Find the substrate (host) ingredient, assumed to be 'sub'
     host = next((ing for ing in ingredient_objects if ing.name == 'host'), None)
@@ -90,11 +88,11 @@ def setup(config):
         )
         role_objects.append(role_obj) 
     logger.debug(f"""Role objects are:
-                {role_objects}\n""")
+                {role_objects}""")
     # Update constraints for each role
     updated_guests_constraints = update_guest_constraints(role_objects)
     logger.debug(f"""Updated guests are:
-                {updated_guests_constraints}\n""")
+                {updated_guests_constraints}""")
     # Reduce guests to unique based on constraints
     unique_guests_constraints = reduce_guests(updated_guests_constraints)
     logger.debug(f"""Unique guests are:
@@ -104,22 +102,64 @@ def setup(config):
 
     return role_objects, host, ingredient_map, unique_guests_constraints
 
-def dock(host, ingredient, outdir):
+def dock(host, ingredient, outdir, dock_params, redocking=False):
     receptor = host.path
     ligand = ingredient.path
     outdir = os.path.join(outdir, ingredient.name)
     os.makedirs(outdir, exist_ok=True)  # Ensure output directory exists
-    center_x, center_y, center_z, size_x, size_y, size_z = calculate_docking_box(receptor, ligand, padding = 5.0)
-    scoring = "vina"
-    cnn_scoring = None
-    addH = False
-    stripH = False
-    exh = 8
-    num_modes = 10000
-    cmd = f"/opt/gnina -r {receptor} -l {ligand} --center_x {center_x} --center_y {center_y} --center_z {center_z} --size_x {size_x} --size_y {size_y} --size_z {size_z} --scoring {scoring} --cnn_scoring {cnn_scoring} --pose_sort_order Energy -o {outdir}/out.xyz --atom_terms {outdir}/atom_terms --addH {addH} --stripH {stripH} --exhaustiveness {exh} --num_modes {num_modes} --quiet"
-    subprocess.run(cmd.split(), check=True)
-    logger.info(f"Docking for {ingredient.name} completed. Results saved in {outdir}\n")
-    return f"{outdir}/out.xyz"  # Return the path to the docked output file
+    
+    # Calculate docking box
+    center_x, center_y, center_z, size_x, size_y, size_z = calculate_docking_box(receptor, ligand, padding=5.0)
+    
+    # Update dock_params with docking box coordinates
+    dock_params = dock_params.copy()  # Avoid modifying the original
+    dock_params.update({
+        'center_x': center_x,
+        'center_y': center_y,
+        'center_z': center_z,
+        'size_x': size_x,
+        'size_y': size_y,
+        'size_z': size_z
+    })
+
+    # Construct the command as a list
+    cmd = [
+        "/opt/gnina",
+        "-r", receptor,
+        "-l", ligand,
+        "--center_x", str(dock_params['center_x']),
+        "--center_y", str(dock_params['center_y']),
+        "--center_z", str(dock_params['center_z']),
+        "--size_x", str(dock_params['size_x']),
+        "--size_y", str(dock_params['size_y']),
+        "--size_z", str(dock_params['size_z']),
+        "--scoring", dock_params['scoring'],
+        "--cnn_scoring", dock_params['cnn_scoring'],
+        "--pose_sort_order", dock_params['pose_sort_order'],
+        "-o", os.path.join(outdir, "out.xyz"),
+        "--atom_terms", os.path.join(outdir, "atom_terms"),
+        "--exhaustiveness", str(dock_params['exhaustiveness']),
+        "--num_modes", str(dock_params['num_modes']),
+        "--quiet"
+    ]
+
+    # Include optional parameters if not None or False
+    if dock_params['addH']:
+        cmd.append("--addH")
+    if dock_params['stripH']:
+        cmd.append("--stripH")
+    if dock_params.get("no_gpu", False):
+       cmd.append("--no_gpu")
+    if dock_params.get("min_rmsd_filter", None):
+        cmd.extend(["--min_rmsd_filter", str(dock_params['min_rmsd_filter'])])
+    if dock_params.get("temperature", None):
+        cmd.extend(["--temperature", str(dock_params['temperature'])])
+    if dock_params.get("num_mc_steps", None):
+        cmd.extend(["--num_mc_steps", str(dock_params['num_mc_steps'])])
+
+    subprocess.run(cmd, check=True)
+    logger.info(f"Docking for {ingredient.name} {'(redocking)' if redocking else ''} completed. Results saved in {outdir}")
+    return os.path.join(outdir, "out.xyz")  # Return the path to the docked output file
 
 def main(configPath):
     configPath = "/home/mchrnwsk/theozymes/config.yaml"
@@ -128,6 +168,8 @@ def main(configPath):
         config = yaml.safe_load(file)
     logger.info(f"Loaded configuration from {configPath}\n")
     paths = config.get("paths", {})
+    dock_params = config.get("docking", {})
+    redock_params = config.get("redocking", {})
     workdir = paths.get("workdir", ".")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     outdir = os.path.join(workdir, f"output_{timestamp}")
@@ -141,7 +183,7 @@ def main(configPath):
         if ingredient.name == 'host':
             continue
         logger.info(f"Running gnina for ingredient: {ingredient.name}")
-        docked_output = dock(host, ingredient, outdir)
+        docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
         merged_path = os.path.join(outdir, f"docked_{ingredient.name}.xyz")
         merge_xyz(host.path, docked_output, merged_path)
         docked_guests.append(merged_path)
@@ -150,7 +192,7 @@ def main(configPath):
     # Evaluate constraints for each ingredient (list of unique guests)
     # for ingredient in unique_guests_constraints, delete in copy conformations that don't satisfy constraints
     for ing in unique_guests_constraints:
-        logger.info(f"Evaluating constraints for ingredient: {ing.name}, role: {ing.role_title}")
+        logger.info(f"\nEvaluating constraints for ingredient: {ing.name}, role: {ing.role_title}")
 
         merged_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
         if not os.path.exists(merged_path):
@@ -161,7 +203,21 @@ def main(configPath):
         if not ing.constraints:
             logger.info(f"No constraints for ingredient {ing.name}, skipping evaluation.")
             continue
-        filter_conformations(merged_path, host.path, ing.id, ing.constraints, logger)
+        valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.id, ing.name, ing.role_title, ing.constraints, logger)
+        if len(valid_structures) == 0:
+            # Repeat docking with redocking parameters
+            logger.warning(f"No poses that satisfy constraints found on first docking attempt. More granular redocking...")
+            # Update dock_params with redocking parameters
+            redock_dock_params = dock_params.copy()
+            redock_dock_params.update(redock_params)
+            docked_output = dock(host, ingredient_map[ing.name], outdir, redock_dock_params, redocking=True)
+            merged_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
+            merge_xyz(host.path, docked_output, merged_path)
+            valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.id, ing.name, ing.role_title, ing.constraints, logger)
+            if len(valid_structures) == 0:
+                logger.error(f"No poses that satisfy constraints {ing.constraints} for {ing.name}, role: {ing.role_title} found on repeat docking.")
+                continue
+        logger.info(f"Filtered conformations are saved in {filtered_path}")
 
     # Satisfy roles according to their priorities
 

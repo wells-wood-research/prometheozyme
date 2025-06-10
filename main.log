@@ -1,169 +1,133 @@
-2025-06-09 23:57:55,598 - INFO - Starting main script.
+2025-06-10 12:35:02,461 - INFO - Loaded configuration from /home/mchrnwsk/theozymes/config.yaml
 
-2025-06-09 23:57:55,609 - INFO - Loaded configuration from /home/mchrnwsk/theozymes/config.yaml
-
-2025-06-09 23:57:55,609 - DEBUG - Ingredients are:
+2025-06-10 12:35:02,461 - DEBUG - Ingredients are:
                 [{'name': 'host', 'path': '/home/mchrnwsk/theozymes/ingredients/adduct.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 7, 'h_donor': 5, 'n5': 44, 'n3': 31, 'o1': 22, 'o2': 23, 'ringMDL': [0, 1, 2, 3, 4, 6], 'ringIAZ': [18, 21, 15, 27, 26, 14, 20, 17]}}, {'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'lys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_lysine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': 4}}, {'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}, {'name': 'cys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_cysteine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}, {'name': 'ser', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}, {'name': 'thr', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_threonine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 2, 'h_donor': 2}}, {'name': 'tyr', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_tyrosine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 5, 'h_donor': 5}}, {'name': 'phe', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {}}, {'name': 'glu', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamate.xyz', 'charge': -1, 'multiplicity': 1, 'indices': {'h_acceptor': [4, 5]}}, {'name': 'gln', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 3, 'h_donor': 4}}, {'name': 'asp', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_aspartate.xyz', 'charge': -1, 'multiplicity': 1, 'indices': {'h_acceptor': 2, 'h_donor': 3}}, {'name': 'asn', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_asparagine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 5, 'h_donor': 2}}]
+2025-06-10 12:35:02,461 - DEBUG - Roles are:
+                [{'name': 'base', 'candidates': [{'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}, {'name': 'ser', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}, {'name': 'thr', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_threonine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 2, 'h_donor': 2}}, {'name': 'cys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_cysteine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}], 'constraints': [{'guestIdx': 'h_acceptor', 'hostIdx': 'h_donor', 'val': 3.0}], 'priority': -1}, {'name': 'stabSubO', 'candidates': [{'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'lys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_lysine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': 4}}, {'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}, {'name': 'tyr', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_tyrosine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 5, 'h_donor': 5}}, {'name': 'gln', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 3, 'h_donor': 4}}, {'name': 'asn', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_asparagine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 5, 'h_donor': 2}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'h_acceptor', 'val': 3.0}], 'priority': 3}, {'name': 'stabN', 'candidates': [{'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'lys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_lysine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': 4}}, {'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'n5', 'val': 3.0}], 'priority': 2}, {'name': 'protN', 'candidates': [{'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}, {'name': 'cys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_cysteine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'n5', 'val': 3.0}], 'priority': 2}, {'name': 'stabIAZpolarO1', 'candidates': [{'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'ser', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'o1', 'val': 3.0}], 'priority': 1}, {'name': 'stabIAZpolarO2', 'candidates': [{'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'ser', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'o2', 'val': 3.0}], 'priority': 1}, {'name': 'stabIAZpolarN', 'candidates': [{'name': 'gln', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 3, 'h_donor': 4}}], 'constraints': [{'guestIdx': 'h_acceptor', 'hostIdx': 'n3', 'val': 3.0}], 'priority': 1}, {'name': 'stabIAZgreasy', 'candidates': [{'name': 'phe', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {}}], 'constraints': [{'guestIdx': 'all', 'guestType': 'com', 'hostIdx': 'ringIAZ', 'hostType': 'com', 'val': 4.5}], 'priority': 1}, {'name': 'stabSubRing', 'candidates': [{'name': 'phe', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {}}], 'constraints': [{'guestIdx': 'all', 'guestType': 'com', 'hostIdx': 'ringMDL', 'hostType': 'com', 'val': 4.5}], 'priority': 1}]
+2025-06-10 12:35:02,462 - DEBUG - Ingredient map is:
+                {'host': <utils.Ingredient object at 0x79552d1938d0>, 'arg': <utils.Ingredient object at 0x79552ce00d50>, 'lys': <utils.Ingredient object at 0x79552ce5e1d0>, 'his': <utils.Ingredient object at 0x79552cf21250>, 'cys': <utils.Ingredient object at 0x795529fa1f10>, 'ser': <utils.Ingredient object at 0x79552a98a550>, 'thr': <utils.Ingredient object at 0x79552a989550>, 'tyr': <utils.Ingredient object at 0x79552a5aead0>, 'phe': <utils.Ingredient object at 0x79552a5ad790>, 'glu': <utils.Ingredient object at 0x79552a5ad990>, 'gln': <utils.Ingredient object at 0x795529f34350>, 'asp': <utils.Ingredient object at 0x79548a2f84d0>, 'asn': <utils.Ingredient object at 0x79548a2f8050>}
+2025-06-10 12:35:02,462 - DEBUG - Role objects are:
+                [<utils.Role object at 0x79548a2f80d0>, <utils.Role object at 0x79548a2f81d0>, <utils.Role object at 0x79548a2f8190>, <utils.Role object at 0x79548a2f82d0>, <utils.Role object at 0x79548a2f8290>, <utils.Role object at 0x79548a2f8350>, <utils.Role object at 0x79548a2f8550>, <utils.Role object at 0x79548a2f8450>, <utils.Role object at 0x79548a2f9090>]
+2025-06-10 12:35:02,462 - DEBUG - Updated guests are:
+                [<utils.Ingredient object at 0x79548a2f8410>, <utils.Ingredient object at 0x79548a2f87d0>, <utils.Ingredient object at 0x79548a2f8990>, <utils.Ingredient object at 0x79548a2f8c10>, <utils.Ingredient object at 0x79548a2f8d90>, <utils.Ingredient object at 0x79548a2f8d10>, <utils.Ingredient object at 0x79548a2f8fd0>, <utils.Ingredient object at 0x79548a2f8dd0>, <utils.Ingredient object at 0x79548a2f9410>, <utils.Ingredient object at 0x79548a2f8e90>, <utils.Ingredient object at 0x79548a2f9710>, <utils.Ingredient object at 0x79548a2f9890>, <utils.Ingredient object at 0x79548a2f9950>, <utils.Ingredient object at 0x79548a2f9ad0>, <utils.Ingredient object at 0x79548a2f9b90>, <utils.Ingredient object at 0x79548a2f9d10>, <utils.Ingredient object at 0x79548a2f9dd0>, <utils.Ingredient object at 0x79548a2f9f10>, <utils.Ingredient object at 0x79548a2fa310>, <utils.Ingredient object at 0x79548a2fa190>, <utils.Ingredient object at 0x79548a2fa3d0>, <utils.Ingredient object at 0x79548a2fa4d0>]
+2025-06-10 12:35:02,462 - DEBUG - Unique guests are:
+                [<utils.Ingredient object at 0x79548a2f8410>, <utils.Ingredient object at 0x79548a2f87d0>, <utils.Ingredient object at 0x79548a2f8990>, <utils.Ingredient object at 0x79548a2f8c10>, <utils.Ingredient object at 0x79548a2f8d90>, <utils.Ingredient object at 0x79548a2f8d10>, <utils.Ingredient object at 0x79548a2f8fd0>, <utils.Ingredient object at 0x79548a2f8dd0>, <utils.Ingredient object at 0x79548a2f9410>, <utils.Ingredient object at 0x79548a2f8e90>, <utils.Ingredient object at 0x79548a2f9710>, <utils.Ingredient object at 0x79548a2f9890>, <utils.Ingredient object at 0x79548a2f9950>, <utils.Ingredient object at 0x79548a2f9b90>, <utils.Ingredient object at 0x79548a2f9d10>, <utils.Ingredient object at 0x79548a2f9dd0>, <utils.Ingredient object at 0x79548a2f9f10>, <utils.Ingredient object at 0x79548a2fa310>, <utils.Ingredient object at 0x79548a2fa190>, <utils.Ingredient object at 0x79548a2fa3d0>, <utils.Ingredient object at 0x79548a2fa4d0>]
 
-2025-06-09 23:57:55,609 - DEBUG - Roles are:
-                [{'name': 'base', 'candidates': [{'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}, {'name': 'ser', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}, {'name': 'thr', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_threonine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 2, 'h_donor': 2}}, {'name': 'cys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_cysteine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}], 'constraints': [{'guestIdx': 'h_acceptor', 'hostIdx': 'h_donor', 'val': 1.5}], 'priority': -1}, {'name': 'stabSubO', 'candidates': [{'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'lys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_lysine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': 4}}, {'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}, {'name': 'tyr', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_tyrosine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 5, 'h_donor': 5}}, {'name': 'gln', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 3, 'h_donor': 4}}, {'name': 'asn', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_asparagine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 5, 'h_donor': 2}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'h_acceptor', 'val': 3.0}], 'priority': 3}, {'name': 'stabN', 'candidates': [{'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'lys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_lysine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': 4}}, {'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'n5', 'val': 3.0}], 'priority': 2}, {'name': 'protN', 'candidates': [{'name': 'his', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 6, 'h_donor': 3}}, {'name': 'cys', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_cysteine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'n5', 'val': 3.0}], 'priority': 2}, {'name': 'stabIAZpolarO1', 'candidates': [{'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'ser', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'o1', 'val': 3.0}], 'priority': 1}, {'name': 'stabIAZpolarO2', 'candidates': [{'name': 'arg', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz', 'charge': 1, 'multiplicity': 1, 'indices': {'h_donor': [3, 5, 7]}}, {'name': 'ser', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 1, 'h_donor': 1}}], 'constraints': [{'guestIdx': 'h_donor', 'hostIdx': 'o2', 'val': 3.0}], 'priority': 1}, {'name': 'stabIAZpolarN', 'candidates': [{'name': 'gln', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {'h_acceptor': 3, 'h_donor': 4}}], 'constraints': [{'guestIdx': 'h_acceptor', 'hostIdx': 'n3', 'val': 3.0}], 'priority': 1}, {'name': 'stabIAZgreasy', 'candidates': [{'name': 'phe', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {}}], 'constraints': [{'guestIdx': 'all', 'guestType': 'com', 'hostIdx': 'ringIAZ', 'hostType': 'com', 'val': 3.0}], 'priority': 1}, {'name': 'stabSubRing', 'candidates': [{'name': 'phe', 'path': '/home/mchrnwsk/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz', 'charge': 0, 'multiplicity': 1, 'indices': {}}], 'constraints': [{'guestIdx': 'all', 'guestType': 'com', 'hostIdx': 'ringMDL', 'hostType': 'com', 'val': 3.0}], 'priority': 1}]
+2025-06-10 12:35:02,462 - DEBUG - After reducing, the following guests were dropped:
+2025-06-10 12:35:02,462 - DEBUG - Path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz
+2025-06-10 12:35:02,462 - DEBUG - Constraints: [([3], 'iter', [44], 'iter', 3.0)]
+2025-06-10 12:35:02,462 - DEBUG - Total dropped duplicates: 1
 
-2025-06-09 23:57:55,609 - DEBUG - Ingredient map is:
-                {'host': <utils.Ingredient object at 0x74a548e21650>, 'arg': <utils.Ingredient object at 0x74a4a61d3450>, 'lys': <utils.Ingredient object at 0x74a4a6384d50>, 'his': <utils.Ingredient object at 0x74a54657f910>, 'cys': <utils.Ingredient object at 0x74a5465bfdd0>, 'ser': <utils.Ingredient object at 0x74a4a6315350>, 'thr': <utils.Ingredient object at 0x74a5465917d0>, 'tyr': <utils.Ingredient object at 0x74a4a6373e50>, 'phe': <utils.Ingredient object at 0x74a4a61fc710>, 'glu': <utils.Ingredient object at 0x74a4a61fc790>, 'gln': <utils.Ingredient object at 0x74a4a61fc250>, 'asp': <utils.Ingredient object at 0x74a4a61fc290>, 'asn': <utils.Ingredient object at 0x74a4a61fc310>}
+2025-06-10 12:35:02,462 - INFO - Running gnina for ingredient: arg
+2025-06-10 12:35:11,850 - INFO - Docking for arg  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/arg
+2025-06-10 12:35:11,996 - INFO - Running gnina for ingredient: lys
+2025-06-10 12:35:16,599 - INFO - Docking for lys  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/lys
+2025-06-10 12:35:16,663 - INFO - Running gnina for ingredient: his
+2025-06-10 12:35:20,924 - INFO - Docking for his  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/his
+2025-06-10 12:35:20,980 - INFO - Running gnina for ingredient: cys
+2025-06-10 12:35:22,167 - INFO - Docking for cys  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/cys
+2025-06-10 12:35:22,176 - INFO - Running gnina for ingredient: ser
+2025-06-10 12:35:23,273 - INFO - Docking for ser  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/ser
+2025-06-10 12:35:23,282 - INFO - Running gnina for ingredient: thr
+2025-06-10 12:35:25,130 - INFO - Docking for thr  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/thr
+2025-06-10 12:35:25,148 - INFO - Running gnina for ingredient: tyr
+2025-06-10 12:35:29,924 - INFO - Docking for tyr  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/tyr
+2025-06-10 12:35:30,009 - INFO - Running gnina for ingredient: phe
+2025-06-10 12:35:33,756 - INFO - Docking for phe  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/phe
+2025-06-10 12:35:33,816 - INFO - Running gnina for ingredient: glu
+2025-06-10 12:35:37,816 - INFO - Docking for glu  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/glu
+2025-06-10 12:35:37,859 - INFO - Running gnina for ingredient: gln
+2025-06-10 12:35:41,217 - INFO - Docking for gln  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/gln
+2025-06-10 12:35:41,266 - INFO - Running gnina for ingredient: asp
+2025-06-10 12:35:43,980 - INFO - Docking for asp  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/asp
+2025-06-10 12:35:44,009 - INFO - Running gnina for ingredient: asn
+2025-06-10 12:35:46,750 - INFO - Docking for asn  completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/asn
+2025-06-10 12:35:46,782 - INFO - Docking completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02
 
-2025-06-09 23:57:55,609 - DEBUG - Role objects are:
-                [<utils.Role object at 0x74a54650dd90>, <utils.Role object at 0x74a4a61fc090>, <utils.Role object at 0x74a4a61fc4d0>, <utils.Role object at 0x74a4a61fc5d0>, <utils.Role object at 0x74a4a61fc390>, <utils.Role object at 0x74a4a61fc550>, <utils.Role object at 0x74a4a61fc890>, <utils.Role object at 0x74a4a61fc410>, <utils.Role object at 0x74a4a61fc950>]
-
-2025-06-09 23:57:55,610 - DEBUG - Updated guests are:
-                [<utils.Ingredient object at 0x74a54657ec10>, <utils.Ingredient object at 0x74a4a61fd910>, <utils.Ingredient object at 0x74a4a61fcb50>, <utils.Ingredient object at 0x74a4a61fce90>, <utils.Ingredient object at 0x74a4a61fce10>, <utils.Ingredient object at 0x74a4a61fd010>, <utils.Ingredient object at 0x74a4a61fd090>, <utils.Ingredient object at 0x74a4a61fd410>, <utils.Ingredient object at 0x74a4a61fdb90>, <utils.Ingredient object at 0x74a4a61fd190>, <utils.Ingredient object at 0x74a4a61fda10>, <utils.Ingredient object at 0x74a4a61fdad0>, <utils.Ingredient object at 0x74a4a61fdc10>, <utils.Ingredient object at 0x74a4a61fddd0>, <utils.Ingredient object at 0x74a4a61fde90>, <utils.Ingredient object at 0x74a4a61fdf50>, <utils.Ingredient object at 0x74a4a61fe090>, <utils.Ingredient object at 0x74a4a61fe190>, <utils.Ingredient object at 0x74a4a61fe2d0>, <utils.Ingredient object at 0x74a4a61fe050>, <utils.Ingredient object at 0x74a4a61fe610>, <utils.Ingredient object at 0x74a4a61ff850>]
-
-2025-06-09 23:57:55,610 - DEBUG - Unique guests are:
-                [<utils.Ingredient object at 0x74a54657ec10>, <utils.Ingredient object at 0x74a4a61fd910>, <utils.Ingredient object at 0x74a4a61fcb50>, <utils.Ingredient object at 0x74a4a61fce90>, <utils.Ingredient object at 0x74a4a61fce10>, <utils.Ingredient object at 0x74a4a61fd010>, <utils.Ingredient object at 0x74a4a61fd090>, <utils.Ingredient object at 0x74a4a61fd410>, <utils.Ingredient object at 0x74a4a61fdb90>, <utils.Ingredient object at 0x74a4a61fd190>, <utils.Ingredient object at 0x74a4a61fda10>, <utils.Ingredient object at 0x74a4a61fdad0>, <utils.Ingredient object at 0x74a4a61fdc10>, <utils.Ingredient object at 0x74a4a61fde90>, <utils.Ingredient object at 0x74a4a61fdf50>, <utils.Ingredient object at 0x74a4a61fe090>, <utils.Ingredient object at 0x74a4a61fe190>, <utils.Ingredient object at 0x74a4a61fe2d0>, <utils.Ingredient object at 0x74a4a61fe050>, <utils.Ingredient object at 0x74a4a61fe610>, <utils.Ingredient object at 0x74a4a61ff850>]
-
-2025-06-09 23:57:55,610 - DEBUG - After reducing, the following guests were dropped:
-2025-06-09 23:57:55,610 - DEBUG - Path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz
-2025-06-09 23:57:55,610 - DEBUG - Constraints: [([3], 'iter', [44], 'iter', 3.0)]
-2025-06-09 23:57:55,610 - DEBUG - Total dropped duplicates: 1
-2025-06-09 23:57:55,610 - INFO - Running gnina for ingredient: arg
-2025-06-09 23:58:04,943 - INFO - Docking for arg completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/arg
-
-2025-06-09 23:58:05,090 - INFO - Running gnina for ingredient: lys
-2025-06-09 23:58:09,618 - INFO - Docking for lys completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/lys
-
-2025-06-09 23:58:09,680 - INFO - Running gnina for ingredient: his
-2025-06-09 23:58:13,981 - INFO - Docking for his completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/his
-
-2025-06-09 23:58:14,037 - INFO - Running gnina for ingredient: cys
-2025-06-09 23:58:15,203 - INFO - Docking for cys completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/cys
-
-2025-06-09 23:58:15,212 - INFO - Running gnina for ingredient: ser
-2025-06-09 23:58:16,303 - INFO - Docking for ser completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/ser
-
-2025-06-09 23:58:16,311 - INFO - Running gnina for ingredient: thr
-2025-06-09 23:58:18,153 - INFO - Docking for thr completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/thr
-
-2025-06-09 23:58:18,172 - INFO - Running gnina for ingredient: tyr
-2025-06-09 23:58:22,963 - INFO - Docking for tyr completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/tyr
-
-2025-06-09 23:58:23,048 - INFO - Running gnina for ingredient: phe
-2025-06-09 23:58:26,829 - INFO - Docking for phe completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/phe
-
-2025-06-09 23:58:26,890 - INFO - Running gnina for ingredient: glu
-2025-06-09 23:58:30,873 - INFO - Docking for glu completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/glu
-
-2025-06-09 23:58:30,917 - INFO - Running gnina for ingredient: gln
-2025-06-09 23:58:34,386 - INFO - Docking for gln completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/gln
-
-2025-06-09 23:58:34,433 - INFO - Running gnina for ingredient: asp
-2025-06-09 23:58:37,162 - INFO - Docking for asp completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/asp
-
-2025-06-09 23:58:37,192 - INFO - Running gnina for ingredient: asn
-2025-06-09 23:58:39,929 - INFO - Docking for asn completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/asn
-
-2025-06-09 23:58:39,963 - INFO - Docking completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55
-
-2025-06-09 23:58:39,963 - INFO - Evaluating constraints for ingredient: his, role: base
-2025-06-09 23:58:40,208 - INFO - Filtered 4344 conformations to 0 valid conformations
-
-2025-06-09 23:58:40,208 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/86258376-d278-41af-a98e-cfc988009e4e.xyz
-
-2025-06-09 23:58:40,211 - INFO - Evaluating constraints for ingredient: ser, role: base
-2025-06-09 23:58:40,252 - INFO - Filtered 894 conformations to 0 valid conformations
-
-2025-06-09 23:58:40,252 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/4fe54e16-44c2-4f62-8905-d8a2456f8f87.xyz
-
-2025-06-09 23:58:40,252 - INFO - Evaluating constraints for ingredient: thr, role: base
-2025-06-09 23:58:40,348 - INFO - Filtered 1920 conformations to 0 valid conformations
-
-2025-06-09 23:58:40,349 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/e4122664-1e12-4f59-b61d-8874409b9df9.xyz
-
-2025-06-09 23:58:40,350 - INFO - Evaluating constraints for ingredient: cys, role: base
-2025-06-09 23:58:40,398 - INFO - Filtered 1041 conformations to 0 valid conformations
-
-2025-06-09 23:58:40,398 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/24924768-2486-4d98-aee7-1d5586ff962a.xyz
-
-2025-06-09 23:58:40,398 - INFO - Evaluating constraints for ingredient: arg, role: stabSubO
-2025-06-09 23:58:40,915 - INFO - Filtered 7379 conformations to 227 valid conformations
-
-2025-06-09 23:58:40,915 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/904141de-dd0a-44e9-948b-8da998d02071.xyz
-
-2025-06-09 23:58:40,920 - INFO - Evaluating constraints for ingredient: lys, role: stabSubO
-2025-06-09 23:58:41,178 - INFO - Filtered 4443 conformations to 92 valid conformations
-
-2025-06-09 23:58:41,178 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/bf2ad036-557c-42aa-8839-2fe0483dbbb7.xyz
-
-2025-06-09 23:58:41,181 - INFO - Evaluating constraints for ingredient: his, role: stabSubO
-2025-06-09 23:58:41,425 - INFO - Filtered 4344 conformations to 81 valid conformations
-
-2025-06-09 23:58:41,426 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/fe97ab14-26ea-4d4e-bde3-0f08d885e0df.xyz
-
-2025-06-09 23:58:41,428 - INFO - Evaluating constraints for ingredient: tyr, role: stabSubO
-2025-06-09 23:58:41,764 - INFO - Filtered 5571 conformations to 145 valid conformations
-
-2025-06-09 23:58:41,764 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/2cdcffc4-1f9b-4e9e-916a-4ff9a24d37c2.xyz
-
-2025-06-09 23:58:41,768 - INFO - Evaluating constraints for ingredient: gln, role: stabSubO
-2025-06-09 23:58:41,965 - INFO - Filtered 3488 conformations to 87 valid conformations
-
-2025-06-09 23:58:41,965 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/c2a2834b-3136-4806-93b6-d5f117494593.xyz
-
-2025-06-09 23:58:41,968 - INFO - Evaluating constraints for ingredient: asn, role: stabSubO
-2025-06-09 23:58:42,122 - INFO - Filtered 2833 conformations to 72 valid conformations
-
-2025-06-09 23:58:42,122 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/df117b33-650d-472a-9c5c-d4fc4dea8c2c.xyz
-
-2025-06-09 23:58:42,124 - INFO - Evaluating constraints for ingredient: arg, role: stabN
-2025-06-09 23:58:42,623 - INFO - Filtered 7379 conformations to 31 valid conformations
-
-2025-06-09 23:58:42,623 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/07268ce3-840a-411f-a0f8-287a6759052b.xyz
-
-2025-06-09 23:58:42,629 - INFO - Evaluating constraints for ingredient: lys, role: stabN
-2025-06-09 23:58:42,885 - INFO - Filtered 4443 conformations to 32 valid conformations
-
-2025-06-09 23:58:42,886 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/21cf6e7a-8fb9-4a4c-8f44-6f84bda9536f.xyz
-
-2025-06-09 23:58:42,889 - INFO - Evaluating constraints for ingredient: his, role: stabN
-2025-06-09 23:58:43,129 - INFO - Filtered 4344 conformations to 2 valid conformations
-
-2025-06-09 23:58:43,129 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/feb67354-8988-46b7-ade5-385ad4032a1c.xyz
-
-2025-06-09 23:58:43,132 - INFO - Evaluating constraints for ingredient: cys, role: protN
-2025-06-09 23:58:43,179 - INFO - Filtered 1041 conformations to 0 valid conformations
-
-2025-06-09 23:58:43,179 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/25b57fba-a5a0-47a3-bc7a-7f5821dabe8a.xyz
-
-2025-06-09 23:58:43,180 - INFO - Evaluating constraints for ingredient: arg, role: stabIAZpolarO1
-2025-06-09 23:58:43,705 - INFO - Filtered 7379 conformations to 284 valid conformations
-
-2025-06-09 23:58:43,705 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/988ce565-3a54-4134-b761-ba576f21199b.xyz
-
-2025-06-09 23:58:43,711 - INFO - Evaluating constraints for ingredient: ser, role: stabIAZpolarO1
-2025-06-09 23:58:43,754 - INFO - Filtered 894 conformations to 30 valid conformations
-
-2025-06-09 23:58:43,754 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/6a629e83-b375-4cb0-a3c5-1ec65b28fe6f.xyz
-
-2025-06-09 23:58:43,756 - INFO - Evaluating constraints for ingredient: arg, role: stabIAZpolarO2
-2025-06-09 23:58:44,277 - INFO - Filtered 7379 conformations to 348 valid conformations
-
-2025-06-09 23:58:44,277 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/f22b4636-f361-4feb-8f63-f4ec50911e3e.xyz
-
-2025-06-09 23:58:44,282 - INFO - Evaluating constraints for ingredient: ser, role: stabIAZpolarO2
-2025-06-09 23:58:44,327 - INFO - Filtered 894 conformations to 43 valid conformations
-
-2025-06-09 23:58:44,327 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/b9ad42e6-1968-42e3-bd8f-eb0f192e4daa.xyz
-
-2025-06-09 23:58:44,328 - INFO - Evaluating constraints for ingredient: gln, role: stabIAZpolarN
-2025-06-09 23:58:44,526 - INFO - Filtered 3488 conformations to 46 valid conformations
-
-2025-06-09 23:58:44,526 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/314536e9-bd30-4d12-8855-d21195d075eb.xyz
-
-2025-06-09 23:58:44,529 - INFO - Evaluating constraints for ingredient: phe, role: stabIAZgreasy
-2025-06-09 23:58:44,859 - INFO - Filtered 4813 conformations to 0 valid conformations
-
-2025-06-09 23:58:44,859 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/18d80f24-35cb-498c-96dd-c511a8300424.xyz
-
-2025-06-09 23:58:44,863 - INFO - Evaluating constraints for ingredient: phe, role: stabSubRing
-2025-06-09 23:58:45,194 - INFO - Filtered 4813 conformations to 0 valid conformations
-
-2025-06-09 23:58:45,194 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-09_23-57-55/89d54e10-7ae2-4365-8b16-461a5238a8c3.xyz
-
+2025-06-10 12:35:46,782 - INFO - 
+Evaluating constraints for ingredient: his, role: base
+2025-06-10 12:35:47,029 - INFO - Filtered 4353 conformations to 38 valid conformations
+2025-06-10 12:35:47,031 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/his_base_62cd484d-9887-4b89-a862-239d24d61490.xyz
+2025-06-10 12:35:47,031 - INFO - 
+Evaluating constraints for ingredient: ser, role: base
+2025-06-10 12:35:47,071 - INFO - Filtered 891 conformations to 23 valid conformations
+2025-06-10 12:35:47,072 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/ser_base_0be4fb36-96cb-4036-ac8b-007488456361.xyz
+2025-06-10 12:35:47,072 - INFO - 
+Evaluating constraints for ingredient: thr, role: base
+2025-06-10 12:35:47,167 - INFO - Filtered 1913 conformations to 38 valid conformations
+2025-06-10 12:35:47,168 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/thr_base_c20b5913-a62c-4bee-b64d-52125004d58f.xyz
+2025-06-10 12:35:47,168 - INFO - 
+Evaluating constraints for ingredient: cys, role: base
+2025-06-10 12:35:47,218 - INFO - Filtered 1082 conformations to 15 valid conformations
+2025-06-10 12:35:47,219 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/cys_base_9f39451b-905a-4291-8d83-1c86105f3a84.xyz
+2025-06-10 12:35:47,219 - INFO - 
+Evaluating constraints for ingredient: arg, role: stabSubO
+2025-06-10 12:35:47,738 - INFO - Filtered 7359 conformations to 229 valid conformations
+2025-06-10 12:35:47,743 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/arg_stabSubO_dae3fab7-b893-4add-a77a-6ee811a14e99.xyz
+2025-06-10 12:35:47,743 - INFO - 
+Evaluating constraints for ingredient: lys, role: stabSubO
+2025-06-10 12:35:47,996 - INFO - Filtered 4492 conformations to 92 valid conformations
+2025-06-10 12:35:48,000 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/lys_stabSubO_45c0367b-d691-4738-81bd-61f831295dbf.xyz
+2025-06-10 12:35:48,000 - INFO - 
+Evaluating constraints for ingredient: his, role: stabSubO
+2025-06-10 12:35:48,243 - INFO - Filtered 4353 conformations to 85 valid conformations
+2025-06-10 12:35:48,246 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/his_stabSubO_223b8330-0c82-497f-a0ab-9642d3ad10d5.xyz
+2025-06-10 12:35:48,246 - INFO - 
+Evaluating constraints for ingredient: tyr, role: stabSubO
+2025-06-10 12:35:48,574 - INFO - Filtered 5510 conformations to 133 valid conformations
+2025-06-10 12:35:48,578 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/tyr_stabSubO_aef9bac5-13ab-4b0f-b5b4-e4d6fff1e0f7.xyz
+2025-06-10 12:35:48,578 - INFO - 
+Evaluating constraints for ingredient: gln, role: stabSubO
+2025-06-10 12:35:48,761 - INFO - Filtered 3443 conformations to 79 valid conformations
+2025-06-10 12:35:48,764 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/gln_stabSubO_c2ea71f9-4080-4a30-8e8d-cc33183aeb22.xyz
+2025-06-10 12:35:48,764 - INFO - 
+Evaluating constraints for ingredient: asn, role: stabSubO
+2025-06-10 12:35:48,910 - INFO - Filtered 2841 conformations to 71 valid conformations
+2025-06-10 12:35:48,913 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/asn_stabSubO_435633a0-5d9f-43f2-a17d-1d34c3645692.xyz
+2025-06-10 12:35:48,913 - INFO - 
+Evaluating constraints for ingredient: arg, role: stabN
+2025-06-10 12:35:49,408 - INFO - Filtered 7359 conformations to 40 valid conformations
+2025-06-10 12:35:49,413 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/arg_stabN_27507660-4710-4db9-8b9f-00f9fbdf5bf3.xyz
+2025-06-10 12:35:49,413 - INFO - 
+Evaluating constraints for ingredient: lys, role: stabN
+2025-06-10 12:35:49,661 - INFO - Filtered 4492 conformations to 34 valid conformations
+2025-06-10 12:35:49,664 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/lys_stabN_edb44cba-5d17-4156-aa51-96f89afc77e3.xyz
+2025-06-10 12:35:49,665 - INFO - 
+Evaluating constraints for ingredient: his, role: stabN
+2025-06-10 12:35:49,908 - INFO - Filtered 4353 conformations to 1 valid conformations
+2025-06-10 12:35:49,911 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/his_stabN_5f1666ed-9277-4a4c-9e0d-bd5cac27a5b6.xyz
+2025-06-10 12:35:49,911 - INFO - 
+Evaluating constraints for ingredient: cys, role: protN
+2025-06-10 12:35:49,959 - INFO - Filtered 1082 conformations to 0 valid conformations
+2025-06-10 12:35:49,960 - WARNING - No poses that satisfy constraints found on first docking attempt. More granular redocking...
+2025-06-10 12:35:51,876 - INFO - Docking for cys (redocking) completed. Results saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/cys
+2025-06-10 12:35:51,960 - INFO - Filtered 1478 conformations to 0 valid conformations
+2025-06-10 12:35:51,961 - ERROR - No poses that satisfy constraints [([1], 'iter', [44], 'iter', 3.0)] for cys, role: protN found on repeat docking.
+2025-06-10 12:35:51,961 - INFO - 
+Evaluating constraints for ingredient: arg, role: stabIAZpolarO1
+2025-06-10 12:35:52,488 - INFO - Filtered 7359 conformations to 305 valid conformations
+2025-06-10 12:35:52,492 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/arg_stabIAZpolarO1_6feb767d-1436-4875-84c3-2903d3291d34.xyz
+2025-06-10 12:35:52,492 - INFO - 
+Evaluating constraints for ingredient: ser, role: stabIAZpolarO1
+2025-06-10 12:35:52,533 - INFO - Filtered 891 conformations to 37 valid conformations
+2025-06-10 12:35:52,535 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/ser_stabIAZpolarO1_8a37f193-c631-49a1-a2e4-4988228ac2e8.xyz
+2025-06-10 12:35:52,535 - INFO - 
+Evaluating constraints for ingredient: arg, role: stabIAZpolarO2
+2025-06-10 12:35:53,050 - INFO - Filtered 7359 conformations to 369 valid conformations
+2025-06-10 12:35:53,053 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/arg_stabIAZpolarO2_5085e544-735e-4701-9a8c-3af16dd3c916.xyz
+2025-06-10 12:35:53,054 - INFO - 
+Evaluating constraints for ingredient: ser, role: stabIAZpolarO2
+2025-06-10 12:35:53,095 - INFO - Filtered 891 conformations to 39 valid conformations
+2025-06-10 12:35:53,096 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/ser_stabIAZpolarO2_b0fcd73a-9d06-4b85-9a37-c5fb0e9caddc.xyz
+2025-06-10 12:35:53,096 - INFO - 
+Evaluating constraints for ingredient: gln, role: stabIAZpolarN
+2025-06-10 12:35:53,290 - INFO - Filtered 3443 conformations to 44 valid conformations
+2025-06-10 12:35:53,292 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/gln_stabIAZpolarN_875dedea-2c47-4d1f-8235-75ec652f2755.xyz
+2025-06-10 12:35:53,292 - INFO - 
+Evaluating constraints for ingredient: phe, role: stabIAZgreasy
+2025-06-10 12:35:53,633 - INFO - Filtered 4753 conformations to 219 valid conformations
+2025-06-10 12:35:53,636 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/phe_stabIAZgreasy_c545b74a-817b-4188-af5c-e81ca1a857ca.xyz
+2025-06-10 12:35:53,636 - INFO - 
+Evaluating constraints for ingredient: phe, role: stabSubRing
+2025-06-10 12:35:53,977 - INFO - Filtered 4753 conformations to 339 valid conformations
+2025-06-10 12:35:53,980 - INFO - Filtered conformations are saved in /home/mchrnwsk/theozymes/docking/output_2025-06-10_12-35-02/phe_stabSubRing_503f01a5-f4e5-496c-ba65-cc22685fdb46.xyz

@@ -1,6 +1,28 @@
 paths:
   workdir: "/home/mchrnwsk/theozymes/docking"
 
+# Define docking params
+docking:
+  center_x: null
+  center_y: null
+  center_z: null
+  size_x: null
+  size_y: null
+  size_z: null
+  scoring: vina
+  cnn_scoring: none
+  pose_sort_order: Energy
+  addH: false
+  stripH: false
+  exhaustiveness: 8
+  num_modes: 10000
+  no_gpu: false
+redocking:
+  num_modes: 100000
+  min_rmsd_filter: 0.5
+  temperature: 451
+  num_mc_steps: 20000
+
 # Define substrate and objects
 ingredients:
   - &host
@@ -131,7 +153,7 @@ roles:
     constraints:
       - guestIdx: h_acceptor
         hostIdx: h_donor
-        val: 1.5
+        val: 3.0
     priority: -1
   - name: stabSubO
     candidates:
@@ -199,7 +221,7 @@ roles:
         guestType: com
         hostIdx: ringIAZ
         hostType: com
-        val: 3.0
+        val: 4.5
     priority: 1
   - name: stabSubRing
     candidates:
@@ -209,5 +231,5 @@ roles:
         guestType: com
         hostIdx: ringMDL
         hostType: com
-        val: 3.0
+        val: 4.5
     priority: 1
