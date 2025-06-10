@@ -3,12 +3,11 @@ import logging
 import os
 from datetime import datetime
 import subprocess
-import shutil
 
-from utils import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
+from define import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 from docking_box import calculate_docking_box
-from merge_xyzs import read_xyz, merge_xyz
-from evaluate_constraints import filter_conformations
+from merge_xyzs import merge_xyz
+from evaluate import filter_conformations
 
 # Configure logging to output to both console and file
 logger = logging.getLogger(__name__)
