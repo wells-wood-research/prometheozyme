@@ -52,7 +52,7 @@ ingredients:
     multiplicity: 1
     indices:
       h_donor: [3, 5, 6]
-      dir: [0, 1]
+      dir: [0, 6]
 
   - &lys
     name: lys
@@ -61,7 +61,7 @@ ingredients:
     multiplicity: 1
     indices:
       h_donor: 4
-      dir: [0, 1]
+      dir: [0, 4]
 
   - &his
     name: his
@@ -71,7 +71,7 @@ ingredients:
     indices:
       h_acceptor: 5
       h_donor: 3
-      dir: [0, 1]
+      dir: [0, 5]
 
   - &cys
     name: cys
@@ -111,7 +111,7 @@ ingredients:
     indices:
       h_acceptor: 5
       h_donor: 5
-      dir: [0, 1]
+      dir: [0, 5]
 
   - &phe
     name: phe
@@ -128,7 +128,7 @@ ingredients:
     multiplicity: 1
     indices:
       h_acceptor: [4, 5]
-      dir: [0, 1]
+      dir: [0, 5]
 
   - &gln
     name: gln
@@ -138,7 +138,7 @@ ingredients:
     indices:
       h_acceptor: 3
       h_donor: 4
-      dir: [0, 1]
+      dir: [0, 4]
 
   - &asp
     name: asp
@@ -148,7 +148,7 @@ ingredients:
     indices:
       h_acceptor: 2
       h_donor: 3
-      dir: [0, 1]
+      dir: [0, 3]
 
   - &asn
     name: asn
@@ -158,7 +158,7 @@ ingredients:
     indices:
       h_acceptor: 3
       h_donor: 2
-      dir: [0, 1]
+      dir: [0, 3]
 
 roles:
   - name: base
