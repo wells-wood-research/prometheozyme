@@ -94,7 +94,7 @@ def write_xyz(filename, comment, coords, atom_types):
         f.write(f"{len(coords)}\n")
         f.write(f"{comment}\n")
         for atom, (x, y, z) in zip(atom_types, coords):
-            f.write(f"{atom} {x:.6f} {y:.6f} {z:.6f}\n")
+            f.write(f"{atom} {x:27.17f} {y:27.17f} {z:27.17f}\n")
 
 def calculate_distance(coord1, coord2):
     """Calculate Euclidean distance between two 3D coordinates."""
