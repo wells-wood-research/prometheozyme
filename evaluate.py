@@ -68,8 +68,7 @@ def evaluate_backbone_out(dir, coordinates, atom_types, host_atom_count):
 
     host_coords = np.array([coord for atom, coord in zip(atom_types[:host_atom_count], coordinates[:host_atom_count]) if atom.upper() != 'H'])
 
-    option = "nearest"
-
+    option = "nearest" # doesn't work very well with 'center'
     if option == "center":
         # Option 1: Use center of host
         host_center = np.mean(host_coords, axis=0)
@@ -110,7 +109,7 @@ def filter_conformations(merged_path, host_path, name, role, indices, constraint
         # Check if all constraints are satisfied
         if not evaluate_backbone_out(dir, coordinates, atom_types, host_atom_count):
             all_constraints_satisfied = False
-            break
+            continue
         if constraints:
             for constraint in constraints:
                 guest_indices, guestType, host_indices, hostType, val = constraint
