@@ -83,7 +83,7 @@ def evaluate_backbone_out(dir, coordinates, atom_types, host_atom_count):
 
     return dot_product < 0 # True if guest faces away
 
-def filter_conformations(merged_path, host_path, name, role, indices, constraints, evaluate_backbone, logger):
+def filter_conformations(merged_path, host_path, name, role, indices, constraints, evaluate_backbone, logger=None):
     """Filter conformations in XYZ file based on multiple distance constraints."""
     # Get atom counts
     total_atoms = get_atom_count(merged_path)
@@ -134,9 +134,6 @@ def filter_conformations(merged_path, host_path, name, role, indices, constraint
         filtered_path = os.path.join(os.path.dirname(merged_path), f"{name}_{role}.xyz")
         with open(filtered_path, 'w') as f:
             for atom_count, comment, coordinates, atom_types in valid_structures:
-                f.write(f"{atom_count}\n")
-                f.write(f"{comment}\n")
-                for atom_type, coord in zip(atom_types, coordinates):
-                    f.write(f"{atom_type} {coord[0]:27.17f} {coord[1]:27.17f} {coord[2]:27.17f}\n")
+                write_xyz(f, comment, coordinates, atom_types)
     
     return valid_structures, filtered_path

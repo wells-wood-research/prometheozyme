@@ -1,4 +1,5 @@
 import numpy as np
+import io
 
 # Define atomic masses for center of mass calculation
 atomic_masses = {
@@ -20,7 +21,7 @@ def get_vdw_radius(atom):
     """Return the Van der Waals radius of an element."""
     return vdw_radii.get(atom, 1.7)  # Default to carbon if unknown
 
-def read_xyz(file_path, logger):
+def read_xyz(file_path, logger=None):
     """Read an XYZ file and return a list of (atom_count, comment, coordinates, atom_types) where coordinates is a numpy array."""
     with open(file_path, 'r') as f:
         lines = [line.strip() for line in f.readlines()]
@@ -80,6 +81,45 @@ def read_xyz(file_path, logger):
     
     return structures
 
+def merge_xyz(receptor_path, ligand_path, output_path):
+    """Merge receptor XYZ with each structure in a multi-XYZ ligand file."""
+    # Read receptor (single structure)
+    receptor_structures = read_xyz(receptor_path)
+    if not receptor_structures:
+        raise ValueError("Receptor file is empty or invalid")
+    receptor_count, receptor_comment, receptor_coords, receptor_atom_types = receptor_structures[0]
+    
+    # Read ligand (potentially multi-XYZ)
+    ligand_structures = read_xyz(ligand_path)
+    if not ligand_structures:
+        raise ValueError("Ligand file is empty or invalid")
+    
+    # Write merged multi-XYZ file
+    with open(output_path, 'w') as f:
+        for ligand_count, ligand_comment, ligand_coords, ligand_atom_types in ligand_structures:
+            # Create comment for merged structure
+            merged_comment = f"Merged from {receptor_path} and {ligand_path} (structure)"
+            merged_coordinates = np.concatenate([receptor_coords, ligand_coords], axis=0)
+            merged_atom_types = receptor_atom_types + ligand_atom_types
+            write_xyz(f, merged_comment, merged_coordinates, merged_atom_types)
+
+def write_xyz(file, comment, coords, atom_types):
+    """Write coordinates to an XYZ file."""
+    def write_to_file(f):
+        """Write the XYZ content to the given file object."""
+        f.write(f"{len(coords)}\n")
+        f.write(f"{comment}\n")
+        for atom, (x, y, z) in zip(atom_types, coords):
+            f.write(f"{atom} {x:27.17f} {y:27.17f} {z:27.17f}\n")
+        f.write("\n")
+
+    # Handle file object or path
+    if isinstance(file, io.IOBase):
+        write_to_file(file)
+    elif isinstance(file, str):
+        with open(file, 'w') as f:
+            write_to_file(f)
+
 def get_atom_count(path):
     """Read host XYZ file and return number of host atoms."""
     with open(path, 'r') as f:
@@ -87,14 +127,6 @@ def get_atom_count(path):
         if len(lines) < 1:
             return 0
         return int(lines[0].strip())  # First line is atom count
-
-def write_xyz(filename, comment, coords, atom_types):
-    """Write coordinates to an XYZ file."""
-    with open(filename, 'w') as f:
-        f.write(f"{len(coords)}\n")
-        f.write(f"{comment}\n")
-        for atom, (x, y, z) in zip(atom_types, coords):
-            f.write(f"{atom} {x:27.17f} {y:27.17f} {z:27.17f}\n")
 
 def calculate_distance(coord1, coord2):
     """Calculate Euclidean distance between two 3D coordinates."""
@@ -120,3 +152,33 @@ def calculate_center_of_mass(coordinates, indices, atom_types):
     center_of_mass = np.sum(weighted_coords, axis=0) / np.sum(masses)
     
     return center_of_mass
+
+def read_score(filepath, logger=None):
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+
+    # Find the start of the results table
+    start_index = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("mode |  affinity"):
+            start_index = i + 3  # data starts 3 lines after the header line
+            break
+
+    # Parse the affinity column
+    affinities = []
+    if start_index is not None:
+        for line in lines[start_index:]:
+            parts = line.split()
+            if len(parts) >= 2:
+                try:
+                    affinity = float(parts[1])  # Second column is "affinity"
+                    affinities.append(affinity)
+                except ValueError:
+                    continue  # Skip lines that don't contain floats in expected place
+    else:
+        logger.error(f"No scores found in {filepath}!")
+
+    # Convert to NumPy array or DataFrame
+    affinity_array = np.array(affinities)
+
+    return affinity_array

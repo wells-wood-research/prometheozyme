@@ -6,7 +6,7 @@ import subprocess
 
 from define import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 from docking_box import calculate_docking_box
-from merge_xyzs import merge_xyz
+from utils import merge_xyz
 from evaluate import filter_conformations
 from arrange import arrange_guests
 
@@ -98,7 +98,7 @@ def setup(config):
     logger.debug(f"""Unique guests are:
                 {unique_guests_constraints}\n""")
     # Print missing guests after reduction for debugging
-    print_reduced(updated_guests_constraints, unique_guests_constraints, logger=logger)
+    print_reduced(updated_guests_constraints, unique_guests_constraints, logger)
 
     return role_objects, host, ingredient_map, unique_guests_constraints
 
@@ -139,8 +139,7 @@ def dock(host, ingredient, outdir, dock_params, redocking=False):
         "-o", os.path.join(outdir, "out.xyz"),
         "--atom_terms", os.path.join(outdir, "atom_terms"),
         "--exhaustiveness", str(dock_params['exhaustiveness']),
-        "--num_modes", str(dock_params['num_modes']),
-        "--quiet"
+        "--num_modes", str(dock_params['num_modes'])
     ]
 
     # Include optional parameters if not None or False
@@ -157,7 +156,8 @@ def dock(host, ingredient, outdir, dock_params, redocking=False):
     if dock_params.get("num_mc_steps", None):
         cmd.extend(["--num_mc_steps", str(dock_params['num_mc_steps'])])
 
-    subprocess.run(cmd, check=True)
+    with open(os.path.join(outdir, 'scores.txt'), 'w') as outfile:
+        subprocess.run(cmd, check=True, stdout=outfile, stderr=subprocess.STDOUT)
     logger.info(f"Docking for {ingredient.name} {'(redocking)' if redocking else ''} completed. Results saved in {outdir}")
     return os.path.join(outdir, "out.xyz")  # Return the path to the docked output file
 
@@ -186,13 +186,12 @@ def main(configPath):
         if ingredient.name == 'host':
             continue
         logger.info(f"Running gnina for ingredient: {ingredient.name}")
-        # docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
+        docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
         merged_path = os.path.join(outdir, f"docked_{ingredient.name}.xyz")
-        # merge_xyz(host.path, docked_output, merged_path)
+        merge_xyz(host.path, docked_output, merged_path)
         docked_guests.append(merged_path)
     logger.info(f"Docking completed. Results saved in {outdir}\n")
 
-    outdir = "/home/mchrnwsk/theozymes/docking/output_2025-06-11_12-52-32"
     # Evaluate constraints for each ingredient (list of unique guests)
     # for ingredient in unique_guests_constraints, delete in copy conformations that don't satisfy constraints
     for ing in unique_guests_constraints:
