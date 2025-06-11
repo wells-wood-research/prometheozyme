@@ -9,7 +9,7 @@ docking:
   size_x: null
   size_y: null
   size_z: null
-  scoring: ad4_scoring
+  scoring: vina #ad4_scoring
   cnn_scoring: none
   pose_sort_order: Energy
   addH: false
@@ -28,6 +28,8 @@ redocking:
   num_mc_steps: 20000
 
 # Define substrate and objects
+#!#!#!#! All hydrogen atoms ABSOLUTELY MUST be specified at the end of the XYZ files
+#!#!#!#! because gnina removes non-polar hydrogens and fucks with indexing
 ingredients:
   - &host
     name: host
@@ -35,14 +37,13 @@ ingredients:
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 7
-      h_donor: 5
-      n5: 44
-      n3: 31
-      o1: 22
-      o2: 23
-      ringMDL: [0, 1, 2, 3, 4, 6]
-      ringIAZ: [18, 21, 15, 27, 26, 14, 20, 17]
+      h_acceptor: 6
+      n5: 26
+      n3: 24
+      o1: 15
+      o2: 16
+      ringMDL: [0, 1, 2, 3, 4, 5]
+      ringIAZ: [23, 25, 18, 16, 24, 33, 17, 15, 22]
   
   - &arg
     name: arg
@@ -50,7 +51,8 @@ ingredients:
     charge: 1
     multiplicity: 1
     indices:
-      h_donor: [3, 5, 7]
+      h_donor: [3, 5, 6]
+      dir: [0, 1]
 
   - &lys
     name: lys
@@ -59,6 +61,7 @@ ingredients:
     multiplicity: 1
     indices:
       h_donor: 4
+      dir: [0, 1]
 
   - &his
     name: his
@@ -66,8 +69,9 @@ ingredients:
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 6
+      h_acceptor: 5
       h_donor: 3
+      dir: [0, 1]
 
   - &cys
     name: cys
@@ -77,6 +81,7 @@ ingredients:
     indices:
       h_acceptor: 1
       h_donor: 1
+      dir: [0, 1]
 
   - &ser
     name: ser
@@ -86,6 +91,7 @@ ingredients:
     indices:
       h_acceptor: 1
       h_donor: 1
+      dir: [0, 1]
 
   - &thr
     name: thr
@@ -95,6 +101,7 @@ ingredients:
     indices:
       h_acceptor: 2
       h_donor: 2
+      dir: [0, 2]
 
   - &tyr
     name: tyr
@@ -104,13 +111,15 @@ ingredients:
     indices:
       h_acceptor: 5
       h_donor: 5
+      dir: [0, 1]
 
   - &phe
     name: phe
     path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz
     charge: 0
     multiplicity: 1
-    indices: {}
+    indices:
+      dir: [0, 1]
 
   - &glu
     name: glu
@@ -119,6 +128,7 @@ ingredients:
     multiplicity: 1
     indices:
       h_acceptor: [4, 5]
+      dir: [0, 1]
 
   - &gln
     name: gln
@@ -128,6 +138,7 @@ ingredients:
     indices:
       h_acceptor: 3
       h_donor: 4
+      dir: [0, 1]
 
   - &asp
     name: asp
@@ -137,6 +148,7 @@ ingredients:
     indices:
       h_acceptor: 2
       h_donor: 3
+      dir: [0, 1]
 
   - &asn
     name: asn
@@ -144,8 +156,9 @@ ingredients:
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 5
+      h_acceptor: 3
       h_donor: 2
+      dir: [0, 1]
 
 roles:
   - name: base
