@@ -60,7 +60,18 @@ def evaluate_constraint(coordinates, atom_types, guest_indices, guestType, host_
         logger.error(f"Invalid constraint types: guestType={guestType}, hostType={hostType}")
         return False
 
-def filter_conformations(merged_path, host_path, name, role, constraints, logger):
+def evaluate_backbone_out(dir, coordinates, atom_types, host_atom_count):
+    closer = coordinates[dir[0] + host_atom_count]
+    further = coordinates[dir[1] + host_atom_count]
+    for atom, coords in zip(atom_types[:host_atom_count], coordinates[:host_atom_count]):
+        if atom.upper() != "H":
+            dist_to_further = calculate_distance(further, coords)
+            dist_to_closer = calculate_distance(closer, coords)
+            if dist_to_closer - 0.5 <= dist_to_further <= dist_to_closer + 0.5:
+                return False
+    return True
+
+def filter_conformations(merged_path, host_path, name, role, indices, constraints, logger):
     """Filter conformations in XYZ file based on multiple distance constraints."""
     # Get atom counts
     total_atoms = get_atom_count(merged_path)
@@ -76,20 +87,27 @@ def filter_conformations(merged_path, host_path, name, role, constraints, logger
         logger.error(f"No conformations found in {merged_path}")
         return
     
+    # Get atom indices for direction (backbone orientation) check
+    dir = getattr(indices, "dir", [0,1])
+    
     # Filter conformations
     valid_structures = []
     for atom_count, comment, coordinates, atom_types in structures:
-        # Check if all constraints are satisfied
         all_constraints_satisfied = True
-        for constraint in constraints:
-            guest_indices, guestType, host_indices, hostType, val = constraint
-            if guest_indices == "all":
-                guest_indices = list(range(0, guest_atom_count))
-            if host_indices == "all":
-                host_indices = list(range(0, host_atom_count))
-            if not evaluate_constraint(coordinates, atom_types, guest_indices, guestType, host_indices, hostType, val, host_atom_count, logger):
-                all_constraints_satisfied = False
-                break
+        # Check if all constraints are satisfied
+        if not evaluate_backbone_out(dir, coordinates, atom_types, host_atom_count):
+            all_constraints_satisfied = False
+            break
+        if constraints:
+            for constraint in constraints:
+                guest_indices, guestType, host_indices, hostType, val = constraint
+                if guest_indices == "all":
+                    guest_indices = list(range(0, guest_atom_count))
+                if host_indices == "all":
+                    host_indices = list(range(0, host_atom_count))
+                if not evaluate_constraint(coordinates, atom_types, guest_indices, guestType, host_indices, hostType, val, host_atom_count, logger):
+                    all_constraints_satisfied = False
+                    break
         
         if all_constraints_satisfied:
             valid_structures.append((atom_count, comment, coordinates, atom_types))

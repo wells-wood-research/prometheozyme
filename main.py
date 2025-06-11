@@ -185,13 +185,13 @@ def main(configPath):
         if ingredient.name == 'host':
             continue
         logger.info(f"Running gnina for ingredient: {ingredient.name}")
-        #docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
+        # docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
         merged_path = os.path.join(outdir, f"docked_{ingredient.name}.xyz")
         # merge_xyz(host.path, docked_output, merged_path)
         docked_guests.append(merged_path)
     logger.info(f"Docking completed. Results saved in {outdir}\n")
 
-    outdir = "/home/mchrnwsk/theozymes/docking/output_2025-06-10_14-31-33"
+    outdir = "/home/mchrnwsk/theozymes/docking/output_2025-06-11_12-52-32"
     # Evaluate constraints for each ingredient (list of unique guests)
     # for ingredient in unique_guests_constraints, delete in copy conformations that don't satisfy constraints
     for ing in unique_guests_constraints:
@@ -203,10 +203,7 @@ def main(configPath):
             continue
 
         # Filter conformations that don't satisfy constraints - only valid written to filtered_path
-        if not ing.constraints:
-            logger.info(f"No constraints for ingredient {ing.name}, skipping evaluation.")
-            continue
-        valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.constraints, logger)
+        valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, logger)
         if len(valid_structures) == 0:
             # Repeat docking with redocking parameters
             logger.warning(f"No poses that satisfy constraints found on first docking attempt. More granular redocking...")
@@ -216,7 +213,7 @@ def main(configPath):
             docked_output = dock(host, ingredient_map[ing.name], outdir, redock_dock_params, redocking=True)
             merged_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
             merge_xyz(host.path, docked_output, merged_path)
-            valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.constraints, logger)
+            valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, logger)
             if len(valid_structures) == 0:
                 logger.error(f"No poses that satisfy constraints {ing.constraints} for {ing.name}, role: {ing.role_title} found on repeat docking.")
                 continue
