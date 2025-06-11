@@ -1,5 +1,6 @@
 import numpy as np
 import io
+import os
 
 # Define atomic masses for center of mass calculation
 atomic_masses = {
@@ -182,3 +183,24 @@ def read_score(filepath, logger=None):
     affinity_array = np.array(affinities)
 
     return affinity_array
+
+def append_scores(xyz_file, scores_file, logger=None):
+    structures = read_xyz(xyz_file, logger=logger)
+    scores = read_score(scores_file, logger=logger)
+
+    if len(structures) != len(scores):
+        if logger:
+            logger.error(f"Mismatch: {len(structures)} structures vs {len(scores)} scores in {xyz_file}")
+        else:
+            raise ValueError(f"Mismatch: {len(structures)} structures vs {len(scores)} scores")
+
+    temp_output = xyz_file + ".tmp"
+
+    with open(temp_output, 'w') as f:
+        for i, (atom_count, comment, coordinates, atom_types) in enumerate(structures):
+            score = scores[i]
+            new_comment = f"{score:.7f}"
+            write_xyz(f, new_comment, coordinates, atom_types)
+
+    # Replace original file only after successful write
+    os.replace(temp_output, xyz_file)

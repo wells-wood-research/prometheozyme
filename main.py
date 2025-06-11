@@ -6,7 +6,7 @@ import subprocess
 
 from define import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 from docking_box import calculate_docking_box
-from utils import merge_xyz
+from utils import merge_xyz, append_scores
 from evaluate import filter_conformations
 from arrange import arrange_guests
 
@@ -189,6 +189,7 @@ def main(configPath):
         docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
         merged_path = os.path.join(outdir, f"docked_{ingredient.name}.xyz")
         merge_xyz(host.path, docked_output, merged_path)
+        append_scores(merged_path, docked_output.replace("out.xyz", "scores.txt"), logger)
         docked_guests.append(merged_path)
     logger.info(f"Docking completed. Results saved in {outdir}\n")
 
