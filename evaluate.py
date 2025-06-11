@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 from utils import calculate_center_of_mass, calculate_distance, get_atom_count, read_xyz
 
@@ -61,15 +62,27 @@ def evaluate_constraint(coordinates, atom_types, guest_indices, guestType, host_
         return False
 
 def evaluate_backbone_out(dir, coordinates, atom_types, host_atom_count):
-    closer = coordinates[dir[0] + host_atom_count]
-    further = coordinates[dir[1] + host_atom_count]
-    for atom, coords in zip(atom_types[:host_atom_count], coordinates[:host_atom_count]):
-        if atom.upper() != "H":
-            dist_to_further = calculate_distance(further, coords)
-            dist_to_closer = calculate_distance(closer, coords)
-            if dist_to_closer - 0.5 <= dist_to_further <= dist_to_closer + 0.5:
-                return False
-    return True
+    cb = np.array(coordinates[dir[0] + host_atom_count])
+    cg = np.array(coordinates[dir[1] + host_atom_count])
+    sidechain_vec = cg - cb
+
+    host_coords = np.array([coord for atom, coord in zip(atom_types[:host_atom_count], coordinates[:host_atom_count]) if atom.upper() != 'H'])
+
+    option = "nearest"
+
+    if option == "center":
+        # Option 1: Use center of host
+        host_center = np.mean(host_coords, axis=0)
+        host_direction = host_center - cb
+    elif option == "nearest":
+        # Option 2: Use nearest host atom
+        distances = np.linalg.norm(host_coords - cb, axis=1)
+        nearest_host = host_coords[np.argmin(distances)]
+        host_direction = nearest_host - cb
+        
+    dot_product = np.dot(sidechain_vec, host_direction)
+
+    return dot_product < 0 # True if guest faces away
 
 def filter_conformations(merged_path, host_path, name, role, indices, constraints, logger):
     """Filter conformations in XYZ file based on multiple distance constraints."""
