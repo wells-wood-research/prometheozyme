@@ -9,7 +9,7 @@ docking:
   size_x: null
   size_y: null
   size_z: null
-  scoring: vina
+  scoring: ad4_scoring
   cnn_scoring: none
   pose_sort_order: Energy
   addH: false
@@ -21,6 +21,10 @@ redocking:
   num_modes: 100000
   min_rmsd_filter: 0.5
   temperature: 451
+  # """How many iterations each MC chain performs.
+  # By default is heuristically scaled based on number of degrees of freedom (more flexible ligands will take longer).
+  # ! SO this might not actually be better for more flexible ligands !
+  # Don't recommend using unless you want to do a "quick and dirty" docking run."""
   num_mc_steps: 20000
 
 # Define substrate and objects
