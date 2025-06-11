@@ -167,10 +167,11 @@ def main(configPath):
     with open(configPath, "r") as file:
         config = yaml.safe_load(file)
     logger.info(f"Loaded configuration from {configPath}\n")
-    paths = config.get("paths", {})
+    misc = config.get("misc", {})
     dock_params = config.get("docking", {})
     redock_params = config.get("redocking", {})
-    workdir = paths.get("workdir", ".")
+    evaluate_backbone = misc.get("evaluate_backbone", False)
+    workdir = misc.get("workdir", ".")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     outdir = os.path.join(workdir, f"output_{timestamp}")
 
@@ -203,7 +204,7 @@ def main(configPath):
             continue
 
         # Filter conformations that don't satisfy constraints - only valid written to filtered_path
-        valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, logger)
+        valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, evaluate_backbone, logger)
         if len(valid_structures) == 0:
             # Repeat docking with redocking parameters
             logger.warning(f"No poses that satisfy constraints found on first docking attempt. More granular redocking...")
@@ -213,7 +214,7 @@ def main(configPath):
             docked_output = dock(host, ingredient_map[ing.name], outdir, redock_dock_params, redocking=True)
             merged_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
             merge_xyz(host.path, docked_output, merged_path)
-            valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, logger)
+            valid_structures, filtered_path = filter_conformations(merged_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, evaluate_backbone, logger)
             if len(valid_structures) == 0:
                 logger.error(f"No poses that satisfy constraints {ing.constraints} for {ing.name}, role: {ing.role_title} found on repeat docking.")
                 continue
