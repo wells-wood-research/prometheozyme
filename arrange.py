@@ -17,7 +17,7 @@ class MaxArrangementsReached(Exception):
     """Custom exception to signal that the maximum number of arrangements has been found."""
     pass
 
-def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger):
+def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=None):
     """
     Finds a limited number of optimal and diverse arrangements of guests around a host,
     satisfying as many roles as possible according to their priority, and ensuring no
