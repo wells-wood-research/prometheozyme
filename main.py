@@ -192,7 +192,7 @@ def main(configPath):
         append_scores(merged_path, docked_output.replace("out.xyz", "scores.txt"), logger)
         docked_guests.append(merged_path)
     logger.info(f"Docking completed. Results saved in {outdir}\n")
-
+    
     # Evaluate constraints for each ingredient (list of unique guests)
     # for ingredient in unique_guests_constraints, delete in copy conformations that don't satisfy constraints
     for ing in unique_guests_constraints:
@@ -223,6 +223,11 @@ def main(configPath):
 
     # Satisfy roles according to their priorities
     arrange_guests(roles, unique_guests_constraints, host.path, outdir, logger)
+
+    logger.info("""
+          Main script complete!
+          ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆
+          """)
 
 if __name__ == "__main__":
     import argparse

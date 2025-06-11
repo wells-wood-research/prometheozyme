@@ -87,7 +87,7 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
                 current_signature_parts = []
                 for g_info in current_arrangement_guests_info:
                     current_signature_parts.append((g_info['obj'].id, g_info['obj'].role_title))
-                
+               
                 # Sort the parts to ensure a canonical representation regardless of order of addition
                 current_signature = tuple(sorted(current_signature_parts)) 
 
@@ -123,7 +123,6 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
                         combined_atom_types.extend(guest_info['atom_types'])
                         arrangement_comment_parts.append(f"{guest_info['obj'].name}({guest_info['obj'].role_title}@{guest_info['conf_idx']})")
 
-                    # Use the imported write_xyz function from utils.py
                     write_xyz(arrangement_output_path, " ".join(arrangement_comment_parts), np.array(combined_coords), combined_atom_types)
                     logger.info(f"Arrangement {saved_arrangements_count} saved to {arrangement_output_path}")
 
@@ -131,11 +130,7 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
                     if len(best_arrangement_info_per_signature) == MAX_FINAL_ARRANGEMENTS:
                         logger.info(f"Reached MAX_FINAL_ARRANGEMENTS ({MAX_FINAL_ARRANGEMENTS}) unique signature arrangements. Stopping search early.")
                         raise MaxArrangementsReached
-                    return True # A new or better arrangement was recorded
-                else:
-                    logger.debug(f"Arrangement for signature {current_signature} with energy {current_energy_sum:.3f} is not better than existing ({existing_best_info['total_energy_sum']:.3f}). Skipping.")
-                    return False # No new/better arrangement for this signature
-            return False # Not at max_satisfied_roles, so don't record
+            return # Simply return from base case, do not control parent loop flow
 
         current_role = roles[current_role_index]
         
@@ -194,7 +189,7 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
                             vdw_sum = get_vdw_radius(g1_atom_type) + get_vdw_radius(g2_atom_type)
                             if distance < vdw_sum * 0.7:
                                 overlap = True
-                                #logger.debug(f"Overlap detected: {guest_uc.name} (conf {conf_idx}) and {existing_guest_info['obj'].name}. Dist: {distance:.2f} vs VdW sum: {vdw_sum:.2f} (threshold: {vdw_sum*0.7:.2f})")
+                                # logger.debug(f"Overlap detected: {guest_uc.name} (conf {conf_idx}) and {existing_guest_info['obj'].name}. Dist: {distance:.2f} vs VdW sum: {vdw_sum:.2f} (threshold: {vdw_sum*0.7:.2f})")
                                 break
                         if overlap:
                             break
@@ -212,28 +207,24 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
                     }
                     new_arrangement_guests_info = current_arrangement_guests_info + [new_guest_info]
                     
-                    # Make recursive call and check if it led to a successful (recorded) arrangement
-                    arrangement_recorded_down_this_path = _recursively_arrange(
+                    _recursively_arrange(
                         current_role_index + 1,
                         new_arrangement_guests_info,
                         satisfied_roles_count + 1,
-                        current_energy_sum + conf_energy, # Pass updated sum
+                        current_energy_sum + conf_energy,
                     )
-                    if arrangement_recorded_down_this_path:
-                        # If a valid arrangement was recorded down this path,
-                        # we can omit further calculation for worse conformers of THIS guest at THIS role.
-                        return True 
+                    # If a valid, non-overlapping conformation is found for this guest,
+                    # and recursive call finishes (doesn't raise MaxArrangementsReached),
+                    # we can stop exploring other (worse energy) conformers for this specific guest.
+                    break 
 
         # Option 2: Do NOT satisfy the current role (skip it)
-        # We must still explore this path as it might lead to valid arrangements
-        # that satisfy fewer roles but are still optimal for that role count.
-        arrangement_recorded_down_this_path_skip_role = _recursively_arrange(
+        _recursively_arrange(
             current_role_index + 1,
             current_arrangement_guests_info, # Pass the same guests as before
             satisfied_roles_count,           # Do not increment satisfied_roles_count
             current_energy_sum               # Energy sum remains same
         )
-        return arrangement_recorded_down_this_path_skip_role # Propagate success/failure
 
     # Initial call to the recursive function
     try:
@@ -242,6 +233,7 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
     except MaxArrangementsReached:
         logger.info("Search terminated early as MAX_FINAL_ARRANGEMENTS limit was reached.")
 
+    logger.info(f"All possibilities for unique arrangements satisfying given constraints have been exhausted.")
     # Format the return value based on the best_arrangement_info_per_signature
     return_list = []
     # Sort the final list by total_energy_sum (most negative first) for consistent output
