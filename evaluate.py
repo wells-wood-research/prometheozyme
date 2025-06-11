@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from utils import calculate_center_of_mass, calculate_distance, get_atom_count, read_xyz
+from utils import calculate_center_of_mass, calculate_distance, get_atom_count, read_xyz, write_xyz
 
 def evaluate_constraint_iter(conformation_coords, guest_indices, host_indices, val, host_atom_count):
     """Evaluate constraints iteratively (any guest-host atom pair satisfying keeps the conformation)."""
@@ -126,6 +126,8 @@ def filter_conformations(merged_path, host_path, name, role, indices, constraint
             valid_structures.append((atom_count, comment, coordinates, atom_types))
 
     logger.info(f"Filtered {len(structures)} conformations to {len(valid_structures)} valid conformations")
+    
+    # TODO Adapt this to reuse write_xyz from utils
     filtered_path = None
     if len(valid_structures) != 0:
         # Write filtered conformations to new file to ensure docked output that might be needed later is not affected
