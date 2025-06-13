@@ -6,9 +6,10 @@ import subprocess
 
 from define import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 from docking_box import calculate_docking_box
-from utils import merge_xyz, append_scores
+from utils import read_xyz, merge_xyz, append_scores
 from evaluate import filter_conformations
 from arrange import arrange_guests
+from drOrca import make_orca_input
 
 # Configure logging to output to both console and file
 logger = logging.getLogger(__name__)
@@ -161,6 +162,68 @@ def dock(host, ingredient, outdir, dock_params, redocking=False):
     logger.info(f"Docking for {ingredient.name} {'(redocking)' if redocking else ''} completed. Results saved in {outdir}")
     return os.path.join(outdir, "out.xyz")  # Return the path to the docked output file
 
+
+def calculate_charge(charges):
+    return int(sum(charges))
+    
+def calculate_multiplicity(multiplicities):
+    # Assume molecules are weakly or non-interacting
+    return int(sum(m - 1 for m in multiplicities) / 2)
+
+def optimise(arr, path, host_atom_count):
+
+    arrName = os.path.splitext(os.path.basename(arr["path"]))[0]
+    orcaInputDir = os.path.join(os.path.dirname(arr["path"]), arrName) 
+    os.makedirs(orcaInputDir, exist_ok=True)
+    orcaInput = os.path.join(orcaInputDir, "opt.inp")
+
+    title = f"""Initial optimisation of {arrName}:\n
+                {arr["desc"]}"""
+    
+    qmMethod = "XTB2"
+    inputFormat = "xyzfile"
+
+    moleculeInfo = {"charge": calculate_charge([guest["obj"].charge for guest in arr["guests_info"]]),
+                    "multiplicity": calculate_multiplicity([guest["obj"].multiplicity for guest in arr["guests_info"]])}
+
+    parallelize = 8
+    maxcore = 2500
+
+    geom = {"keep": []}
+    for guest_info in arr["guests_info"]:
+        guest = guest_info["obj"]
+        constraints = guest.constraints
+        for constraint in guest.constraints:
+            guestIdx, hostIdx, val = constraint
+            guestIdx = host_atom_count + guestIdx
+            atoms = [guestIdx, hostIdx]
+            geom["keep"].append({"atoms": atoms, "val": val})
+
+    make_orca_input(orcaInput = orcaInput,
+                    title = title,
+                    qmMethod = qmMethod,
+                    inputFormat = inputFormat,
+                    inputFile = path,
+                    moleculeInfo = moleculeInfo,
+                    parallelize = parallelize,
+                    maxcore = maxcore,
+                    qmmm = None,
+                    geom = geom,
+                    neb = None,
+                    scf = None,
+                    docker = None)
+    arr_optimised = orcaInput.replace(".inp", ".xyz")
+    return arr_optimised
+
+def protonate(arr, path):
+    return None
+ 
+#def pull_backbone_out(arrangement, arr_optimised):
+#    return arr_reactant
+#
+#def prepare_product(arrangement, arr_reactant):
+#    return arr_product
+
 def main(configPath):
     configPath = "/home/mchrnwsk/theozymes/config.yaml"
     # Load the YAML file
@@ -179,6 +242,12 @@ def main(configPath):
     roles, host, ingredient_map, unique_guests_constraints = setup(config)
     # Sort roles by priority (lower number = higher priority, e.g., -1 is highest)
     roles = sorted(roles, key=lambda x: x.priority)
+
+    host_data = read_xyz(host.path, logger)
+    if not host_data:
+        logger.error(f"Could not read host file: {host.path}. Exiting arrangement process.")
+        return []
+    host_atom_count, host_comment, host_coords, host_atom_types = host_data[0]
 
     # Run gnina for each ingredients (constraints not evaluated here)
     docked_guests = []
@@ -222,7 +291,20 @@ def main(configPath):
         logger.info(f"Filtered conformations are saved in {filtered_path}")
 
     # Satisfy roles according to their priorities
-    arrange_guests(roles, unique_guests_constraints, host.path, outdir, logger)
+    sorted_final_arrangements = arrange_guests(roles, unique_guests_constraints, host.path, outdir, logger)
+
+    for arr in sorted_final_arrangements:
+        # protonate!
+        arr_protonated = protonate(arr, arr["path"], host_atom_count)
+        # simple constrained optimisation
+        arr_optimised = optimise(arr, arr_protonated)
+    #    # constrained optimisation with pulling backbone out
+    #    arr_reactant = pull_backbone_out(arr, arr_optimised)
+    #    # prepare product
+    #    arr_product = prepare_product(arr, arr_reactant)
+
+    #for arrangement in final_arrangements_list:
+        # run NEB
 
     logger.info("""
           Main script complete!
