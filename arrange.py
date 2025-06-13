@@ -12,7 +12,7 @@ class MaxArrangementsReached(Exception):
     """Custom exception to signal that the maximum number of arrangements has been found."""
     pass
 
-def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=None):
+def arrange_guests(roles, unique_guests_constraints, host_atom_count, host_coords, host_atom_types, outdir, logger=None):
     """
     Finds a limited number of optimal and diverse arrangements of guests around a host,
     satisfying as many roles as possible according to their priority, and ensuring no
@@ -55,14 +55,6 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
     max_satisfied_roles = -1
     saved_arrangements_count = 0 # Counter for naming output files sequentially
 
-    # Read host coordinates and atom types once for combining later
-    host_data = read_xyz(host_path, logger)
-    if not host_data:
-        logger.error(f"Could not read host file: {host_path}. Exiting arrangement process.")
-        return []
-    
-    host_atom_count, host_comment, host_coords, host_atom_types = host_data[0]
-
     # Recursive helper function to explore arrangements
     def _recursively_arrange(
         current_role_index,
@@ -86,7 +78,7 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
                 # The signature identifies the unique set of guests and the roles they satisfied.
                 current_signature_parts = []
                 for g_info in current_arrangement_guests_info:
-                    current_signature_parts.append((g_info['obj'].id, g_info['obj'].role_title))
+                    current_signature_parts.append((g_info['obj'].id, g_info['obj'].role_title, g_info['obj'].charge, g_info['obj'].multiplicity))
                
                 # Sort the parts to ensure a canonical representation regardless of order of addition
                 current_signature = tuple(sorted(current_signature_parts)) 
@@ -98,30 +90,33 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
                     # This is a new unique ingredient-role combination or an improved (lower energy) one
                     logger.debug(f"New/Improved arrangement found for signature {current_signature} with energy {current_energy_sum:.3f}.")
                     
+                    saved_arrangements_count += 1
+                    arrangement_output_path = os.path.join(outdir, f"arrangement_{saved_arrangements_count}.xyz")
+
+                    arrangement_comment_parts = [
+                        f"Arrangement {saved_arrangements_count} (Roles: {satisfied_roles_count}, Energy Sum: {current_energy_sum:.3f})"
+                    ]
+                    for guest_info in current_arrangement_guests_info:
+                        arrangement_comment_parts.append(f"{guest_info['obj'].name}({guest_info['obj'].role_title}@{guest_info['conf_idx']})")
+
                     # Store the details for output
                     arrangement_details_for_output = {
                         'guests_info': current_arrangement_guests_info,
                         'satisfied_roles_count': satisfied_roles_count,
-                        'total_energy_sum': current_energy_sum
+                        'total_energy_sum': current_energy_sum,
+                        'path': arrangement_output_path,
+                        'desc': " ".join(arrangement_comment_parts)
                     }
                     
                     best_arrangement_info_per_signature[current_signature] = arrangement_details_for_output
 
                     # Immediately output this arrangement
-                    saved_arrangements_count += 1
-                    arrangement_output_path = os.path.join(outdir, f"arrangement_{saved_arrangements_count}.xyz")
-                    
                     # Build comment and combine coordinates for output
                     combined_coords = host_coords.tolist()
                     combined_atom_types = host_atom_types[:]
-                    
-                    arrangement_comment_parts = [
-                        f"Arrangement {saved_arrangements_count} (Roles: {satisfied_roles_count}, Energy Sum: {current_energy_sum:.3f})"
-                    ]
                     for guest_info in current_arrangement_guests_info:
                         combined_coords.extend(guest_info['coords'].tolist())
                         combined_atom_types.extend(guest_info['atom_types'])
-                        arrangement_comment_parts.append(f"{guest_info['obj'].name}({guest_info['obj'].role_title}@{guest_info['conf_idx']})")
 
                     write_xyz(arrangement_output_path, " ".join(arrangement_comment_parts), np.array(combined_coords), combined_atom_types)
                     logger.info(f"Arrangement {saved_arrangements_count} saved to {arrangement_output_path}")
@@ -235,21 +230,12 @@ def arrange_guests(roles, unique_guests_constraints, host_path, outdir, logger=N
 
     logger.info(f"All possibilities for unique arrangements satisfying given constraints have been exhausted.")
     # Format the return value based on the best_arrangement_info_per_signature
-    return_list = []
+    final_arrangements_list = []
     # Sort the final list by total_energy_sum (most negative first) for consistent output
     sorted_final_arrangements = sorted(best_arrangement_info_per_signature.values(), 
                                        key=lambda x: x['total_energy_sum'])
 
-    for arr_item in sorted_final_arrangements:
-        return_list.append({
-            'guests': [
-                {'name': g_info['obj'].name, 'role_title': g_info['obj'].role_title, 'conformation_idx': g_info['conf_idx']}
-                for g_info in arr_item['guests_info']
-            ],
-            'satisfied_roles_count': arr_item['satisfied_roles_count']
-        })
-
-    if not return_list:
+    if not sorted_final_arrangements:
         logger.info("No valid arrangements could be found satisfying any roles within the given limits.")
 
-    return return_list
+    return sorted_final_arrangements
