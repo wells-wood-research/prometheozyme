@@ -1,40 +1,26 @@
-from pdbUtils import pdbUtils
-import pandas as pd
-import argparse
+from pymol import cmd
 import os
-import re
-from typing import Optional, List
 
-from rdkit import Chem as RDchem
-from rdkit.Chem import Draw
-from rdkit.Chem import rdDetermineBonds
-from rdkit.Chem import AllChem as RDchem
-from rdkit.Chem import rdFMCS
-from rdkit.Chem import rdForceFieldHelpers as RDforceFields
-from rdkit.Chem import Descriptors
+def protonate(path=None, unprotonatedIdx=None):
+    # Load your molecule (replace 'molecule.pdb' with your file)
+    cmd.load(path, 'mol')
 
-from utils.errors import XYZFileFormatError, SubstructureNotFound, StructureNotOptimised
+    # Add hydrogens to the molecule
+    cmd.h_add('mol')
 
-def load_molecule(molec: str) -> tuple[pd.DataFrame, RDchem.Mol]:
-    """
-    Read molecule structure file into a pandas dataframe, handing PDB and XYZ file formats.
+    # Define the list of atom indices (example: 10, 15, 20) to remove
+    if unprotonatedIdx:
+        # Convert orca indices to a PyMOL selection string
+        pymol_indices = [x+1 for x in unprotonatedIdx]
+        index_selection = '+'.join(str(i) for i in pymol_indices)
+        # Note: Use 'neighbor' to select hydrogens bonded to the target atoms
+        cmd.remove(f'elem H and neighbor (index {index_selection})')
 
-    Args:
-        molec (str): Absolute path to a molecule structure file.
+    # Save the modified structure with hydrogens (optional)
+    outfile = f"{os.path.splitext(path)[0]}_Hs{os.path.splitext(path)[1]}"
+    cmd.save(outfile, 'mol', state=0, format='pdb', quiet=0)
 
-    Returns:
-        pd.DataFrame:   Dataframe describing the input structure with columns:
-                        ['ATOM', 'ATOM_ID', 'ATOM_NAME', 'RES_NAME', 'CHAIN_ID', 'RES_ID', 'X', 'Y', 'Z', 'OCCUPANCY', 'BETAFACTOR', 'ELEMENT']
-        RDchem.Mol:     RDKit molecule object constructred from the input structure file
-    """
-    name, extension = get_file_format(molec)
-    if extension == "pdb":
-        df = pdbUtils.pdb2df(molec)
-        mol = RDchem.rdmolfiles.MolFromPDBFile(molec)
-    else:
-        # Assume .xyz as checked at get_file_format level
-        df = xyz2df(molec)
-        mol = RDchem.rdmolfiles.MolFromXYZFile(molec)
-        RDchem.rdDetermineBonds.DetermineBonds(mol,charge=0) # TODO Must allow user to input their charge
-    mol.SetProp("name", name)
-    return df, mol, name
+path = "/home/mchrnwsk/theozymes/docking/output_2025-06-13_15-04-14/arg_1.pdb"
+unprotonatedIdx = []
+
+protonate(path, unprotonatedIdx)

@@ -10,6 +10,7 @@ from utils import read_xyz, merge_xyz, append_scores
 from evaluate import filter_conformations
 from arrange import arrange_guests
 from drOrca import make_orca_input
+from protonate import protonate
 
 # Configure logging to output to both console and file
 logger = logging.getLogger(__name__)
@@ -215,9 +216,6 @@ def optimise(arr, path, host_atom_count):
     arr_optimised = orcaInput.replace(".inp", ".xyz")
     return arr_optimised
 
-def protonate(arr, path):
-    return None
- 
 #def pull_backbone_out(arrangement, arr_optimised):
 #    return arr_reactant
 #
@@ -256,8 +254,9 @@ def main(configPath):
             continue
         logger.info(f"Running gnina for ingredient: {ingredient.name}")
         docked_output = dock(host, ingredient, outdir, dock_params, redocking=False)
+        protonated_output = protonate(docked_output, getattr(ingredient.indices, "protonate", [0]))
         merged_path = os.path.join(outdir, f"docked_{ingredient.name}.xyz")
-        merge_xyz(host.path, docked_output, merged_path)
+        merge_xyz(host.path, protonated_output, merged_path)
         append_scores(merged_path, docked_output.replace("out.xyz", "scores.txt"), logger)
         docked_guests.append(merged_path)
     logger.info(f"Docking completed. Results saved in {outdir}\n")
@@ -291,13 +290,11 @@ def main(configPath):
         logger.info(f"Filtered conformations are saved in {filtered_path}")
 
     # Satisfy roles according to their priorities
-    sorted_final_arrangements = arrange_guests(roles, unique_guests_constraints, host.path, outdir, logger)
+    sorted_final_arrangements = arrange_guests(roles, unique_guests_constraints, host_atom_count, host_coords, host_atom_types, outdir, logger)
 
     for arr in sorted_final_arrangements:
-        # protonate!
-        arr_protonated = protonate(arr, arr["path"], host_atom_count)
         # simple constrained optimisation
-        arr_optimised = optimise(arr, arr_protonated)
+        arr_optimised = optimise(arr, arr)
     #    # constrained optimisation with pulling backbone out
     #    arr_reactant = pull_backbone_out(arr, arr_optimised)
     #    # prepare product
