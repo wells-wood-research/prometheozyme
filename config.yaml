@@ -43,6 +43,7 @@ ingredients:
       n3: 24
       o1: 15
       o2: 16
+      h1: 27
       ringMDL: [0, 1, 2, 3, 4, 5]
       ringIAZ: [23, 25, 18, 16, 24, 33, 17, 15, 22]
   
@@ -54,6 +55,7 @@ ingredients:
     indices:
       h_donor: [3, 5, 6]
       dir: [0, 6]
+      protonate: [0, 1, 2, 3, 5, 6]
 
   - &lys
     name: lys
@@ -63,6 +65,7 @@ ingredients:
     indices:
       h_donor: 4
       dir: [0, 4]
+      protonate: [0, 1, 2, 3, 4]
 
   - &his
     name: his
@@ -73,6 +76,7 @@ ingredients:
       h_acceptor: 5
       h_donor: 3
       dir: [0, 5]
+      protonate: [0, 2, 3, 4]
 
   - &cys
     name: cys
@@ -83,6 +87,7 @@ ingredients:
       h_acceptor: 1
       h_donor: 1
       dir: [0, 1]
+      protonate: [0, 1]
 
   - &ser
     name: ser
@@ -93,6 +98,7 @@ ingredients:
       h_acceptor: 1
       h_donor: 1
       dir: [0, 1]
+      protonate: [0, 1]
 
   - &thr
     name: thr
@@ -113,6 +119,7 @@ ingredients:
       h_acceptor: 5
       h_donor: 5
       dir: [0, 5]
+      protonate: [0, 1, 2]
 
   - &phe
     name: phe
@@ -121,6 +128,7 @@ ingredients:
     multiplicity: 1
     indices:
       dir: [0, 1]
+      protonate: [0, 2, 3, 4, 5, 6]
 
   - &glu
     name: glu
@@ -130,6 +138,7 @@ ingredients:
     indices:
       h_acceptor: [4, 5]
       dir: [0, 5]
+      protonate: [0, 1, 2]
 
   - &gln
     name: gln
@@ -140,6 +149,7 @@ ingredients:
       h_acceptor: 3
       h_donor: 4
       dir: [0, 4]
+      protonate: [0, 1, 4]
 
   - &asp
     name: asp
@@ -160,6 +170,7 @@ ingredients:
       h_acceptor: 3
       h_donor: 2
       dir: [0, 3]
+      protonate: [0, 3]
 
 roles:
   - name: base
@@ -170,7 +181,7 @@ roles:
       - *cys
     constraints:
       - guestIdx: h_acceptor
-        hostIdx: h_donor
+        hostIdx: h1
         val: 3.0
     priority: -1
   - name: stabSubO
