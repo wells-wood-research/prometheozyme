@@ -17,10 +17,7 @@ def protonate(path=None, unprotonatedIdx=None):
         cmd.remove(f'elem H and neighbor (index {index_selection})')
 
     # Save the modified structure with hydrogens (optional)
-    outfile = f"{os.path.splitext(path)[0]}_Hs{os.path.splitext(path)[1]}"
+    outfile = f"{os.path.splitext(path)[0]}_Hs.pdb"
     cmd.save(outfile, 'mol', state=0, format='pdb', quiet=0)
 
-path = "/home/mchrnwsk/theozymes/docking/output_2025-06-13_15-04-14/arg_1.pdb"
-unprotonatedIdx = []
-
-protonate(path, unprotonatedIdx)
+    return outfile
