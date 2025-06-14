@@ -1,6 +1,8 @@
 import numpy as np
 import argparse
 from typing import Tuple, List
+import subprocess
+import os
 
 # Van der Waals radii in Angstroms for common elements
 VDW_RADII = {
@@ -102,6 +104,66 @@ def main(receptor, ligand, padding):
     print(f"  size_x: {size_x:.3f} Å")
     print(f"  size_y: {size_y:.3f} Å")
     print(f"  size_z: {size_z:.3f} Å")
+
+def dock(host, ingredient, outdir, dock_params, redocking=False, logger=None):
+    receptor = host.path
+    ligand = ingredient.path
+    outdir = os.path.join(outdir, ingredient.name)
+    os.makedirs(outdir, exist_ok=True)  # Ensure output directory exists
+    
+    # Calculate docking box
+    center_x, center_y, center_z, size_x, size_y, size_z = calculate_docking_box(receptor, ligand, padding=5.0)
+    
+    # Update dock_params with docking box coordinates
+    dock_params = dock_params.copy()  # Avoid modifying the original
+    dock_params.update({
+        'center_x': center_x,
+        'center_y': center_y,
+        'center_z': center_z,
+        'size_x': size_x,
+        'size_y': size_y,
+        'size_z': size_z
+    })
+
+    # Construct the command as a list
+    cmd = [
+        "gnina",
+        "-r", receptor,
+        "-l", ligand,
+        "--center_x", str(dock_params['center_x']),
+        "--center_y", str(dock_params['center_y']),
+        "--center_z", str(dock_params['center_z']),
+        "--size_x", str(dock_params['size_x']),
+        "--size_y", str(dock_params['size_y']),
+        "--size_z", str(dock_params['size_z']),
+        "--scoring", dock_params['scoring'],
+        "--cnn_scoring", dock_params['cnn_scoring'],
+        "--pose_sort_order", dock_params['pose_sort_order'],
+        "-o", os.path.join(outdir, "out.xyz"),
+        "--atom_terms", os.path.join(outdir, "atom_terms"),
+        "--exhaustiveness", str(dock_params['exhaustiveness']),
+        "--num_modes", str(dock_params['num_modes'])
+    ]
+
+    # Include optional parameters if not None or False
+    if dock_params['addH']:
+        cmd.append("--addH")
+    if dock_params['stripH']:
+        cmd.append("--stripH")
+    if dock_params.get("no_gpu", False):
+       cmd.append("--no_gpu")
+    if dock_params.get("min_rmsd_filter", None):
+        cmd.extend(["--min_rmsd_filter", str(dock_params['min_rmsd_filter'])])
+    if dock_params.get("temperature", None):
+        cmd.extend(["--temperature", str(dock_params['temperature'])])
+    if dock_params.get("num_mc_steps", None):
+        cmd.extend(["--num_mc_steps", str(dock_params['num_mc_steps'])])
+
+    with open(os.path.join(outdir, 'scores.txt'), 'w') as outfile:
+        subprocess.run(cmd, check=True, stdout=outfile, stderr=subprocess.STDOUT)
+    logger.info(f"Docking for {ingredient.name} {'(redocking)' if redocking else ''} completed. Results saved in {outdir}")
+    return os.path.join(outdir, "out.xyz")  # Return the path to the docked output file
+
 
 if __name__ == '__main__':
     """Calculate docking box parameters from receptor and ligand XYZ files."""
