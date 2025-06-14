@@ -413,7 +413,7 @@ def split_df_by_H(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     return dfNotH, dfH
 
-def reindex(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple[int], match2: tuple[int], diff1: list, diff2: list) -> tuple[pd.DataFrame, pd.DataFrame]:
+def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple[int], match2: tuple[int], diff1: list, diff2: list) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Reindex two DataFrames to match indices between elements that are in common, and appending the unique elements at the end.
     Indices of the reference (df1) are maintained, while referee (df2) is reindexed. Hydrogen atoms are preserved by splitting
@@ -530,7 +530,7 @@ def pad_to_match(df1: pd.DataFrame, df2: pd.DataFrame) -> tuple[pd.DataFrame, pd
 
 #############################################################################################################
 
-def main(reference: str, referee: str, outDir: str):
+def reindex(reference: str, referee: str, outDir: str):
     """
     TODO
     Loads reference molecule (index maintained) and referee molecule (reindexed to match reference).
@@ -566,7 +566,7 @@ def main(reference: str, referee: str, outDir: str):
 
     # Reindex the referee dataframe to match atom indices of reference
     # Atoms unique to each molecule are moved to the end rows of the dataframe
-    df1new, df2new = reindex(df1, df2, match1, match2, diff1, diff2)
+    df1new, df2new = get_reindexed_dataframes(df1, df2, match1, match2, diff1, diff2)
     # Save to xyz files
     df2xyz(df1new, f"{os.path.join(outDir, name1+'_reidx.xyz')}")
     df2xyz(df2new, f"{os.path.join(outDir, name2+'_reidx.xyz')}")
