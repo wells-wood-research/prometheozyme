@@ -401,7 +401,7 @@ def split_df_by_H(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         indicating that no hydrogen atoms were found in the DataFrame. The second DataFrame in this case will be empty.
     """
     # Check if either ATOM_NAME or ELEMENT is 'H' to identify hydrogen atoms
-    isH = df['ELEMENT'].str.upper().eq('H')
+    isH = df['ATOM_NAME'].str.upper().str.match(r'^H\d*$')
 
     # Split DataFrame
     dfNotH = df[~isH].copy()  # Rows where atom is not hydrogen
@@ -496,8 +496,12 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
         df2new = pd.concat([df2new, df2H])
 
     # Sort by index to ensure consistent order
-    df1new = df1new.sort_index()
-    df2new = df2new.sort_index()
+    df1new.reset_index(drop=True, inplace=True)
+    df2new.reset_index(drop=True, inplace=True)
+
+    # Reset ATOM_ID to match new row order (1-based)
+    df1new['ATOM_ID'] = range(1, len(df1new) + 1)
+    df2new['ATOM_ID'] = range(1, len(df2new) + 1)
 
     # Ensure reference and referee have the same number of rows if needed
     # df1new, df2new = pad_to_match(df1new, df2new)
@@ -530,7 +534,7 @@ def pad_to_match(df1: pd.DataFrame, df2: pd.DataFrame) -> tuple[pd.DataFrame, pd
 
 #############################################################################################################
 
-def reindex(reference: str, referee: str, outDir: str, reindex_output_name, visualise=False, print=False, logger=None) -> Optional[str]:
+def reindex(reference: str, referee: str, outDir: str, visualise=False, print=False, logger=None) -> Optional[str]:
     """
     Loads reference molecule (index maintained) and referee molecule (reindexed to match reference).
     Reindexes referee to match reference using RDKit's MCS, logging specific failures and returning None if unsuccessful.
@@ -592,7 +596,7 @@ def reindex(reference: str, referee: str, outDir: str, reindex_output_name, visu
         return None
 
     # Save to xyz and pdb files
-    referee_reindexed = os.path.join(outDir, f"{name2}_reidx_{reindex_output_name:06d}")
+    referee_reindexed = os.path.join(outDir, f"{name2}_reidx")
     try:
         #df2xyz(df2new, f"{referee_reindexed}.xyz")
         pdbUtils.df2pdb(df2new, f"{referee_reindexed}.pdb")
