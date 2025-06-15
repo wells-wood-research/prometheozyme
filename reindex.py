@@ -460,8 +460,8 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
     df2new = df2NotH.copy()
 
     # Reindex referee DataFrame for common non-hydrogen elements
-    df1common = df1new.loc[idx1common].copy() if idx1common else pd.DataFrame(columns=df1new.columns)
-    df2common = df2new.loc[idx2common].copy() if idx2common else pd.DataFrame(columns=df2new.columns)
+    df1common = df1new.iloc[idx1common].copy() if idx1common else pd.DataFrame(columns=df1new.columns)
+    df2common = df2new.iloc[idx2common].copy() if idx2common else pd.DataFrame(columns=df2new.columns)
 
     # Assign new indices to referee to match reference
     if not df2common.empty:
@@ -530,45 +530,76 @@ def pad_to_match(df1: pd.DataFrame, df2: pd.DataFrame) -> tuple[pd.DataFrame, pd
 
 #############################################################################################################
 
-def reindex(reference: str, referee: str, outDir: str, visualise=False, print=False, logger=None):
+def reindex(reference: str, referee: str, outDir: str, reindex_output_name, visualise=False, print=False, logger=None) -> Optional[str]:
     """
-    TODO
     Loads reference molecule (index maintained) and referee molecule (reindexed to match reference).
-    Check if molecules are isomers of each other (otherwise raise RuntimeError), and if they have same SMILES strings.
-    If yes, then reindex using RDKit; otherwise perform manual reindexing. (TODO compare fragments?)
+    Reindexes referee to match reference using RDKit's MCS, logging specific failures and returning None if unsuccessful.
 
     Args:
-        reference (str):       Absolute path to a reference molecule structure file.
-        referee (str):       Absolute path to a referee molecule structure file.
-        suffix (str):       Suffix to append to name of referee molecule when saving with reindexed atoms.
-        outFormat (str):    Structure file format to save output in, choices allowed from IMPLEMENTED_EXTENSIONS
+        reference (str): Absolute path to a reference molecule structure file.
+        referee (str): Absolute path to a referee molecule structure file.
+        outDir (str): Directory to save reindexed files.
+        reindex_output_name: Identifier for output file naming.
+        visualise (bool): Whether to visualize (not implemented).
+        print (bool): Whether to print (not implemented).
+        logger: Logger instance for error reporting.
 
     Returns:
-        TODO
-        Optional[str]: Extension format of the input file without the leading dot,
-                       or None if the format is not supported.
+        Optional[str]: Path to reindexed PDB file, or None if reindexing fails.
 
     Raises:
-        TODO
-        TypeError: If the input is not a string.
-        ValueError: If the file path is empty or has no extension.
+        Exceptions are caught internally and logged; None is returned on failure.
     """
     os.makedirs(outDir, exist_ok=True)
 
     # Load structure files into dataframe, molecule, name
-    (df1, mol1, name1), (df2, mol2, name2) = load_molecule(reference), load_molecule(referee)
+    try:
+        (df1, mol1, name1) = load_molecule(reference)
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to load reference molecule {reference}: {str(e)}")
+        return None
+
+    try:
+        (df2, mol2, name2) = load_molecule(referee)
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to load referee molecule {referee}: {str(e)}")
+        return None
+
     # Get MCS, and indices of atoms matching it and unique to each molecule
-    mcs_mol = get_maximum_common_substructure(mol1, mol2)
-    match1, match2 = mol1.GetSubstructMatch(mcs_mol), mol2.GetSubstructMatch(mcs_mol)
-    diff1, diff2 = get_atom_difference(mol1, match1), get_atom_difference(mol2, match2)
+    try:
+        mcs_mol = get_maximum_common_substructure(mol1, mol2)
+    except Exception as e:  # Note: Original code raises SubstructureNotFound, assuming it's an Exception subclass
+        if logger:
+            logger.error(f"Could not find common substructure between {name1} and {name2}: {str(e)}")
+        return None
+
+    try:
+        match1, match2 = mol1.GetSubstructMatch(mcs_mol), mol2.GetSubstructMatch(mcs_mol)
+        diff1, diff2 = get_atom_difference(mol1, match1), get_atom_difference(mol2, match2)
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to compute substructure matches or differences for {name2}: {str(e)}")
+        return None
 
     # Reindex the referee dataframe to match atom indices of reference
-    # Atoms unique to each molecule are moved to the end rows of the dataframe
-    df1new, df2new = get_reindexed_dataframes(df1, df2, match1, match2, diff1, diff2)
-    # Save to xyz files
-    referee_reindexed = f"{os.path.join(outDir, name2+'_reidx.xyz')}"
-    # df2xyz(df1new, f"{os.path.join(outDir, name1+'_reidx.xyz')}") No point reindexing reference?
-    df2xyz(df2new, referee_reindexed)
+    try:
+        df1new, df2new = get_reindexed_dataframes(df1, df2, match1, match2, diff1, diff2)
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to reindex dataframes for {name2}: {str(e)}")
+        return None
+
+    # Save to xyz and pdb files
+    referee_reindexed = os.path.join(outDir, f"{name2}_reidx_{reindex_output_name:06d}")
+    try:
+        #df2xyz(df2new, f"{referee_reindexed}.xyz")
+        pdbUtils.df2pdb(df2new, f"{referee_reindexed}.pdb")
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to save reindexed files for {name2}: {str(e)}")
+        return None
 
     if visualise:
         save_image_difference(mol1, match1, mol2, match2, f"{outDir}/img_preindexed")
@@ -600,7 +631,7 @@ def reindex(reference: str, referee: str, outDir: str, visualise=False, print=Fa
         logger.debug(f"    Number of unpaired electrons: {Descriptors.NumRadicalElectrons(mol2reidx)}")
         logger.debug(f"    Formal chagre: {RDchem.rdmolops.GetFormalCharge(mol2reidx)}")
         
-    return referee_reindexed
+    return f"{referee_reindexed}.pdb"
 
 # Entry point for command-line execution
 if __name__ == "__main__":
@@ -614,6 +645,6 @@ if __name__ == "__main__":
     outDir = args.outDir
 
     try:
-        main(reference, referee, outDir)
+        reindex(reference, referee, outDir)
     except (ValueError, TypeError, RuntimeError) as e:
         print(f"Error: {e}")
