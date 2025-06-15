@@ -283,7 +283,7 @@ def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
                     # If this is not the very first model, save the previous one
                     if current_model_lines:
                         model_count += 1
-                        output_file_path = os.path.join(output_dir, f"model_{model_count:04d}.pdb")
+                        output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
                         with open(output_file_path, 'w') as out_f:
                             out_f.writelines(current_model_lines)
                         individual_pdb_paths.append(output_file_path)
@@ -292,7 +292,7 @@ def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
                 elif line.startswith("ENDMDL"):
                     current_model_lines.append(line)
                     model_count += 1
-                    output_file_path = os.path.join(output_dir, f"model_{model_count:04d}.pdb")
+                    output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
                     with open(output_file_path, 'w') as out_f:
                         out_f.writelines(current_model_lines)
                     individual_pdb_paths.append(output_file_path)
@@ -307,7 +307,7 @@ def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
                  with open(output_file_path, 'w') as out_f:
                      out_f.writelines(current_model_lines)
                  individual_pdb_paths.append(output_file_path)
-            elif current_model_lines and individual_pdb_paths and not individual_pdb_paths[-1].endswith(f"model_{model_count:04d}.pdb"):
+            elif current_model_lines and individual_pdb_paths and not individual_pdb_paths[-1].endswith(f"model_{model_count:06d}.pdb"):
                  # This handles cases where the last model doesn't have an ENDMDL
                  model_count += 1
                  output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
@@ -328,45 +328,25 @@ def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
         logger.info(f"Split {multi_pdb_path} into {len(individual_pdb_paths)} individual PDB files.")
     return individual_pdb_paths
 
-def write_multi_pdb(input_paths, output_path, logger=None):
+def write_multi_pdb(pdb_paths, output_path):
     """
-    Combines multiple PDB files into a single multi-PDB file.
-    
-    Each input PDB file is treated as a separate model in the output file.
-    Follows PDB formatting rules, using MODEL and ENDMDL records for each structure,
-    and terminating the file with END.
-    
+    Merge a list of individual PDB files into a single multi-model PDB file.
+
+    This function reads each input PDB file, extracts its "HETATM" lines until a "TER" line
+    (if present), and writes them to the output file as a separate model, enclosed between
+    "MODEL" and "ENDMDL" lines.
+
     Args:
-        input_paths (list of str): List of paths to input PDB files.
-        output_path (str): Path to the output multi-PDB file.
-        logger: Logger instance for warnings and errors (optional).
+        pdb_paths (list): List of file paths to the individual PDB files.
+        output_path (str): Path to the output multi-model PDB file.
     """
-    # Ensure output directory exists
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    with open(output_path, 'w') as outfile:
-        for i, path in enumerate(input_paths, start=1):
-            try:
-                with open(path, 'r') as infile:
-                    content = infile.readlines()
-                # Remove any MODEL, ENDMDL, or END lines from input files
-                content = [line for line in content if not line.startswith(("MODEL", "ENDMDL", "END"))]
-                # Write MODEL line with right-justified model number in columns 11-14
-                outfile.write(f"MODEL    {i:4d}\n")
-                # Write the filtered content
-                for line in content:
-                    outfile.write(line)
-                # Write ENDMDL to close the model
-                outfile.write("ENDMDL\n")
-            except FileNotFoundError:
-                if logger:
-                    logger.warning(f"File not found - {path}")
-                else:
-                    print(f"Warning: File not found - {path}")
-            except Exception as e:
-                if logger:
-                    logger.error(f"Error reading {path}: {e}")
-                else:
-                    print(f"Error reading {path}: {e}")
-        # Write END to terminate the file
-        outfile.write("END\n")
+    with open(output_path, 'w') as out_file:
+        for i, pdb_path in enumerate(pdb_paths, start=1):
+            out_file.write(f"MODEL        {i}\n")
+            with open(pdb_path, 'r') as in_file:
+                for line in in_file:
+                    if line.startswith("HETATM"):
+                        out_file.write(line)
+                    elif line.startswith("TER"):
+                        break
+            out_file.write("ENDMDL\n")
