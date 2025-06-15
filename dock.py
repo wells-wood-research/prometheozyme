@@ -105,11 +105,12 @@ def main(receptor, ligand, padding):
     print(f"  size_y: {size_y:.3f} Å")
     print(f"  size_z: {size_z:.3f} Å")
 
-def dock(host, ingredient, outdir, dock_params, redocking=False, logger=None):
+def dock(host, ing, outdir, dock_params, redocking=False, logger=None):
     receptor = host.path
-    ligand = ingredient.path
-    outdir = os.path.join(outdir, ingredient.name)
+    ligand = ing.path
+    outdir = os.path.join(outdir, ing.name)
     os.makedirs(outdir, exist_ok=True)  # Ensure output directory exists
+    outpath = os.path.join(outdir, f"{ing.name}_docked.pdb")
     
     # Calculate docking box
     center_x, center_y, center_z, size_x, size_y, size_z = calculate_docking_box(receptor, ligand, padding=5.0)
@@ -139,7 +140,7 @@ def dock(host, ingredient, outdir, dock_params, redocking=False, logger=None):
         "--scoring", dock_params['scoring'],
         "--cnn_scoring", dock_params['cnn_scoring'],
         "--pose_sort_order", dock_params['pose_sort_order'],
-        "-o", os.path.join(outdir, "out.pdb"),
+        "-o", outpath,
         "--atom_terms", os.path.join(outdir, "atom_terms"),
         "--exhaustiveness", str(dock_params['exhaustiveness']),
         "--num_modes", str(dock_params['num_modes'])
@@ -159,10 +160,10 @@ def dock(host, ingredient, outdir, dock_params, redocking=False, logger=None):
     if dock_params.get("num_mc_steps", None):
         cmd.extend(["--num_mc_steps", str(dock_params['num_mc_steps'])])
 
-    with open(os.path.join(outdir, 'scores.txt'), 'w') as outfile:
-        subprocess.run(cmd, check=True, stdout=outfile, stderr=subprocess.STDOUT)
-    logger.info(f"Docking for {ingredient.name} {'(redocking)' if redocking else ''} completed. Results saved in {outdir}")
-    return os.path.join(outdir, "out.pdb")  # Return the path to the docked output file
+    with open(os.path.join(outdir, 'scores.txt'), 'w') as o:
+        subprocess.run(cmd, check=True, stdout=o, stderr=subprocess.STDOUT)
+    logger.info(f"Docking for {ing.name} {'(redocking)' if redocking else ''} completed. Results saved in {outdir}")
+    return outpath
 
 
 if __name__ == '__main__':
