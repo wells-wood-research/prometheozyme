@@ -10,7 +10,7 @@ docking:
   size_x: null
   size_y: null
   size_z: null
-  scoring: ad4_scoring
+  scoring: vina
   cnn_scoring: none
   pose_sort_order: Energy
   addH: false
