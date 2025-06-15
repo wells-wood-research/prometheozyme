@@ -247,6 +247,26 @@ def append_scores(xyz_file, scores_file, logger=None):
     # Replace original file only after successful write
     os.replace(temp_output, xyz_file)
 
+def split_multi_xyz(multi_xyz_path, output_dir, logger=None):
+    """
+    Splits a multi-XYZ file into individual XYZ files.
+    """
+    individual_xyz_paths = []
+    structures = read_xyz(multi_xyz_path, logger)
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for i, (atom_count, comment, coords, atom_types) in enumerate(structures):
+        output_file_path = os.path.join(output_dir, f"structure_{i+1:04d}.xyz")
+        with open(output_file_path, 'w') as f:
+            write_xyz(f, comment, coords, atom_types)
+        individual_xyz_paths.append(output_file_path)
+
+    if logger:
+        logger.info(f"Split {multi_xyz_path} into {len(individual_xyz_paths)} individual XYZ files in {output_dir}")
+    return individual_xyz_paths
+
 def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
     """
     Splits a multi-PDB file into individual PDB files, one for each model.
@@ -283,14 +303,14 @@ def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
             # Save any remaining lines if the file doesn't end with ENDMDL after the last MODEL
             if current_model_lines and not individual_pdb_paths: # Case for single PDB without MODEL/ENDMDL
                  model_count += 1
-                 output_file_path = os.path.join(output_dir, f"model_{model_count:04d}.pdb")
+                 output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
                  with open(output_file_path, 'w') as out_f:
                      out_f.writelines(current_model_lines)
                  individual_pdb_paths.append(output_file_path)
             elif current_model_lines and individual_pdb_paths and not individual_pdb_paths[-1].endswith(f"model_{model_count:04d}.pdb"):
                  # This handles cases where the last model doesn't have an ENDMDL
                  model_count += 1
-                 output_file_path = os.path.join(output_dir, f"model_{model_count:04d}.pdb")
+                 output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
                  with open(output_file_path, 'w') as out_f:
                      out_f.writelines(current_model_lines)
                  individual_pdb_paths.append(output_file_path)
@@ -307,3 +327,46 @@ def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
     if logger:
         logger.info(f"Split {multi_pdb_path} into {len(individual_pdb_paths)} individual PDB files.")
     return individual_pdb_paths
+
+def write_multi_pdb(input_paths, output_path, logger=None):
+    """
+    Combines multiple PDB files into a single multi-PDB file.
+    
+    Each input PDB file is treated as a separate model in the output file.
+    Follows PDB formatting rules, using MODEL and ENDMDL records for each structure,
+    and terminating the file with END.
+    
+    Args:
+        input_paths (list of str): List of paths to input PDB files.
+        output_path (str): Path to the output multi-PDB file.
+        logger: Logger instance for warnings and errors (optional).
+    """
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    with open(output_path, 'w') as outfile:
+        for i, path in enumerate(input_paths, start=1):
+            try:
+                with open(path, 'r') as infile:
+                    content = infile.readlines()
+                # Remove any MODEL, ENDMDL, or END lines from input files
+                content = [line for line in content if not line.startswith(("MODEL", "ENDMDL", "END"))]
+                # Write MODEL line with right-justified model number in columns 11-14
+                outfile.write(f"MODEL    {i:4d}\n")
+                # Write the filtered content
+                for line in content:
+                    outfile.write(line)
+                # Write ENDMDL to close the model
+                outfile.write("ENDMDL\n")
+            except FileNotFoundError:
+                if logger:
+                    logger.warning(f"File not found - {path}")
+                else:
+                    print(f"Warning: File not found - {path}")
+            except Exception as e:
+                if logger:
+                    logger.error(f"Error reading {path}: {e}")
+                else:
+                    print(f"Error reading {path}: {e}")
+        # Write END to terminate the file
+        outfile.write("END\n")
