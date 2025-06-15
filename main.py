@@ -7,11 +7,13 @@ import shutil
 
 from define import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 from dock import dock
-from utils import read_xyz, write_xyz, merge_xyz, append_scores, get_atom_count, split_multi_pdb
+from utils import read_xyz, write_xyz, merge_xyz, split_multi_pdb, write_multi_pdb, append_scores, get_atom_count
 from evaluate import filter_conformations
 from arrange import arrange_guests
-from protonate import protonate
+from protonate import protonate_all, deprotonate_selected
 from reindex import reindex
+
+from pymol import cmd
 
 # Configure logging to output to both console and file
 logger = logging.getLogger(__name__)
@@ -120,11 +122,41 @@ def setup_ingredients(config):
 
     return role_objects, host, ingredient_map, unique_guests_constraints
 
+def process_reindexing(protonated_structures, reindex_reference_path, reindex_output_dir, ing_name, logger):
+    successful = []
+    failed = []
+    for idx, path in enumerate(protonated_structures):
+        reindexed_pdb_path = reindex(reindex_reference_path, path, reindex_output_dir, idx, logger=logger)
+        if reindexed_pdb_path is None:
+            if logger:
+                logger.info(f"Reindexing failed for pose {idx} of ingredient {ing_name}")
+            continue
+        successful.append(reindexed_pdb_path)
+
+    # Check if all poses failed
+    if not successful:
+        failed.append(ing_name)
+        if logger:
+            logger.warning(f"No poses were successfully reindexed for ingredient {ing_name}")
+    else:
+        if logger:
+            logger.info(f"For ingredient {ing_name}, {len(successful)} out of {len(protonated_structures)} poses were successfully reindexed")
+
+    return successful, failed
+
 def process_docking(ing, host, outdir, dock_params, redocking=False):
-    # Handles the docking, per-conformation protonation, and reindexing for a single ingredient.
+    # Handles the docking, per-conformation protonation, reindexing, and deprotonation for a single ingredient.
     logger.info(f"Processing docking for {ing.name}{' (redocking)' if redocking else ''}...")
-    processed_guest_structures = [] # This will store (atom_count, comment, coordinates, atom_types) in XYZ format
-    original_guest_atom_count = get_atom_count(ing.path, logger) # Atom count of original guest molecule
+    # Create a temporary directory for per-conformation processing
+    temp_processing_dir = os.path.join(outdir, f"temp_processing_{ing.name}")
+    prot_output_dir = os.path.join(temp_processing_dir, f"protonation")
+    reindex_output_dir = os.path.join(temp_processing_dir, f"reindexing")
+    deprot_output_dir = os.path.join(temp_processing_dir, f"deprotonation")
+    os.makedirs(prot_output_dir, exist_ok=True)
+    os.makedirs(reindex_output_dir, exist_ok=True)
+    os.makedirs(deprot_output_dir, exist_ok=True)
+
+    reference_atom_count = get_atom_count(ing.path, logger) # Atom count of original guest molecule
 
     # Perform initial docking
     docked_path = dock(host, ing, outdir, dock_params, redocking, logger)
@@ -132,60 +164,52 @@ def process_docking(ing, host, outdir, dock_params, redocking=False):
         logger.warning(f"Docked output for {ing.name} not found or is empty at {docked_path}. Skipping further processing.")
         return None
     
-    # Protonate output of initial docking
-    protonated_path, protonated_atom_count = protonate(docked_path, getattr(ing.indices, "deprotonate", []))
-    if not os.path.exists(protonated_path) or os.path.getsize(protonated_path) == 0:
-        logger.warning(f"Docked output for {ing.name} not found or is empty at {docked_path}. Skipping further processing.")
+    # Protonate output of initial docking on all atoms
+    prot_path, prot_atom_count = protonate_all(docked_path)
+    if not os.path.exists(prot_path) or os.path.getsize(prot_path) == 0:
+        logger.warning(f"Protonated output for {ing.name} not found or is empty at {prot_path}. Skipping further processing.")
         return None
-    if protonated_atom_count != original_guest_atom_count:
-        logger.warning(f"Discarding {ing.name}: protonation changed atom count from {original_guest_atom_count} to {protonated_atom_count}.")
-
-    # Create a temporary directory for per-conformation processing
-    temp_processing_dir = os.path.join(outdir, f"temp_processing_{ing.name}")
-    reindex_output_dir = os.path.join(temp_processing_dir, f"reindexing")
-    os.makedirs(reindex_output_dir, exist_ok=True)
 
     # Prepare reference for reindexing (PDB version of original ingredient)
-    ing_basename = os.path.splitext(os.path.basename(ing.path))[0]
-    ing_dir = os.path.dirname(ing.path)
-    reindex_reference_path = os.path.join(ing_dir, f"{ing_basename}.pdb")
+    reindex_reference_path = ing.path.replace(".xyz", ".pdb")
     if not os.path.exists(reindex_reference_path):
         logger.warning("Reference ingredient in PDB format not found - using XYZ instead; consider adding a PDB reference with same atom indices and path as XYZ.")
         reindex_reference_path = ing.path
 
-    protonated_structures = split_multi_pdb(protonated_path, temp_processing_dir, logger)
+    # Split the protonated multi-PDB into individual PDB files
+    protonated_structures = split_multi_pdb(prot_path, prot_output_dir, logger)
+    # Reindex protonated PDB files individually
+    successful, failed = process_reindexing(protonated_structures, reindex_reference_path, reindex_output_dir, ing.name, logger)
+    if failed:
+        logger.error(f"Reindexing failed for {ing.name}. Investigate output manually.")
+        logger.warning(f"Failed ingredients: {', '.join(failed)}")
+        return None, failed
+    # Merge protonated and reindexed PDB files into one multi-PDB file
+    multi_prot_path = os.path.join(outdir, ing.name, f"{ing.name}_docked_prot.pdb")
+    write_multi_pdb(successful, multi_prot_path, logger)
 
-    for idx, path in enumerate(protonated_structures):
-        try:
-            # Reindex protonated structures (referee) to match the original (reference)
-            os.makedirs(reindex_output_dir, exist_ok=True)
-            reindexed_path = reindex(reindex_reference_path, path, reindex_output_dir, logger=logger)
-            
-            if not os.path.exists(reindexed_path):
-                logger.error(f"Reindexed file not found at expected path: {reindexed_path}. Skipping pose {idx}.")
-                continue
-            
-            # Read the reindexed structure and add to list
-            reindexed_data = read_xyz(reindexed_path, logger)
-            if reindexed_data:
-                processed_guest_structures.append(reindexed_data[0]) # Assuming reindex_xyz gives one structure
-            else:
-                logger.warning(f"Failed to read reindexed structure from {reindexed_path}. Skipping pose {idx}.")
-
-        except Exception as e:
-            logger.error(f"Error processing pose {idx} for {ing.name}: {e}", exc_info=True)
-            continue # Continue to the next pose even if one fails
+    # Deprotonate specific atoms
+    deprot_path, deprot_atom_count = deprotonate_selected(multi_prot_path, getattr(ing.indices, "deprotonate", []))
+    if not os.path.exists(deprot_path):
+        logger.error(f"Deprotonated file not found at expected path: {deprot_path}.")
+    if deprot_atom_count != reference_atom_count:
+        failed.append(ing.name)
+        logger.error(f"Deprotonation failed for {ing.name}. Investigate output manually.")
+        logger.warning(f"Failed ingredients: {', '.join(failed)}")
+        return None, failed
     
-    # Merge all processed guest structures into a single multi-XYZ file
-    temp_multi_xyz_protonated_reindexed_guests_path = os.path.join(outdir, f"tmp_protonated_reindexed_{ing.name}.xyz")
-    with open(temp_multi_xyz_protonated_reindexed_guests_path, 'w') as f_out:
-        for atom_count, comment, coords, types in processed_guest_structures:
-            write_xyz(f_out, comment, coords, types) # Use write_xyz with file object
-    logger.info(f"All valid processed guest structures merged into: {temp_multi_xyz_protonated_reindexed_guests_path}")
+    # Convert protonated, reindexed, deprotonated multi-PDB file to multi-XYZ file
+    prot_reidx_deprot_pdb_path = deprot_path.replace(".pdb", ".xyz")
+    cmd = [
+        "obabel",
+        "-ipdb", deprot_path,
+        "-O", 
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     # Merge this multi-XYZ guest file with the host structure
-    final_merged_host_guest_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
-    merge_xyz(host.path, temp_multi_xyz_protonated_reindexed_guests_path, final_merged_host_guest_path)
+    final_merged_host_guest_path = os.path.join(outdir, f"{ing.name}.xyz")
+    merge_xyz(host.path, prot_reidx_deprot_pdb_path, final_merged_host_guest_path)
     logger.info(f"Final merged host-guest file saved to: {final_merged_host_guest_path}")
 
     # Append scores from gnina docking
