@@ -33,6 +33,7 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 
 def setup_config(configPath):
+    configPath = "/home/mchrnwsk/theozyme/his/theozymes/config.yaml"
     # Load the YAML file
     with open(configPath, "r") as file:
         config = yaml.safe_load(file)
@@ -126,7 +127,7 @@ def process_reindexing(protonated_structures, reindex_reference_path, reindex_ou
     successful = []
     failed = []
     for idx, path in enumerate(protonated_structures):
-        reindexed_pdb_path = reindex(reindex_reference_path, path, reindex_output_dir, idx, logger=logger)
+        reindexed_pdb_path = reindex(reindex_reference_path, path, reindex_output_dir, logger=logger)
         if reindexed_pdb_path is None:
             if logger:
                 logger.info(f"Reindexing failed for pose {idx} of ingredient {ing_name}")
@@ -186,7 +187,7 @@ def process_docking(ing, host, outdir, dock_params, redocking=False):
         return None, failed
     # Merge protonated and reindexed PDB files into one multi-PDB file
     multi_prot_path = os.path.join(outdir, ing.name, f"{ing.name}_docked_prot.pdb")
-    write_multi_pdb(successful, multi_prot_path, logger)
+    write_multi_pdb(successful, multi_prot_path)
 
     # Deprotonate specific atoms
     deprot_path, deprot_atom_count = deprotonate_selected(multi_prot_path, getattr(ing.indices, "deprotonate", []))
@@ -203,8 +204,8 @@ def process_docking(ing, host, outdir, dock_params, redocking=False):
     cmd = [
         "obabel",
         "-ipdb", deprot_path,
-        "-O", 
-    ]
+        "-O", prot_reidx_deprot_pdb_path
+        ]
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     # Merge this multi-XYZ guest file with the host structure
