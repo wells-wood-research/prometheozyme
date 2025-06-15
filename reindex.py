@@ -530,7 +530,7 @@ def pad_to_match(df1: pd.DataFrame, df2: pd.DataFrame) -> tuple[pd.DataFrame, pd
 
 #############################################################################################################
 
-def reindex(reference: str, referee: str, outDir: str):
+def reindex(reference: str, referee: str, outDir: str, visualise=False, print=False, logger=None):
     """
     TODO
     Loads reference molecule (index maintained) and referee molecule (reindexed to match reference).
@@ -561,43 +561,46 @@ def reindex(reference: str, referee: str, outDir: str):
     mcs_mol = get_maximum_common_substructure(mol1, mol2)
     match1, match2 = mol1.GetSubstructMatch(mcs_mol), mol2.GetSubstructMatch(mcs_mol)
     diff1, diff2 = get_atom_difference(mol1, match1), get_atom_difference(mol2, match2)
-    # Save an image visualising original atom indices and which atoms are not common to the structures
-    save_image_difference(mol1, match1, mol2, match2, f"{outDir}/img_preindexed")
 
     # Reindex the referee dataframe to match atom indices of reference
     # Atoms unique to each molecule are moved to the end rows of the dataframe
     df1new, df2new = get_reindexed_dataframes(df1, df2, match1, match2, diff1, diff2)
     # Save to xyz files
-    df2xyz(df1new, f"{os.path.join(outDir, name1+'_reidx.xyz')}")
-    df2xyz(df2new, f"{os.path.join(outDir, name2+'_reidx.xyz')}")
+    referee_reindexed = f"{os.path.join(outDir, name2+'_reidx.xyz')}"
+    # df2xyz(df1new, f"{os.path.join(outDir, name1+'_reidx.xyz')}") No point reindexing reference?
+    df2xyz(df2new, referee_reindexed)
 
-    # Reload reindexed files to visualise the results of reindexing and optimise geometry (only mol needed)
-    (_, mol1reidx, _),  (_, mol2reidx, _) = load_molecule(f"{os.path.join(outDir, name1+'_reidx.xyz')}"), load_molecule(f"{os.path.join(outDir, name2+'_reidx.xyz')}")
+    if visualise:
+        save_image_difference(mol1, match1, mol2, match2, f"{outDir}/img_preindexed")
 
-    # Optimise geometry
-    isConv1 = RDforceFields.UFFOptimizeMolecule(mol1reidx)
-    if isConv1 != 0:
-        raise StructureNotOptimised("Reindexed reference could not have been optimised.")
-    RDchem.MolToXYZFile(mol1reidx, f"{os.path.join(outDir, name1+'_reidx_opt.xyz')}")
-    isConv2 = RDforceFields.UFFOptimizeMolecule(mol2reidx)
-    if isConv2 != 0:
-        raise StructureNotOptimised("Reindexed referee could not have been optimised.")
-    RDchem.MolToXYZFile(mol2reidx, f"{os.path.join(outDir, name2+'_reidx_opt.xyz')}")
-    
-    # Get reindexed MCS, and indices of atoms matching it and unique to each molecule
-    mcs_molreidx = get_maximum_common_substructure(mol1reidx, mol2reidx)
-    match1reidx, match2reidx = mol1reidx.GetSubstructMatch(mcs_molreidx), mol2reidx.GetSubstructMatch(mcs_molreidx)
-    # Save an image visualising reindexed atom indices and which atoms are not common to the structures
-    save_image_difference(mol1reidx, match1reidx, mol2reidx, match2reidx, f"{outDir}/img_reindexed")
-    
-    # Provide hint on charge and multiplicty with RDkit
-    print(f"Reference molecule: {name1}")
-    print(f"    Number of unpaired electrons: {Descriptors.NumRadicalElectrons(mol1reidx)}")
-    print(f"    Formal chagre: {RDchem.rdmolops.GetFormalCharge(mol1reidx)}")
-    print(f"Referee molecule: {name2}")
-    print(f"    Number of unpaired electrons: {Descriptors.NumRadicalElectrons(mol2reidx)}")
-    print(f"    Formal chagre: {RDchem.rdmolops.GetFormalCharge(mol2reidx)}")
-    return None
+        # Reload reindexed files to visualise the results of reindexing and optimise geometry (only mol needed)
+        (_, mol1reidx, _),  (_, mol2reidx, _) = load_molecule(f"{os.path.join(outDir, name1+'_reidx.xyz')}"), load_molecule(f"{os.path.join(outDir, name2+'_reidx.xyz')}")
+
+        # Optimise geometry
+        isConv1 = RDforceFields.UFFOptimizeMolecule(mol1reidx)
+        if isConv1 != 0:
+            raise StructureNotOptimised("Reindexed reference could not have been optimised.")
+        RDchem.MolToXYZFile(mol1reidx, f"{os.path.join(outDir, name1+'_reidx_opt.xyz')}")
+        isConv2 = RDforceFields.UFFOptimizeMolecule(mol2reidx)
+        if isConv2 != 0:
+            raise StructureNotOptimised("Reindexed referee could not have been optimised.")
+        RDchem.MolToXYZFile(mol2reidx, f"{os.path.join(outDir, name2+'_reidx_opt.xyz')}")
+        
+        # Get reindexed MCS, and indices of atoms matching it and unique to each molecule
+        mcs_molreidx = get_maximum_common_substructure(mol1reidx, mol2reidx)
+        match1reidx, match2reidx = mol1reidx.GetSubstructMatch(mcs_molreidx), mol2reidx.GetSubstructMatch(mcs_molreidx)
+        # Save an image visualising reindexed atom indices and which atoms are not common to the structures
+        save_image_difference(mol1reidx, match1reidx, mol2reidx, match2reidx, f"{outDir}/img_reindexed")
+        
+        # Provide hint on charge and multiplicty with RDkit
+        logger.debug(f"Reference molecule: {name1}")
+        logger.debug(f"    Number of unpaired electrons: {Descriptors.NumRadicalElectrons(mol1reidx)}")
+        logger.debug(f"    Formal chagre: {RDchem.rdmolops.GetFormalCharge(mol1reidx)}")
+        logger.debug(f"Referee molecule: {name2}")
+        logger.debug(f"    Number of unpaired electrons: {Descriptors.NumRadicalElectrons(mol2reidx)}")
+        logger.debug(f"    Formal chagre: {RDchem.rdmolops.GetFormalCharge(mol2reidx)}")
+        
+    return referee_reindexed
 
 # Entry point for command-line execution
 if __name__ == "__main__":

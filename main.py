@@ -3,10 +3,11 @@ import logging
 import os
 from datetime import datetime
 import subprocess
+import shutil
 
 from define import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 from dock import dock
-from utils import read_xyz, merge_xyz, append_scores
+from utils import read_xyz, write_xyz, merge_xyz, append_scores, get_atom_count, split_multi_pdb
 from evaluate import filter_conformations
 from arrange import arrange_guests
 from protonate import protonate
@@ -119,24 +120,87 @@ def setup_ingredients(config):
 
     return role_objects, host, ingredient_map, unique_guests_constraints
 
-def process_docking(ing, host, outdir, dock_params, redocking=False, logger=logger):
-    # dock
+def process_docking(ing, host, outdir, dock_params, redocking=False):
+    # Handles the docking, per-conformation protonation, and reindexing for a single ingredient.
+    logger.info(f"Processing docking for {ing.name}{' (redocking)' if redocking else ''}...")
+    processed_guest_structures = [] # This will store (atom_count, comment, coordinates, atom_types) in XYZ format
+    original_guest_atom_count = get_atom_count(ing.path, logger) # Atom count of original guest molecule
+
+    # Perform initial docking
     docked_path = dock(host, ing, outdir, dock_params, redocking, logger)
+    if not os.path.exists(docked_path) or os.path.getsize(docked_path) == 0:
+        logger.warning(f"Docked output for {ing.name} not found or is empty at {docked_path}. Skipping further processing.")
+        return None
+    
+    # Protonate output of initial docking
+    protonated_path, protonated_atom_count = protonate(docked_path, getattr(ing.indices, "deprotonate", []))
+    if not os.path.exists(protonated_path) or os.path.getsize(protonated_path) == 0:
+        logger.warning(f"Docked output for {ing.name} not found or is empty at {docked_path}. Skipping further processing.")
+        return None
+    if protonated_atom_count != original_guest_atom_count:
+        logger.warning(f"Discarding {ing.name}: protonation changed atom count from {original_guest_atom_count} to {protonated_atom_count}.")
 
-    # protonate
-    protonated_path = protonate(docked_path, getattr(ing.indices, "deprotonate", [0]))
+    # Create a temporary directory for per-conformation processing
+    temp_processing_dir = os.path.join(outdir, f"temp_processing_{ing.name}")
+    reindex_output_dir = os.path.join(temp_processing_dir, f"reindexing")
+    os.makedirs(reindex_output_dir, exist_ok=True)
 
-    # reindex
-    reindexed_path = reindex(ing.path, protonated_path, os.path.join(outdir, ing.name))
+    # Prepare reference for reindexing (PDB version of original ingredient)
+    ing_basename = os.path.splitext(os.path.basename(ing.path))[0]
+    ing_dir = os.path.dirname(ing.path)
+    reindex_reference_path = os.path.join(ing_dir, f"{ing_basename}.pdb")
+    if not os.path.exists(reindex_reference_path):
+        logger.warning("Reference ingredient in PDB format not found - using XYZ instead; consider adding a PDB reference with same atom indices and path as XYZ.")
+        reindex_reference_path = ing.path
 
-    # merge docked protonated output with host
-    merged_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
-    merge_xyz(host.path, protonated_path, merged_path)
+    protonated_structures = split_multi_pdb(protonated_path, temp_processing_dir, logger)
 
-    # write scores as comment line for each structure in multi XYZ merged output
-    append_scores(merged_path, docked_path.replace("out.xyz", "scores.txt"), logger)
+    for idx, path in enumerate(protonated_structures):
+        try:
+            # Reindex protonated structures (referee) to match the original (reference)
+            os.makedirs(reindex_output_dir, exist_ok=True)
+            reindexed_path = reindex(reindex_reference_path, path, reindex_output_dir, logger=logger)
+            
+            if not os.path.exists(reindexed_path):
+                logger.error(f"Reindexed file not found at expected path: {reindexed_path}. Skipping pose {idx}.")
+                continue
+            
+            # Read the reindexed structure and add to list
+            reindexed_data = read_xyz(reindexed_path, logger)
+            if reindexed_data:
+                processed_guest_structures.append(reindexed_data[0]) # Assuming reindex_xyz gives one structure
+            else:
+                logger.warning(f"Failed to read reindexed structure from {reindexed_path}. Skipping pose {idx}.")
 
-    return merged_path
+        except Exception as e:
+            logger.error(f"Error processing pose {idx} for {ing.name}: {e}", exc_info=True)
+            continue # Continue to the next pose even if one fails
+    
+    # Merge all processed guest structures into a single multi-XYZ file
+    temp_multi_xyz_protonated_reindexed_guests_path = os.path.join(outdir, f"tmp_protonated_reindexed_{ing.name}.xyz")
+    with open(temp_multi_xyz_protonated_reindexed_guests_path, 'w') as f_out:
+        for atom_count, comment, coords, types in processed_guest_structures:
+            write_xyz(f_out, comment, coords, types) # Use write_xyz with file object
+    logger.info(f"All valid processed guest structures merged into: {temp_multi_xyz_protonated_reindexed_guests_path}")
+
+    # Merge this multi-XYZ guest file with the host structure
+    final_merged_host_guest_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
+    merge_xyz(host.path, temp_multi_xyz_protonated_reindexed_guests_path, final_merged_host_guest_path)
+    logger.info(f"Final merged host-guest file saved to: {final_merged_host_guest_path}")
+
+    # Append scores from gnina docking
+    scores_file_from_dock = os.path.join(os.path.dirname(docked_path), "scores.txt")
+    if os.path.exists(scores_file_from_dock):
+        append_scores(final_merged_host_guest_path, scores_file_from_dock, logger)
+        logger.info(f"Appended scores to {final_merged_host_guest_path}")
+    else:
+        logger.warning(f"Scores file not found at {scores_file_from_dock}. Skipping score appending.")
+
+    # Clean up temporary processing directory
+    shutil.rmtree(temp_processing_dir)
+    logger.debug(f"Cleaned up temporary directory: {temp_processing_dir}")
+
+    return final_merged_host_guest_path
 
 def process_constraints(docked_path, ing, host, outdir, evaluate_backbone, dock_params, redock_params, logger):
     # Filter conformations that don't satisfy constraints - only valid written to filtered_path

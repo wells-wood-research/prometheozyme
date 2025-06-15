@@ -121,13 +121,55 @@ def write_xyz(file, comment, coords, atom_types):
         with open(file, 'w') as f:
             write_to_file(f)
 
-def get_atom_count(path):
-    """Read host XYZ file and return number of host atoms."""
-    with open(path, 'r') as f:
-        lines = f.readlines()
-        if len(lines) < 1:
+# Modified get_atom_count to handle both XYZ and PDB
+def get_atom_count(path, logger=None):
+    """Read molecule file (XYZ or PDB) and return number of atoms."""
+    _, ext = os.path.splitext(path)
+    ext = ext.lower()
+
+    if ext == '.xyz':
+        try:
+            with open(path, 'r') as f:
+                lines = f.readlines()
+                if len(lines) < 1:
+                    if logger:
+                        logger.warning(f"XYZ file {path} is empty.")
+                    return 0
+                return int(lines[0].strip())  # First line is atom count
+        except FileNotFoundError:
+            if logger:
+                logger.error(f"XYZ file not found: {path}")
             return 0
-        return int(lines[0].strip())  # First line is atom count
+        except ValueError:
+            if logger:
+                logger.error(f"Invalid atom count in XYZ file: {path}")
+            return 0
+        except Exception as e:
+            if logger:
+                logger.error(f"Error reading XYZ atom count from {path}: {e}")
+            return 0
+    elif ext == '.pdb':
+        try:
+            from pdbUtils import pdb2df
+            df = pdb2df(path)
+            return len(df) # Number of rows in DataFrame is atom count
+        except FileNotFoundError:
+            if logger:
+                logger.error(f"PDB file not found: {path}")
+            return 0
+        except ImportError:
+            if logger:
+                logger.error("pdbUtils.pdb2df is required to read PDB files but could not be imported.")
+            return 0
+        except Exception as e:
+            if logger:
+                logger.error(f"Error reading PDB atom count from {path}: {e}")
+            return 0
+    else:
+        if logger:
+            logger.warning(f"Unsupported file format for atom count: {ext} for file {path}")
+        return 0
+
 
 def calculate_distance(coord1, coord2):
     """Calculate Euclidean distance between two 3D coordinates."""
@@ -204,3 +246,64 @@ def append_scores(xyz_file, scores_file, logger=None):
 
     # Replace original file only after successful write
     os.replace(temp_output, xyz_file)
+
+def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
+    """
+    Splits a multi-PDB file into individual PDB files, one for each model.
+    Returns a list of paths to the individual PDB files.
+    """
+    individual_pdb_paths = []
+    current_model_lines = []
+    model_count = 0
+    
+    try:
+        with open(multi_pdb_path, 'r') as f:
+            for line in f:
+                if line.startswith("MODEL"):
+                    # If this is not the very first model, save the previous one
+                    if current_model_lines:
+                        model_count += 1
+                        output_file_path = os.path.join(output_dir, f"model_{model_count:04d}.pdb")
+                        with open(output_file_path, 'w') as out_f:
+                            out_f.writelines(current_model_lines)
+                        individual_pdb_paths.append(output_file_path)
+                        current_model_lines = []
+                    current_model_lines.append(line) # Start new model
+                elif line.startswith("ENDMDL"):
+                    current_model_lines.append(line)
+                    model_count += 1
+                    output_file_path = os.path.join(output_dir, f"model_{model_count:04d}.pdb")
+                    with open(output_file_path, 'w') as out_f:
+                        out_f.writelines(current_model_lines)
+                    individual_pdb_paths.append(output_file_path)
+                    current_model_lines = []
+                else:
+                    current_model_lines.append(line)
+            
+            # Save any remaining lines if the file doesn't end with ENDMDL after the last MODEL
+            if current_model_lines and not individual_pdb_paths: # Case for single PDB without MODEL/ENDMDL
+                 model_count += 1
+                 output_file_path = os.path.join(output_dir, f"model_{model_count:04d}.pdb")
+                 with open(output_file_path, 'w') as out_f:
+                     out_f.writelines(current_model_lines)
+                 individual_pdb_paths.append(output_file_path)
+            elif current_model_lines and individual_pdb_paths and not individual_pdb_paths[-1].endswith(f"model_{model_count:04d}.pdb"):
+                 # This handles cases where the last model doesn't have an ENDMDL
+                 model_count += 1
+                 output_file_path = os.path.join(output_dir, f"model_{model_count:04d}.pdb")
+                 with open(output_file_path, 'w') as out_f:
+                     out_f.writelines(current_model_lines)
+                 individual_pdb_paths.append(output_file_path)
+
+    except FileNotFoundError:
+        if logger:
+            logger.error(f"Multi-PDB file not found: {multi_pdb_path}")
+        return []
+    except Exception as e:
+        if logger:
+            logger.error(f"Error splitting multi-PDB file {multi_pdb_path}: {e}")
+        return []
+
+    if logger:
+        logger.info(f"Split {multi_pdb_path} into {len(individual_pdb_paths)} individual PDB files.")
+    return individual_pdb_paths

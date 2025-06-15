@@ -139,7 +139,7 @@ def dock(host, ingredient, outdir, dock_params, redocking=False, logger=None):
         "--scoring", dock_params['scoring'],
         "--cnn_scoring", dock_params['cnn_scoring'],
         "--pose_sort_order", dock_params['pose_sort_order'],
-        "-o", os.path.join(outdir, "out.xyz"),
+        "-o", os.path.join(outdir, "out.pdb"),
         "--atom_terms", os.path.join(outdir, "atom_terms"),
         "--exhaustiveness", str(dock_params['exhaustiveness']),
         "--num_modes", str(dock_params['num_modes'])
@@ -162,7 +162,7 @@ def dock(host, ingredient, outdir, dock_params, redocking=False, logger=None):
     with open(os.path.join(outdir, 'scores.txt'), 'w') as outfile:
         subprocess.run(cmd, check=True, stdout=outfile, stderr=subprocess.STDOUT)
     logger.info(f"Docking for {ingredient.name} {'(redocking)' if redocking else ''} completed. Results saved in {outdir}")
-    return os.path.join(outdir, "out.xyz")  # Return the path to the docked output file
+    return os.path.join(outdir, "out.pdb")  # Return the path to the docked output file
 
 
 if __name__ == '__main__':
