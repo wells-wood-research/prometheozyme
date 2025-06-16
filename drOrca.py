@@ -46,6 +46,7 @@ def write_geometry_block(f, geom):
     geomBreak = geom.get("break", {})            
     geomKeep = geom.get("keep", {})
     geomScan = geom.get("scan", {})
+    geomPots = geom.get("pots", {})
 
     f.write("%geom\n")
     if geomBreak:
@@ -85,6 +86,26 @@ def write_geometry_block(f, geom):
         f.write(f"{' '*4}Scan\n")
         f.write(f"{' '*8}{geomScanType} {' '.join(geomScanAtoms)} = {scanValues[0]}, {scanValues[1]}, {scanValues[2]}\n")
         f.write(f"{' '*4}end\n")
+    if geomPots:
+        if isinstance(geomPots, dict):
+            geomPotsAtoms = geomPots.get("atoms", None)
+            geomPotsAtoms = list(map(str, geomPotsAtoms))
+            if len(geomPotsAtoms) == 2:
+                geomPotsType = "B"
+            geomPotsVal = geomPots.get("val", None)
+            f.write(f"{' '*4}Potentials\n")
+            f.write(f"{' '*8}{{C {' '.join(geomPotsAtoms)} {geomPotsVal} }}\n")
+            f.write(f"{' '*4}end\n")
+        elif isinstance(geomPots, list):
+            f.write(f"{' '*4}Potentials\n")
+            for constraint in geomPots:
+                geomPotsAtoms = constraint.get("atoms", None)
+                geomPotsAtoms = list(map(str, geomPotsAtoms))
+                if len(geomPotsAtoms) == 2:
+                    geomPotsType = "B"
+                geomPotsVal = constraint.get("val", None)
+                f.write(f"{' '*8}{{C {' '.join(geomPotsAtoms)} {geomPotsVal} }}\n")
+            f.write(f"{' '*4}end\n")
     f.write("end\n")
     f.write("\n")
 
