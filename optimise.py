@@ -17,9 +17,10 @@ def optimise(arr, host_atom_count, logger):
     os.makedirs(orcaInputDir, exist_ok=True)
     orcaInput = os.path.join(orcaInputDir, "opt.inp")
 
-    title = f"Initial optimisation of {arrName}:\n{arr['desc']}"
+    title = f"Initial optimisation of {arrName}:\n # {arr['desc']}"
     
     qmMethod = "XTB2"
+    method = "Opt"
     inputFormat = "xyzfile"
 
     moleculeInfo = {"charge": calculate_charge([guest["obj"].charge for guest in arr["guests_info"]]),
@@ -34,10 +35,12 @@ def optimise(arr, host_atom_count, logger):
         guest = guest_info["obj"]
         for constraint in guest.constraints:
             guestIdx, guestType, hostIdx, hostType, val = constraint
+            # TODO hostType
+            h_idx = hostIdx[0]
             if guestType == 'iter':
                 for idx in guestIdx:
                     g_idx = host_atom_count + idx
-                    atoms = [g_idx, hostIdx]
+                    atoms = [g_idx, h_idx]
                     geom["keep"].append({"atoms": atoms, "val": val})
             elif guestType == 'com':
                 # TODO com
@@ -50,6 +53,7 @@ def optimise(arr, host_atom_count, logger):
     make_orca_input(orcaInput = orcaInput,
                     title = title,
                     qmMethod = qmMethod,
+                    method = method,
                     inputFormat = inputFormat,
                     inputFile = path,
                     moleculeInfo = moleculeInfo,
