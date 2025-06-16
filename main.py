@@ -12,7 +12,7 @@ from evaluate import filter_conformations
 from arrange import arrange_guests
 from protonate import protonate_all, deprotonate_selected
 from reindex import reindex
-from optimise import optimise
+from optimise import optimise, pull_backbone
 
 from pymol import cmd
 
@@ -34,7 +34,7 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 
 def setup_config(configPath):
-    configPath = "/home/mchrnwsk/theozyme/his/theozymes/config.yaml"
+    configPath = "/home/mchrnwsk/theozymes/config.yaml"
     # Load the YAML file
     with open(configPath, "r") as file:
         config = yaml.safe_load(file)
@@ -301,9 +301,9 @@ def main(configPath):
         else:
             logger.debug(f"Arrangement at path {arr['path']} has no failed guests.")
         # simple constrained optimisation
-        arr_optimised = optimise(arr, host_atom_count, logger)
+        arr_optimised = optimise(arr, host_atom_count, ingredient_map, logger)
         # constrained optimisation with pulling backbone out
-    #    arr_reactant = pull_backbone_out(arr, arr_optimised)
+        arr_reactant = pull_backbone(arr, host_atom_count, ingredient_map, logger, arr_optimised)
     #    # prepare product
     #    arr_product = prepare_product(arr, arr_reactant)
 
