@@ -12,6 +12,7 @@ from evaluate import filter_conformations
 from arrange import arrange_guests
 from protonate import protonate_all, deprotonate_selected
 from reindex import reindex
+from optimise import optimise
 
 from pymol import cmd
 
@@ -123,7 +124,7 @@ def setup_ingredients(config):
 
     return role_objects, host, ingredient_map, unique_guests_constraints
 
-def process_reindexing(protonated_structures, reindex_reference_path, reindex_output_dir, ing_name, logger):
+def process_reindexing(protonated_structures, reindex_reference_path, reindex_output_dir, ing_name, ing_id, logger):
     successful = []
     failed = []
     for idx, path in enumerate(protonated_structures):
@@ -136,7 +137,7 @@ def process_reindexing(protonated_structures, reindex_reference_path, reindex_ou
 
     # Check if all poses failed
     if not successful:
-        failed.append(ing_name)
+        failed.append(ing_id)
         if logger:
             logger.warning(f"No poses were successfully reindexed for ingredient {ing_name}")
     else:
@@ -180,7 +181,7 @@ def process_docking(ing, host, outdir, dock_params, redocking=False):
     # Split the protonated multi-PDB into individual PDB files
     protonated_structures = split_multi_pdb(prot_path, prot_output_dir, logger)
     # Reindex protonated PDB files individually
-    successful, failed = process_reindexing(protonated_structures, reindex_reference_path, reindex_output_dir, ing.name, logger)
+    successful, failed = process_reindexing(protonated_structures, reindex_reference_path, reindex_output_dir, ing.name, ing.id, logger)
     if failed:
         logger.error(f"Reindexing failed for {ing.name}. Investigate output manually.")
         logger.warning(f"Failed ingredients: {', '.join(failed)}")
@@ -225,7 +226,7 @@ def process_docking(ing, host, outdir, dock_params, redocking=False):
     shutil.rmtree(temp_processing_dir)
     logger.debug(f"Cleaned up temporary directory: {temp_processing_dir}")
 
-    return final_merged_host_guest_path
+    return final_merged_host_guest_path, failed
 
 def process_constraints(docked_path, ing, host, outdir, evaluate_backbone, dock_params, redock_params, logger):
     # Filter conformations that don't satisfy constraints - only valid written to filtered_path
@@ -238,7 +239,7 @@ def process_constraints(docked_path, ing, host, outdir, evaluate_backbone, dock_
         redock_dock_params = dock_params.copy()
         redock_dock_params.update(redock_params)
         # Repeat docking with redocking parameters
-        redocked_path = process_docking(ing, host, outdir, redock_params, redocking=True)
+        redocked_path, failed = process_docking(ing, host, outdir, redock_params, redocking=True)
 
         # Repeat filtering conformations that don't satisfy constraints
         valid_structures, filtered_path = filter_conformations(redocked_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, evaluate_backbone, logger)
@@ -266,11 +267,14 @@ def main(configPath):
     host_atom_count, _, host_coords, host_atom_types = host_data[0]
 
     # Run gnina for each ingredients (constraints not evaluated here)
+    failed = []
     for ing in ingredient_map.values():
         if ing.name == 'host':
             continue
         logger.info(f"Running gnina for ingredient: {ing.name}")
-        outpath = process_docking(ing, host, outdir, dock_params)
+        outpath, failed_i = process_docking(ing, host, outdir, dock_params)
+        if failed_i:
+            failed.append(failed_i)
     logger.info(f"Docking completed. Results saved in {outdir}\n")
     
     # Evaluate constraints for each ingredient (list of unique guests)
@@ -278,7 +282,7 @@ def main(configPath):
     for ing in unique_guests_constraints:
         logger.info(f"\nEvaluating constraints for ingredient: {ing.name}, role: {ing.role_title}")
 
-        docked_path = os.path.join(outdir, f"docked_{ing.name}.xyz")
+        docked_path = os.path.join(outdir, f"{ing.name}.xyz")
         if not os.path.exists(docked_path):
             logger.error(f"Docked output for {ing.name} not found at {docked_path}. Skipping constraint evaluation.")
             continue
@@ -289,10 +293,16 @@ def main(configPath):
     # Satisfy roles according to their priorities
     sorted_final_arrangements = arrange_guests(roles, unique_guests_constraints, host_atom_count, host_coords, host_atom_types, outdir, logger)
 
-    #for arr in sorted_final_arrangements:
+    for arr in sorted_final_arrangements:
+        failed_ids = [guest["obj"] for guest in arr["guests_info"] if guest["obj"] in failed]
+
+        if failed_ids:
+            logger.warning(f"Arrangement at path {arr['path']} includes failed guests with IDs: {failed_ids}. Protonate/reindex/deprotonate manually before proceeding.")
+        else:
+            logger.debug(f"Arrangement at path {arr['path']} has no failed guests.")
         # simple constrained optimisation
-        #arr_optimised = optimise(arr, arr)
-    #    # constrained optimisation with pulling backbone out
+        arr_optimised = optimise(arr, host_atom_count, logger)
+        # constrained optimisation with pulling backbone out
     #    arr_reactant = pull_backbone_out(arr, arr_optimised)
     #    # prepare product
     #    arr_product = prepare_product(arr, arr_reactant)
