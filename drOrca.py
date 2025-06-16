@@ -94,7 +94,7 @@ def write_geometry_block(f, geom):
                 geomPotsType = "B"
             geomPotsVal = geomPots.get("val", None)
             f.write(f"{' '*4}Potentials\n")
-            f.write(f"{' '*8}{{C {' '.join(geomPotsAtoms)} {geomPotsVal} }}\n")
+            f.write(f"{' '*8}{{ C {' '.join(geomPotsAtoms)} {geomPotsVal} }}\n")
             f.write(f"{' '*4}end\n")
         elif isinstance(geomPots, list):
             f.write(f"{' '*4}Potentials\n")
@@ -104,7 +104,7 @@ def write_geometry_block(f, geom):
                 if len(geomPotsAtoms) == 2:
                     geomPotsType = "B"
                 geomPotsVal = constraint.get("val", None)
-                f.write(f"{' '*8}{{C {' '.join(geomPotsAtoms)} {geomPotsVal} }}\n")
+                f.write(f"{' '*8}{{ C {' '.join(geomPotsAtoms)} {geomPotsVal} }}\n")
             f.write(f"{' '*4}end\n")
     f.write("end\n")
     f.write("\n")
