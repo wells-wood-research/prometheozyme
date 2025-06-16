@@ -13,3 +13,6 @@ using gnina docking and orca optimisation
 
 ### pymol
 ```conda install -c conda-forge -c schrodinger pymol-bundle```
+
+### obabel
+```conda install conda-forge::openbabel```
