@@ -78,7 +78,7 @@ def arrange_guests(roles, unique_guests_constraints, host_atom_count, host_coord
                 # The signature identifies the unique set of guests and the roles they satisfied.
                 current_signature_parts = []
                 for g_info in current_arrangement_guests_info:
-                    current_signature_parts.append((g_info['obj'].id, g_info['obj'].role_title, g_info['obj'].charge, g_info['obj'].multiplicity))
+                    current_signature_parts.append((g_info['obj'].id, g_info['obj'].name, g_info['obj'].role_title, g_info['obj'].charge, g_info['obj'].multiplicity))
                
                 # Sort the parts to ensure a canonical representation regardless of order of addition
                 current_signature = tuple(sorted(current_signature_parts)) 
