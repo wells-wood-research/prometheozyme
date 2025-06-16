@@ -47,15 +47,15 @@ ingredients:
       ringMDL: [0, 1, 2, 3, 4, 5]
       ringIAZ: [23, 25, 18, 16, 24, 33, 17, 15, 22]
 
-  #  - &arg
-  #    name: arg
-  #    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_arginine.xyz
-  #    charge: 1
-  #    multiplicity: 1
-  #    indices:
-  #      h_donor: [3, 5, 6]
-  #      dir: [0, 6]
-  #      protonate: [5, 6]
+  - &arg
+    name: arg
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_arginine.xyz
+    charge: 1
+    multiplicity: 1
+    indices:
+      h_donor: [3, 5, 6]
+      dir: [0, 6]
+      protonate: [5, 6]
 
   - &lys
     name: lys
@@ -78,127 +78,127 @@ ingredients:
       dir: [0, 5]
       deprotonate: [5]
 
-#  - &cys
-#    name: cys
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_cysteine.xyz
-#    charge: 0
-#    multiplicity: 1
-#    indices:
-#      h_acceptor: 1
-#      h_donor: 1
-#      dir: [0, 1]
-#
-#  - &ser
-#    name: ser
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_serine.xyz
-#    charge: 0
-#    multiplicity: 1
-#    indices:
-#      h_acceptor: 1
-#      h_donor: 1
-#      dir: [0, 1]
-#
-#  - &thr
-#    name: thr
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_threonine.xyz
-#    charge: 0
-#    multiplicity: 1
-#    indices:
-#      h_acceptor: 2
-#      h_donor: 2
-#      dir: [0, 2]
-#
-#  - &tyr
-#    name: tyr
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_tyrosine.xyz
-#    charge: 0
-#    multiplicity: 1
-#    indices:
-#      h_acceptor: 5
-#      h_donor: 5
-#      dir: [0, 5]
-#
-#  - &phe
-#    name: phe
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz
-#    charge: 0
-#    multiplicity: 1
-#    indices:
-#      dir: [0, 1]
-#
-#  - &glu
-#    name: glu
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_glutamate.xyz
-#    charge: -1
-#    multiplicity: 1
-#    indices:
-#      h_acceptor: [4, 5]
-#      dir: [0, 5]
-#      deprotonate: [4, 5]
-#
-#  - &gln
-#    name: gln
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_glutamine.xyz
-#    charge: 0
-#    multiplicity: 1
-#    indices:
-#      h_acceptor: 3
-#      h_donor: 4
-#      dir: [0, 4]
-#      deprotonate: [3]
-#
-#  - &asp
-#    name: asp
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_aspartate.xyz
-#    charge: -1
-#    multiplicity: 1
-#    indices:
-#      h_acceptor: 2
-#      h_donor: 3
-#      dir: [0, 3]
-#      deprotonate: [2]
-#
-#  - &asn
-#    name: asn
-#    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_asparagine.xyz
-#    charge: 0
-#    multiplicity: 1
-#    indices:
-#      h_acceptor: 3
-#      h_donor: 2
-#      dir: [0, 3]
-#      deprotonate: [3]
+  - &cys
+    name: cys
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_cysteine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 1
+      h_donor: 1
+      dir: [0, 1]
+
+  - &ser
+    name: ser
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_serine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 1
+      h_donor: 1
+      dir: [0, 1]
+
+  - &thr
+    name: thr
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_threonine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 2
+      h_donor: 2
+      dir: [0, 2]
+
+  - &tyr
+    name: tyr
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_tyrosine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 5
+      h_donor: 5
+      dir: [0, 5]
+
+  - &phe
+    name: phe
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      dir: [0, 1]
+
+  - &glu
+    name: glu
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_glutamate.xyz
+    charge: -1
+    multiplicity: 1
+    indices:
+      h_acceptor: [4, 5]
+      dir: [0, 5]
+      deprotonate: [4, 5]
+
+  - &gln
+    name: gln
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_glutamine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 3
+      h_donor: 4
+      dir: [0, 4]
+      deprotonate: [3]
+
+  - &asp
+    name: asp
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_aspartate.xyz
+    charge: -1
+    multiplicity: 1
+    indices:
+      h_acceptor: 2
+      h_donor: 3
+      dir: [0, 3]
+      deprotonate: [2]
+
+  - &asn
+    name: asn
+    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_asparagine.xyz
+    charge: 0
+    multiplicity: 1
+    indices:
+      h_acceptor: 3
+      h_donor: 2
+      dir: [0, 3]
+      deprotonate: [3]
 
 roles:
   - name: base
     candidates:
       - *his
-    #      - *ser
-    #      - *thr
-    #      - *cys
+      - *ser
+      - *thr
+      - *cys
     constraints:
       - guestIdx: h_acceptor
         hostIdx: h1
         val: 3.0
     priority: -1
-  #  - name: stabSubO
-  #    candidates:
-  #      - *arg
-  #      - *lys
-  #      - *his
-  #      - *tyr
-  #      - *gln
-  #      - *asn
-  #    constraints:
-  #      - guestIdx: h_donor
-  #        hostIdx: h_acceptor
-  #        val: 3.0
-  #    priority: 1
+  - name: stabSubO
+    candidates:
+      - *arg
+      - *lys
+      - *his
+      - *tyr
+      - *gln
+      - *asn
+    constraints:
+      - guestIdx: h_donor
+        hostIdx: h_acceptor
+        val: 3.0
+    priority: 1
   - name: stabN
     candidates:
-      #      - *arg
+      - *arg
       - *lys
-    #      - *his
+      - *his
     constraints:
       - guestIdx: h_donor
         hostIdx: n5
