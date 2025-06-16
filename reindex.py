@@ -446,7 +446,7 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
     # Split DataFrames into non-hydrogen and hydrogen atoms
     df1NotH, df1H = split_df_by_H(df1)
     df2NotH, df2H = split_df_by_H(df2)
-
+    
     # Convert tuples to lists for easier manipulation
     idx1common = list(match1)
     idx2common = list(match2)
@@ -455,56 +455,80 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
     diff1 = diff1 or []
     diff2 = diff2 or []
 
-    # Create new DataFrames for non-hydrogen output
-    df1new = df1NotH.copy()
-    df2new = df2NotH.copy()
+    # --- Reindexing for common non-hydrogen atoms ---
+    # Create a new DataFrame for df1's common atoms, maintaining their original indices
+    df1common = df1NotH.loc[idx1common].copy() if idx1common else pd.DataFrame(columns=df1NotH.columns)
 
-    # Reindex referee DataFrame for common non-hydrogen elements
-    df1common = df1new.iloc[idx1common].copy() if idx1common else pd.DataFrame(columns=df1new.columns)
-    df2common = df2new.iloc[idx2common].copy() if idx2common else pd.DataFrame(columns=df2new.columns)
+    # Create a temporary DataFrame for df2's common atoms, indexed by their corresponding df1 indices
+    # This is the core reindexing step for common atoms.
+    df2common_reindexed_data = []
+    for ref_idx, referee_idx in zip(idx1common, idx2common): # Iterate through the paired common indices
+        # Get the row from df2NotH using its original index label (referee_idx)
+        # and set its new index to ref_idx
+        row = df2NotH.iloc[referee_idx].copy()
+        df2common_reindexed_data.append(row.rename(ref_idx)) # Rename the series index to the new index
 
-    # Assign new indices to referee to match reference
-    if not df2common.empty:
-        df2common.index = idx1common
+    if df2common_reindexed_data:
+        df2common = pd.DataFrame(df2common_reindexed_data, columns=df2NotH.columns)
+        # Sort by the new index to ensure consistent order
+        df2common = df2common.sort_index()
+    else:
+        df2common = pd.DataFrame(columns=df2NotH.columns)
 
-    # Handle additional non-hydrogen elements
-    # For reference, keep original indices but append at end
+
+    # --- Handle additional non-hydrogen elements for df1 ---
+    df1_parts = [df1common]
     if diff1:
-        df1diff = df1new.loc[diff1].copy()
-        idxMaxCommon = max(idx1common) if idx1common else -1
-        idx1diff = range(idxMaxCommon + 1, idxMaxCommon + 1 + len(diff1))
-        df1diff.index = idx1diff
-        df1new = pd.concat([df1common, df1diff])
-    else:
-        df1new = df1common
+        df1diff = df1NotH.loc[diff1].copy()
+        # Find the maximum index already present in df1common, or -1 if empty
+        idxMaxCurrent = max(df1common.index) if not df1common.empty else -1
+        # Assign new sequential indices starting from after the current max index
+        new_diff1_indices = range(idxMaxCurrent + 1, idxMaxCurrent + 1 + len(diff1))
+        df1diff.index = new_diff1_indices
+        df1_parts.append(df1diff)
+    df1new = pd.concat(df1_parts)
 
-    # For referee, append additional non-hydrogen elements with new sequential indices
+
+    # --- Handle additional non-hydrogen elements for df2 ---
+    df2_parts = [df2common]
     if diff2:
-        df2diff = df2new.loc[diff2].copy()
-        idxMaxCommon = max(idx1common) if idx1common else -1
-        idx2diff = range(idxMaxCommon + 1 + len(diff1),
-                         idxMaxCommon + 1 + len(diff1) + len(diff2))
-        df2diff.index = idx2diff
-        df2new = pd.concat([df2common, df2diff])
-    else:
-        df2new = df2common
+        df2diff = df2NotH.loc[diff2].copy()
+        # The starting index for unique elements in df2 should follow the last index used by df1's unique atoms
+        # This ensures sequential indexing across both reindexed DFs if they are combined or compared later
+        idxMaxFromDf1 = max(df1new.index) if not df1new.empty else -1
+        new_diff2_indices = range(idxMaxFromDf1 + 1, idxMaxFromDf1 + 1 + len(diff2))
+        df2diff.index = new_diff2_indices
+        df2_parts.append(df2diff)
+    df2new = pd.concat(df2_parts)
 
-    # Merge hydrogen atoms back into the reindexed DataFrames
+
+    # --- Merge hydrogen atoms back into the reindexed DataFrames ---
     if not df1H.empty:
-        df1new = pd.concat([df1new, df1H])
+        # Before concatenating, ensure df1H's indices don't overlap with df1new.
+        # This can happen if original df1 had hydrogens with low indices that match reindexed non-H atoms.
+        idxMaxCurrentDf1New = max(df1new.index) if not df1new.empty else -1
+        # Create new sequential indices for df1H
+        new_df1H_indices = range(idxMaxCurrentDf1New + 1, idxMaxCurrentDf1New + 1 + len(df1H))
+        df1H_reindexed = df1H.copy()
+        df1H_reindexed.index = new_df1H_indices
+        df1new = pd.concat([df1new, df1H_reindexed])
+    
     if not df2H.empty:
-        df2new = pd.concat([df2new, df2H])
-
+        # Similarly, ensure df2H's indices don't overlap with df2new.
+        idxMaxCurrentDf2New = max(df2new.index) if not df2new.empty else -1
+        # Create new sequential indices for df2H
+        new_df2H_indices = range(idxMaxCurrentDf2New + 1, idxMaxCurrentDf2New + 1 + len(df2H))
+        df2H_reindexed = df2H.copy()
+        df2H_reindexed.index = new_df2H_indices
+        df2new = pd.concat([df2new, df2H_reindexed])
+    
     # Sort by index to ensure consistent order
-    df1new.reset_index(drop=True, inplace=True)
-    df2new.reset_index(drop=True, inplace=True)
+    df1new = df1new.sort_index().reset_index(drop=True)
+    df2new = df2new.sort_index().reset_index(drop=True)
 
     # Reset ATOM_ID to match new row order (1-based)
     df1new['ATOM_ID'] = range(1, len(df1new) + 1)
     df2new['ATOM_ID'] = range(1, len(df2new) + 1)
-
-    # Ensure reference and referee have the same number of rows if needed
-    # df1new, df2new = pad_to_match(df1new, df2new)
 
     return df1new, df2new
 
