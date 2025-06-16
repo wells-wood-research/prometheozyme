@@ -283,6 +283,7 @@ def modify_orca_input(input_file):
 def make_orca_input(orcaInput: FilePath,
                     title: str,
                     qmMethod: str,
+                    method: str,
                     inputFormat: str,
                     inputFile: FilePath,
                     moleculeInfo: dict,
@@ -295,7 +296,7 @@ def make_orca_input(orcaInput: FilePath,
                     docker: dict
                     ) -> FilePath:
     
-    method = "" # Used to be "Opt", need to go back and fix what relies on it
+    method = "Opt" # Used to be "Opt", need to go back and fix what relies on it
     if neb:
         method = neb.get("nebMethod", "NEB")
     keepDens = None
