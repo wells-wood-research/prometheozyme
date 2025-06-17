@@ -11,17 +11,16 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 
-def find_indices_closest_to_val(conformation_coords, absolute_guest_indices,  host_indices, val, host_atom_count):
-    min_diff = float('inf')  # Track minimum difference from target value
-    best_pair = None  # Store the best (guest, host) index pair
-    best_distance = None  # Store the actual distance of the best pair
+def find_indices_closest_to_val(conformation_coords, absolute_guest_indices, host_indices, val):
+    min_diff = float('inf')
+    best_pair = None
+    best_distance = None
 
     for g_idx in absolute_guest_indices:
-        guest_coord = conformation_coords[g_idx + host_atom_count]
+        guest_coord = conformation_coords[g_idx]  # Fixed: Use absolute index directly
         for h_idx in host_indices:
             host_coord = conformation_coords[h_idx]
             distance = calculate_distance(guest_coord, host_coord)
-            # Calculate how close this distance is to the target value
             diff = abs(distance - val)
             if diff < min_diff:
                 min_diff = diff
@@ -30,9 +29,9 @@ def find_indices_closest_to_val(conformation_coords, absolute_guest_indices,  ho
 
     return best_pair, best_distance if best_pair is not None else (None, None)
 
-def process_constraint_com(conformation_coords, atom_types, absolute_guest_indices, host_indices, val, host_atom_count, guest_da_added, host_da_added):
+def process_constraint_com(conformation_coords, atom_types, absolute_guest_indices, host_indices, guest_da_added, host_da_added):
     """Evaluate constraints using center of mass distance."""
-    guest_com = calculate_center_of_mass(conformation_coords, [i + host_atom_count for i in absolute_guest_indices], atom_types)
+    guest_com = calculate_center_of_mass(conformation_coords, [i for i in absolute_guest_indices], atom_types)
     host_com = calculate_center_of_mass(conformation_coords, host_indices, atom_types)
     
     if guest_com is None or host_com is None:
@@ -45,7 +44,7 @@ def process_constraint_com(conformation_coords, atom_types, absolute_guest_indic
 
     return (guest_da_index, host_da_index), updated_xyz_coords, updated_atom_types, guest_da_added, host_da_added
 
-def process_constraint_mixed(path, original_comment, conformation_coords, current_atom_types, absolute_guest_indices, guestType, host_indices, hostType, val, host_atom_count, guest_da_added, host_da_added):
+def process_constraint_mixed(path, original_comment, conformation_coords, current_atom_types, absolute_guest_indices, guestType, host_indices, hostType, val, guest_da_added, host_da_added):
     """Evaluate constraints for mixed iter and com types."""
     
     
@@ -56,7 +55,7 @@ def process_constraint_mixed(path, original_comment, conformation_coords, curren
         updated_xyz_coords, updated_atom_types, host_da_index = add_dummy_atom_to_xyz(conformation_coords, current_atom_types, host_com)
         host_da_added = True
         write_xyz(path, f"{original_comment} (with Dummy Atoms)", updated_xyz_coords, updated_atom_types)
-        (g_idx, h_idx), best_distance = find_indices_closest_to_val(updated_xyz_coords, absolute_guest_indices, [host_da_index], val, host_atom_count)
+        (g_idx, h_idx), best_distance = find_indices_closest_to_val(updated_xyz_coords, absolute_guest_indices, [host_da_index], val)
         return (g_idx, h_idx), updated_xyz_coords, updated_atom_types, guest_da_added, host_da_added
     
     elif guestType == "com" and hostType == "iter":
@@ -66,7 +65,7 @@ def process_constraint_mixed(path, original_comment, conformation_coords, curren
         updated_xyz_coords, updated_atom_types, guest_da_index = add_dummy_atom_to_xyz(conformation_coords, current_atom_types, guest_com)
         guest_da_added = True
         write_xyz(path, f"{original_comment} (with Dummy Atoms)", updated_xyz_coords, updated_atom_types)
-        (g_idx, h_idx), best_distance = find_indices_closest_to_val(updated_xyz_coords, [guest_da_index], host_indices, val, host_atom_count)
+        (g_idx, h_idx), best_distance = find_indices_closest_to_val(updated_xyz_coords, [guest_da_index], host_indices, val)
         return (g_idx, h_idx), updated_xyz_coords, updated_atom_types, guest_da_added, host_da_added
 
 def optimise(arr, host_atom_count, ingredient_map, logger):
@@ -97,9 +96,7 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
         logger.error(f"Could not read XYZ data from {path}")
         return None
     original_atom_count, original_comment, initial_coordinates, initial_atom_types = xyz_data[0]
-    orca_input_files = []
 
-    # TODO com for guestType and all for hostType!
     geom = {"keep": []}
     geom_pots = {"pots": []}
     
@@ -118,13 +115,13 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
             host_da_added = False
 
             if guestType == "iter" and hostType == "iter":
-                (g_idx, h_idx), best_distance = find_indices_closest_to_val(current_xyz_coords, absolute_guest_indices,  hostIdx_orig, val, host_atom_count)
+                (g_idx, h_idx), best_distance = find_indices_closest_to_val(current_xyz_coords, absolute_guest_indices,  hostIdx_orig, val)
                 # if abs(val - best_distance) < 1.5:
                 geom["keep"].append({"atoms": [g_idx, h_idx], "val": val})
                 geom_pots["pots"].append({"atoms": [current_guest_absolute_start_index, h_idx], "val": 0.5})
 
             elif guestType == "com" and hostType == "com":
-                (g_idx, h_idx), updated_xyz_coords, updated_atom_types, guest_da_added, host_da_added = process_constraint_com(current_xyz_coords, current_atom_types, guestIdx_orig, hostIdx_orig, val, host_atom_count, absolute_guest_indices, guest_da_added, host_da_added)
+                (g_idx, h_idx), updated_xyz_coords, updated_atom_types, guest_da_added, host_da_added = process_constraint_com(current_xyz_coords, current_atom_types, absolute_guest_indices, hostIdx_orig, guest_da_added, host_da_added)
                 write_xyz(path, f"{original_comment} (with Dummy Atoms)", updated_xyz_coords, updated_atom_types)
                 current_xyz_coords = updated_xyz_coords
                 current_atom_types = updated_atom_types
@@ -132,7 +129,7 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
                 geom_pots["pots"].append({"atoms": [current_guest_absolute_start_index, h_idx], "val": 0.5})
 
             elif (guestType == "iter" and hostType == "com") or (guestType == "com" and hostType == "iter"):
-                (g_idx, h_idx), updated_xyz_coords, updated_atom_types, guest_da_added, host_da_added = process_constraint_mixed(path, original_comment, current_xyz_coords, current_atom_types, absolute_guest_indices, guestType, hostIdx_orig, hostType, val, host_atom_count, current_atom_types, absolute_guest_indices, guest_da_added, host_da_added)
+                (g_idx, h_idx), updated_xyz_coords, updated_atom_types, guest_da_added, host_da_added = process_constraint_mixed(path, original_comment, current_xyz_coords, current_atom_types, absolute_guest_indices, guestType, hostIdx_orig, hostType, val, guest_da_added, host_da_added)
                 current_xyz_coords = updated_xyz_coords
                 current_atom_types = updated_atom_types
                 geom["keep"].append({"atoms": [g_idx, h_idx], "val": val})
@@ -142,7 +139,7 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
                 logger.error(f"guestType in constraints for role {arr.desc} cannot be {guestType}; only allowed options are 'iter' and 'com'!")
         accumulated_guest_atom_count += current_guest_atom_count # Update accumulated_guest_atom_count
 
-    make_orca_input(orcaInput = orcaInput_Pull,
+    make_orca_input(orcaInput = orcaInput_Opt,
                     title = title,
                     qmMethod = qmMethod,
                     method = method,
@@ -156,8 +153,14 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
                     neb = None,
                     scf = None,
                     docker = None)
-    arr_optimised = orcaInput_Pull.replace(".inp", ".xyz")
-    geom = geom | geom_pots
+    arr_optimised = orcaInput_Opt.replace(".inp", ".xyz")
+    try: # Python 3.9+
+        geom = geom | geom_pots
+    except:
+        try: # Python < 3.9+
+            geom = {**geom, **geom_pots}
+        except:
+            logger.error("Cannot merge geometry dictionaries for ORCA constraints")
     make_orca_input(orcaInput = orcaInput_Pull,
                     title = title,
                     qmMethod = qmMethod,
@@ -175,71 +178,3 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
     arr_pulled = orcaInput_Pull.replace(".inp", ".xyz")
 
     return arr_optimised, arr_pulled
-
-def pull_backbone(arr, host_atom_count, ingredient_map, logger, input_path):
-    path = arr["path"]
-    arrName = os.path.splitext(os.path.basename(path))[0]
-    orcaInputDir = os.path.join(os.path.dirname(path), arrName) 
-    os.makedirs(orcaInputDir, exist_ok=True)
-    orcaInput = os.path.join(orcaInputDir, "pull.inp")
-
-    title = f"Pulling backbones out of {arrName}:\n # {arr['desc']}"
-    
-    qmMethod = "XTB2"
-    method = "Opt"
-    inputFormat = "xyzfile"
-
-    moleculeInfo = {"charge": calculate_charge([guest["obj"].charge for guest in arr["guests_info"]]),
-                    "multiplicity": calculate_multiplicity([guest["obj"].multiplicity for guest in arr["guests_info"]])}
-
-    parallelize = 8
-    maxcore = 2500
-
-    # TODO com for guestType and all for hostType!
-    geom = {}
-    geom["keep"] = []
-    accumulated_guest_atom_count = 0  # Initialize accumulated_guest_atom_count
-    for guest_info in arr["guests_info"]:
-        guest = guest_info["obj"]
-        current_guest_atom_count = get_atom_count(ingredient_map[guest_info["obj"].name].path) # Get current guest's atom count
-        current_guest_absolute_start_index = host_atom_count + accumulated_guest_atom_count # Calculate absolute start index for current guest
-        for constraint in guest.constraints:
-            guestIdx, guestType, hostIdx, hostType, val = constraint
-            # TODO hostType
-            h_idx = hostIdx[0]
-            g_idx_absolute = current_guest_absolute_start_index + guestIdx[0] # Calculate absolute g_idx
-            atoms = [g_idx_absolute, h_idx] # hostIdx might need adjustment if it's not absolute
-            geom["keep"].append({"atoms": atoms, "val": val})
-        accumulated_guest_atom_count += current_guest_atom_count # Update accumulated_guest_atom_count
-    geom["pots"] = []
-    accumulated_guest_atom_count = 0  # Initialize accumulated_guest_atom_count
-    for guest_info in arr["guests_info"]:
-        guest = guest_info["obj"]
-        current_guest_atom_count = get_atom_count(ingredient_map[guest_info["obj"].name].path) # Get current guest's atom count
-        current_guest_absolute_start_index = host_atom_count + accumulated_guest_atom_count # Calculate absolute start index for current guest
-        for constraint in guest.constraints:
-            guestIdx, guestType, hostIdx, hostType, val = constraint
-            val = 0.5 # Potentials have a constant force
-            # TODO hostType
-            h_idx = hostIdx[0]
-            g_idx_absolute = current_guest_absolute_start_index # Calculate absolute g_idx
-            atoms = [g_idx_absolute, h_idx] # hostIdx might need adjustment if it's not absolute
-            geom["pots"].append({"atoms": atoms, "val": val})
-        accumulated_guest_atom_count += current_guest_atom_count # Update accumulated_guest_atom_count
-
-    make_orca_input(orcaInput = orcaInput,
-                    title = title,
-                    qmMethod = qmMethod,
-                    method = method,
-                    inputFormat = inputFormat,
-                    inputFile = path,
-                    moleculeInfo = moleculeInfo,
-                    parallelize = parallelize,
-                    maxcore = maxcore,
-                    qmmm = None,
-                    geom = geom,
-                    neb = None,
-                    scf = None,
-                    docker = None)
-    arr_optimised = orcaInput.replace(".inp", ".xyz")
-    return arr_optimised
