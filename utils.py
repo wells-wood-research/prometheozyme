@@ -351,7 +351,7 @@ def write_multi_pdb(pdb_paths, output_path):
                         break
             out_file.write("ENDMDL\n")
 
-def add_dummy_atom_to_xyz(xyz_coords, atom_types, dummy_atom_element, dummy_atom_coords):
+def add_dummy_atom_to_xyz(xyz_coords, atom_types, dummy_atom_coords):
     """
     Appends a dummy atom to existing XYZ coordinates and atom types.
 
@@ -375,7 +375,7 @@ def add_dummy_atom_to_xyz(xyz_coords, atom_types, dummy_atom_element, dummy_atom
     
     # Append to atom types
     updated_atom_types = list(atom_types) # Ensure it's a mutable list copy
-    updated_atom_types.append(dummy_atom_element)
+    updated_atom_types.append("DA")
     
     # The index of the new atom is the last index of the updated list
     dummy_atom_index = len(updated_atom_types) - 1
