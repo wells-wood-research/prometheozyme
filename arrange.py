@@ -5,7 +5,7 @@ import numpy as np
 from utils import get_vdw_radius, read_xyz, write_xyz, calculate_distance
 
 # Constants for filtering and limiting output
-MAX_FINAL_ARRANGEMENTS = 100  # Maximum number of unique ingredient-role combinations to keep
+MAX_FINAL_ARRANGEMENTS = 1000  # Maximum number of unique ingredient-role combinations to keep
 
 # Custom exception for early termination
 class MaxArrangementsReached(Exception):
