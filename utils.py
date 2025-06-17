@@ -121,6 +121,112 @@ def write_xyz(file, comment, coords, atom_types):
         with open(file, 'w') as f:
             write_to_file(f)
 
+def convert_optimised_arr_xyz_to_pdb(output_pdb_path, xyz_data, host_atom_count, guest_names_ordered, ingredient_map, logger=None):
+    """
+    Writes a PDB file from XYZ data, assigning residue names based on host and ordered guests.
+
+    Args:
+        output_pdb_path (str): Path to the output PDB file.
+        xyz_data (tuple): A single (atom_count, comment, coordinates, atom_types) tuple
+                          from read_xyz for the combined pull.xyz file.
+        host_atom_count (int): Number of atoms in the host molecule.
+        guest_names_ordered (list): Ordered list of guest names (e.g., ['ser', 'arg'])
+                                    as extracted from the arrangement_N.xyz comment.
+        ingredient_map (dict): Map of ingredient names (str) to Ingredient objects.
+        logger (logging.Logger, optional): Logger instance. Defaults to None.
+    """
+    total_xyz_atoms, _, coords, atom_types = xyz_data
+
+    # Calculate expected total atoms from host and known guests for verification
+    expected_total_atoms_sum = host_atom_count
+    for guest_name in guest_names_ordered:
+        guest_obj = ingredient_map.get(guest_name)
+        if guest_obj:
+            # Call get_atom_count from imported utils module
+            guest_count = get_atom_count(guest_obj.path, logger=logger)
+            if guest_count == 0:
+                logger.warning(f"Could not get atom count for guest '{guest_name}' from its path '{guest_obj.path}'. "
+                               f"This guest's atoms will not be correctly assigned if its file is empty or invalid.")
+            expected_total_atoms_sum += guest_count
+        else:
+            logger.warning(f"Guest '{guest_name}' from comment not found in ingredient_map. "
+                           f"Its atoms will not be correctly assigned in PDB. Check config.yaml.")
+            # If guest not in map, we can't get its atom count, so we just assume 0 for sum verification.
+
+    if expected_total_atoms_sum != total_xyz_atoms:
+        logger.warning(f"Total atom count mismatch for {output_pdb_path}: "
+                       f"Expected sum from host/guests ({expected_total_atoms_sum}) != "
+                       f"atoms in pull.xyz ({total_xyz_atoms}). "
+                       f"Atom assignments in PDB might be incorrect.")
+
+    current_atom_global_idx = 0
+    current_residue_serial = 1 # PDB residue serial number
+    
+    with open(output_pdb_path, 'w') as f:
+        # Write HOST atoms
+        host_res_name = "UNK" # Standard residue name for the host
+        for i in range(host_atom_count):
+            if current_atom_global_idx >= total_xyz_atoms:
+                logger.error(f"Ran out of atoms in XYZ data while writing host. PDB might be incomplete.")
+                break
+            
+            atom_element = atom_types[current_atom_global_idx]
+            x, y, z = coords[current_atom_global_idx]
+            
+            # PDB ATOM/HETATM record format (simplified example):
+            # HETATM  AtomIdx AtomName ResName ChainID ResSeq   X      Y      Z      Occ  TempFactor Element
+            # HETATM     1  C           HST A    1      -1.234   0.567   2.890  1.00  0.00           C
+            line = (f"HETATM{current_atom_global_idx + 1:5d}  " # Atom serial number
+                    f"{atom_element:<4s}" # Atom name (element symbol, left-justified)
+                    f"{host_res_name:<3s} " # Residue name (3 chars, left-justified)
+                    f"A" # Chain ID (fixed to A for simplicity)
+                    f"{current_residue_serial:4d}    " # Residue sequence number
+                    f"{x:8.3f}{y:8.3f}{z:8.3f}" # X, Y, Z coordinates (8 chars, 3 decimal places)
+                    f"  1.00  0.00          " # Occupancy, Temp Factor
+                    f"{atom_element:>2s}\n") # Element symbol (right-justified)
+            f.write(line)
+            current_atom_global_idx += 1
+        current_residue_serial += 1 # Increment residue number for the next molecule
+
+        # Write GUEST atoms
+        for guest_name in guest_names_ordered:
+            guest_obj = ingredient_map.get(guest_name)
+            if guest_obj:
+                # Call get_atom_count from imported utils module
+                guest_atom_count = get_atom_count(guest_obj.path, logger=logger)
+                if guest_atom_count == 0:
+                    logger.warning(f"Guest '{guest_name}' has 0 atoms according to its file. Skipping in PDB.")
+                    continue
+
+                # Use uppercase first 3 characters of guest name for PDB residue name
+                guest_res_name = guest_name.upper()[:3] 
+                
+                for i in range(guest_atom_count):
+                    if current_atom_global_idx >= total_xyz_atoms:
+                        logger.error(f"Ran out of atoms in XYZ data while writing guest '{guest_name}'. PDB might be incomplete.")
+                        break
+
+                    atom_element = atom_types[current_atom_global_idx]
+                    x, y, z = coords[current_atom_global_idx]
+                    
+                    line = (f"HETATM{current_atom_global_idx + 1:5d}  "
+                            f"{atom_element:<4s}"
+                            f"{guest_res_name:<3s} "
+                            f"A"
+                            f"{current_residue_serial:4d}    "
+                            f"{x:8.3f}{y:8.3f}{z:8.3f}"
+                            f"  1.00  0.00          "
+                            f"{atom_element:>2s}\n")
+                    f.write(line)
+                    current_atom_global_idx += 1
+                current_residue_serial += 1 # Increment residue number for the next guest
+            else:
+                logger.error(f"Ingredient '{guest_name}' not found in ingredient_map. Cannot write its atoms to PDB.")
+                # If guest not found, we cannot determine its atom count or path, so skip its PDB writing.
+
+        f.write("END\n") # Standard PDB file terminator
+        logger.info(f"Successfully wrote PDB file: {output_pdb_path}")
+        
 # Modified get_atom_count to handle both XYZ and PDB
 def get_atom_count(path, logger=None):
     """Read molecule file (XYZ or PDB) and return number of atoms."""
@@ -169,7 +275,6 @@ def get_atom_count(path, logger=None):
         if logger:
             logger.warning(f"Unsupported file format for atom count: {ext} for file {path}")
         return 0
-
 
 def calculate_distance(coord1, coord2):
     """Calculate Euclidean distance between two 3D coordinates."""
