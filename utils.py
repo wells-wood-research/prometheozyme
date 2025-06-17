@@ -209,7 +209,7 @@ def convert_optimised_arr_xyz_to_pdb(output_pdb_path, xyz_data, host_atom_count,
                     atom_element = atom_types[current_atom_global_idx]
                     x, y, z = coords[current_atom_global_idx]
                     
-                    line = (f"HETATM{current_atom_global_idx + 1:5d}  "
+                    line = (f"ATOM  {current_atom_global_idx + 1:5d}  "
                             f"{atom_element:<4s}"
                             f"{guest_res_name:<3s} "
                             f"A"
