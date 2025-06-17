@@ -1,6 +1,6 @@
 misc:
   evaluate_backbone: False
-  workdir: "/home/mchrnwsk/theozyme/his/theozymes/docking"
+  workdir: "/home/mchrnwsk/theozymes/docking"
 
 # Define docking params
 docking:
@@ -34,7 +34,7 @@ redocking:
 ingredients:
   - &host
     name: host
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/adduct.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/adduct.xyz
     charge: 0
     multiplicity: 1
     indices:
@@ -49,7 +49,7 @@ ingredients:
 
   - &arg
     name: arg
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_arginine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_arginine.xyz
     charge: 1
     multiplicity: 1
     indices:
@@ -59,7 +59,7 @@ ingredients:
 
   - &lys
     name: lys
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_lysine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_lysine.xyz
     charge: 1
     multiplicity: 1
     indices:
@@ -69,18 +69,18 @@ ingredients:
 
   - &his
     name: his
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_histidine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_histidine.xyz
     charge: 0
     multiplicity: 1
     indices:
       h_acceptor: 5
       h_donor: 3
       dir: [0, 5]
-      deprotonate: [5]
+      deprotonate: [3]
 
   - &cys
     name: cys
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_cysteine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_cysteine.xyz
     charge: 0
     multiplicity: 1
     indices:
@@ -90,7 +90,7 @@ ingredients:
 
   - &ser
     name: ser
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_serine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_serine.xyz
     charge: 0
     multiplicity: 1
     indices:
@@ -100,7 +100,7 @@ ingredients:
 
   - &thr
     name: thr
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_threonine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_threonine.xyz
     charge: 0
     multiplicity: 1
     indices:
@@ -110,7 +110,7 @@ ingredients:
 
   - &tyr
     name: tyr
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_tyrosine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_tyrosine.xyz
     charge: 0
     multiplicity: 1
     indices:
@@ -120,7 +120,7 @@ ingredients:
 
   - &phe
     name: phe
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_phenylalanine.xyz
     charge: 0
     multiplicity: 1
     indices:
@@ -128,7 +128,7 @@ ingredients:
 
   - &glu
     name: glu
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_glutamate.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamate.xyz
     charge: -1
     multiplicity: 1
     indices:
@@ -138,7 +138,7 @@ ingredients:
 
   - &gln
     name: gln
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_glutamine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_glutamine.xyz
     charge: 0
     multiplicity: 1
     indices:
@@ -149,7 +149,7 @@ ingredients:
 
   - &asp
     name: asp
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_aspartate.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_aspartate.xyz
     charge: -1
     multiplicity: 1
     indices:
@@ -160,7 +160,7 @@ ingredients:
 
   - &asn
     name: asn
-    path: /home/mchrnwsk/theozyme/his/theozymes/ingredients/amino_acids/cb_asparagine.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cb_asparagine.xyz
     charge: 0
     multiplicity: 1
     indices:
@@ -204,15 +204,15 @@ roles:
         hostIdx: n5
         val: 3.0
     priority: 2
-#  - name: protN
-#    candidates:
-#      - *his
-#      - *cys
-#    constraints:
-#      - guestIdx: h_donor
-#        hostIdx: n5
-#        val: 3.0
-#    priority: 2
+  - name: protN
+    candidates:
+      - *his
+      - *cys
+    constraints:
+      - guestIdx: h_donor
+        hostIdx: n5
+        val: 3.0
+    priority: 2
 #  - name: stabIAZpolarO1
 #    candidates:
 #      - *arg
