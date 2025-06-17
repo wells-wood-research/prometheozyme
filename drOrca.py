@@ -226,7 +226,7 @@ def write_simple_input(f, keyword, qmMethod, method, keepDens, parallelize):
 def write_title(f, title):
     x = len(title)
     f.write(f" # {'-'*(x+5)} #\n")
-    f.write(f" # {title}{' '*5} #\n")
+    f.write(f" # {title}{' '*5}\n")
     f.write(f" # {'-'*(x+5)} #\n")
     f.write("\n")
 
