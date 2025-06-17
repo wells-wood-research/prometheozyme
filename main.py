@@ -237,7 +237,7 @@ def process_constraints(docked_path, ing, host, outdir, evaluate_backbone, dock_
         redock_dock_params = dock_params.copy()
         redock_dock_params.update(redock_params)
         # Repeat docking with redocking parameters
-        redocked_path, failed = process_docking(ing, host, outdir, redock_params, redocking=True)
+        redocked_path, failed = process_docking(ing, host, outdir, redock_dock_params, redocking=True)
 
         # Repeat filtering conformations that don't satisfy constraints
         valid_structures, filtered_path = filter_conformations(redocked_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, evaluate_backbone, logger)
