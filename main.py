@@ -7,14 +7,12 @@ import shutil
 
 from define import Indices, Ingredient, Constraint, Role, update_guest_constraints, reduce_guests, print_reduced
 from dock import dock
-from utils import read_xyz, write_xyz, merge_xyz, split_multi_pdb, write_multi_pdb, append_scores, get_atom_count
+from utils import read_xyz, merge_xyz, split_multi_pdb, write_multi_pdb, append_scores, get_atom_count
 from evaluate import filter_conformations
 from arrange import arrange_guests
 from protonate import protonate_all, deprotonate_selected
 from reindex import reindex
-from optimise import optimise, pull_backbone
-
-from pymol import cmd
+from optimise import optimise
 
 # Configure logging to output to both console and file
 logger = logging.getLogger(__name__)
@@ -301,9 +299,7 @@ def main(configPath):
         else:
             logger.debug(f"Arrangement at path {arr['path']} has no failed guests.")
         # simple constrained optimisation
-        arr_optimised = optimise(arr, host_atom_count, ingredient_map, logger)
-        # constrained optimisation with pulling backbone out
-        arr_reactant = pull_backbone(arr, host_atom_count, ingredient_map, logger, arr_optimised)
+        arr_optimised, arr_reactant = optimise(arr, host_atom_count, ingredient_map, logger)
     #    # prepare product
     #    arr_product = prepare_product(arr, arr_reactant)
 
