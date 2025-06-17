@@ -350,3 +350,34 @@ def write_multi_pdb(pdb_paths, output_path):
                     elif line.startswith("TER"):
                         break
             out_file.write("ENDMDL\n")
+
+def add_dummy_atom_to_xyz(xyz_coords, atom_types, dummy_atom_element, dummy_atom_coords):
+    """
+    Appends a dummy atom to existing XYZ coordinates and atom types.
+
+    Args:
+        xyz_coords (np.ndarray): NumPy array of coordinates (shape: N, 3).
+        atom_types (list): List of atom type strings (length: N).
+        dummy_atom_element (str): Element string for the dummy atom (e.g., "XG").
+        dummy_atom_coords (np.ndarray or list): Coordinates of the dummy atom (shape: 1, 3 or 3,).
+
+    Returns:
+        tuple: (modified_xyz_coords, modified_atom_types, dummy_atom_index)
+               modified_xyz_coords (np.ndarray): Updated coordinates array.
+               modified_atom_types (list): Updated list of atom types.
+               dummy_atom_index (int): 0-based index of the newly added dummy atom.
+    """
+    # Ensure dummy_atom_coords is a NumPy array with the correct shape (1, 3) for vstack
+    da_coords_np = np.array(dummy_atom_coords).reshape(1, 3)
+
+    # Append to coordinates
+    updated_xyz_coords = np.vstack([xyz_coords, da_coords_np])
+    
+    # Append to atom types
+    updated_atom_types = list(atom_types) # Ensure it's a mutable list copy
+    updated_atom_types.append(dummy_atom_element)
+    
+    # The index of the new atom is the last index of the updated list
+    dummy_atom_index = len(updated_atom_types) - 1
+    
+    return updated_xyz_coords, updated_atom_types, dummy_atom_index
