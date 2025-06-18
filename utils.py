@@ -375,50 +375,55 @@ def split_multi_xyz(multi_xyz_path, output_dir, logger=None):
 def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
     """
     Splits a multi-PDB file into individual PDB files, one for each model.
+    Appends the CONECT block (usually found at the end) to each output PDB file.
     Returns a list of paths to the individual PDB files.
     """
     individual_pdb_paths = []
+    models = []
     current_model_lines = []
-    model_count = 0
-    
+    conect_lines = []
+    in_conect_block = False
+
     try:
         with open(multi_pdb_path, 'r') as f:
-            for line in f:
-                if line.startswith("MODEL"):
-                    # If this is not the very first model, save the previous one
-                    if current_model_lines:
-                        model_count += 1
-                        output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
-                        with open(output_file_path, 'w') as out_f:
-                            out_f.writelines(current_model_lines)
-                        individual_pdb_paths.append(output_file_path)
-                        current_model_lines = []
-                    current_model_lines.append(line) # Start new model
-                elif line.startswith("ENDMDL"):
-                    current_model_lines.append(line)
-                    model_count += 1
-                    output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
-                    with open(output_file_path, 'w') as out_f:
-                        out_f.writelines(current_model_lines)
-                    individual_pdb_paths.append(output_file_path)
+            lines = f.readlines()
+
+        for line in lines:
+            if line.startswith("CONECT") or line.startswith("MASTER") or line.startswith("END"):
+                in_conect_block = True
+                conect_lines.append(line)
+                continue
+
+            if in_conect_block:
+                # Skip everything after the CONECT block
+                continue
+
+            if line.startswith("MODEL"):
+                # Start of a new model
+                if current_model_lines:
+                    models.append(current_model_lines)
                     current_model_lines = []
-                else:
-                    current_model_lines.append(line)
-            
-            # Save any remaining lines if the file doesn't end with ENDMDL after the last MODEL
-            if current_model_lines and not individual_pdb_paths: # Case for single PDB without MODEL/ENDMDL
-                 model_count += 1
-                 output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
-                 with open(output_file_path, 'w') as out_f:
-                     out_f.writelines(current_model_lines)
-                 individual_pdb_paths.append(output_file_path)
-            elif current_model_lines and individual_pdb_paths and not individual_pdb_paths[-1].endswith(f"model_{model_count:06d}.pdb"):
-                 # This handles cases where the last model doesn't have an ENDMDL
-                 model_count += 1
-                 output_file_path = os.path.join(output_dir, f"model_{model_count:06d}.pdb")
-                 with open(output_file_path, 'w') as out_f:
-                     out_f.writelines(current_model_lines)
-                 individual_pdb_paths.append(output_file_path)
+                current_model_lines.append(line)
+            elif line.startswith("ENDMDL"):
+                current_model_lines.append(line)
+                models.append(current_model_lines)
+                current_model_lines = []
+            else:
+                current_model_lines.append(line)
+
+        # Handle last model if file does not end with ENDMDL
+        if current_model_lines:
+            models.append(current_model_lines)
+
+        # Write out each model with appended CONECT lines
+        for i, model_lines in enumerate(models, 1):
+            output_file_path = os.path.join(output_dir, f"model_{i:06d}.pdb")
+            with open(output_file_path, 'w') as out_f:
+                out_f.writelines(model_lines)
+                if not model_lines[-1].startswith("ENDMDL"):
+                    out_f.write("ENDMDL\n")
+                out_f.writelines(conect_lines)
+            individual_pdb_paths.append(output_file_path)
 
     except FileNotFoundError:
         if logger:
