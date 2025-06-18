@@ -374,68 +374,129 @@ def split_multi_xyz(multi_xyz_path, output_dir, logger=None):
 
 def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
     """
-    Splits a multi-PDB file into individual PDB files, one for each model.
-    Appends the CONECT block (usually found at the end) to each output PDB file.
-    Returns a list of paths to the individual PDB files.
+    Splits a multi-structure PDB file into individual PDB files,
+    including the CONECT records from the end of the multi-structure file
+    in each split file.
+
+    Args:
+        multi_pdb_path (str): Path to the input multi-structure PDB file.
+        output_dir (str): Directory to save the split PDB files.
+        logger (logging.Logger, optional): Logger instance. Defaults to None.
+
+    Returns:
+        list: A list of paths to the individual PDB files created.
     """
     individual_pdb_paths = []
-    models = []
     current_model_lines = []
-    conect_lines = []
-    in_conect_block = False
+    model_count = 0
+    conect_section = []
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        if logger:
+            logger.info(f"Created output directory: {output_dir}")
 
     try:
         with open(multi_pdb_path, 'r') as f:
             lines = f.readlines()
 
+        # --- Extract CONECT records from the end of the file ---
+        # Find the start of CONECT records by searching backwards
+        conect_records_start_index = -1
+        # Iterate backwards to find the block of CONECT records
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].startswith("CONECT"):
+                conect_records_start_index = i
+            elif conect_records_start_index != -1 and not lines[i].strip():
+                # Found an empty line after a CONECT, so the CONECT block starts from conect_records_start_index
+                break
+            elif conect_records_start_index != -1 and not lines[i].startswith("CONECT"):
+                 # Found a non-CONECT line after a CONECT, means the CONECT block started earlier
+                 # This handles cases where there might be non-CONECT lines between CONECT blocks or before the first CONECT.
+                 # We want the *last contiguous block* of CONECT records.
+                 conect_records_start_index = i + 1 # The block starts from the next line
+                 break
+
+
+        if conect_records_start_index != -1:
+            conect_section = [line for line in lines[conect_records_start_index:] if line.startswith("CONECT")]
+            # Remove CONECT records from the main lines list to avoid re-processing them
+            # We only remove them if they were found at the very end of the file as expected.
+            if conect_records_start_index == len(lines) - len(conect_section): # Check if it's the last block
+                lines = lines[:conect_records_start_index]
+        else:
+            if logger:
+                logger.warning("No CONECT records found at the end of the PDB file.")
+
+        # --- Process models ---
         for line in lines:
-            if line.startswith("CONECT") or line.startswith("MASTER") or line.startswith("END"):
-                in_conect_block = True
-                conect_lines.append(line)
-                continue
-
-            if in_conect_block:
-                # Skip everything after the CONECT block
-                continue
-
             if line.startswith("MODEL"):
-                # Start of a new model
+                # If we were already processing a model, save it before starting a new one
                 if current_model_lines:
-                    models.append(current_model_lines)
-                    current_model_lines = []
-                current_model_lines.append(line)
+                    model_count += 1
+                    output_file_name = f"model_{model_count:06d}.pdb"
+                    output_file_path = os.path.join(output_dir, output_file_name)
+                    
+                    with open(output_file_path, 'w') as out_file:
+                        out_file.writelines(current_model_lines)
+                        # Add CONECT records after the model data and its ENDMDL
+                        for conect_line in conect_section:
+                            out_file.write(conect_line)
+                    individual_pdb_paths.append(output_file_path)
+                    current_model_lines = [] # Reset for the next model
+                current_model_lines.append(line) # Add the current MODEL line to the new set
             elif line.startswith("ENDMDL"):
                 current_model_lines.append(line)
-                models.append(current_model_lines)
-                current_model_lines = []
+                # This ENDMDL signals the end of a model, so we save it immediately
+                model_count += 1
+                output_file_name = f"model_{model_count:06d}.pdb"
+                output_file_path = os.path.join(output_dir, output_file_name)
+
+                with open(output_file_path, 'w') as out_file:
+                    out_file.writelines(current_model_lines)
+                    # Add CONECT records after the model data and its ENDMDL
+                    for conect_line in conect_section:
+                        out_file.write(conect_line)
+                individual_pdb_paths.append(output_file_path)
+                current_model_lines = [] # Reset for the next model
             else:
+                # Accumulate lines that are part of the current model (ATOM, HETATM, REMARK, etc.)
                 current_model_lines.append(line)
 
-        # Handle last model if file does not end with ENDMDL
+        # Handle the case where the file might not end with ENDMDL after the last MODEL
+        # or if it's a single model file without MODEL/ENDMDL
         if current_model_lines:
-            models.append(current_model_lines)
-
-        # Write out each model with appended CONECT lines
-        for i, model_lines in enumerate(models, 1):
-            output_file_path = os.path.join(output_dir, f"model_{i:06d}.pdb")
-            with open(output_file_path, 'w') as out_f:
-                out_f.writelines(model_lines)
-                if not model_lines[-1].startswith("ENDMDL"):
-                    out_f.write("ENDMDL\n")
-                out_f.writelines(conect_lines)
-            individual_pdb_paths.append(output_file_path)
+            # Check if this model has already been saved (i.e., if it ended with ENDMDL)
+            # This logic can be tricky if the file format is inconsistent.
+            # A more robust check: if the last saved path corresponds to the current model_count
+            # then it's already saved.
+            
+            # Simple check for now: if current_model_lines isn't empty, and it wasn't
+            # explicitly ended by ENDMDL (which would have cleared it), save it.
+            # This primarily catches the very last model if it lacks an ENDMDL or if it's a single model file.
+            if not individual_pdb_paths or (model_count == 0 and current_model_lines): # Case: single PDB or last model of multi-PDB
+                model_count += 1
+                output_file_name = f"model_{model_count:06d}.pdb"
+                output_file_path = os.path.join(output_dir, output_file_name)
+                
+                with open(output_file_path, 'w') as out_file:
+                    out_file.writelines(current_model_lines)
+                    # Add CONECT records
+                    for conect_line in conect_section:
+                        out_file.write(conect_line)
+                    # Ensure ENDMDL if not present for single-model files or last model
+                    if not any(line.startswith("ENDMDL") for line in current_model_lines):
+                        out_file.write("ENDMDL\n")
+                individual_pdb_paths.append(output_file_path)
 
     except FileNotFoundError:
-        if logger:
-            logger.error(f"Multi-PDB file not found: {multi_pdb_path}")
+        logger.error(f"Multi-PDB file not found: {multi_pdb_path}")
         return []
     except Exception as e:
-        if logger:
-            logger.error(f"Error splitting multi-PDB file {multi_pdb_path}: {e}")
+        logger.error(f"Error splitting multi-PDB file {multi_pdb_path}: {e}")
         return []
 
-    if logger:
-        logger.info(f"Split {multi_pdb_path} into {len(individual_pdb_paths)} individual PDB files.")
+    logger.info(f"Split {multi_pdb_path} into {len(individual_pdb_paths)} individual PDB files, each with CONECT records.")
     return individual_pdb_paths
 
 def write_multi_pdb(pdb_paths, output_path):
