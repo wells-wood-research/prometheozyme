@@ -15,7 +15,6 @@ def protonate_all(path=None):
 
     # Save the fully protonated structure
     outfile = f"{os.path.splitext(path)[0]}_prot.pdb"
-   
     cmd.save(outfile, 'mol', state=0, format='pdb', quiet=0)
     atom_count = cmd.count_atoms('mol')
 
