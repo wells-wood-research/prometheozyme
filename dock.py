@@ -3,6 +3,7 @@ import argparse
 from typing import Tuple, List
 import subprocess
 import os
+import pdbUtils
 
 # Van der Waals radii in Angstroms for common elements
 VDW_RADII = {
@@ -71,8 +72,20 @@ def calculate_docking_box(receptor_path: str, ligand_path: str, padding: float =
         Tuple of (center_x, center_y, center_z, size_x, size_y, size_z)
     """
     # Read receptor and ligand files
-    receptor_types, receptor_coords = read_xyz_file(receptor_path)
-    ligand_types, ligand_coords = read_xyz_file(ligand_path)
+    rec_ext = os.path.splitext(receptor_path)[1]
+    lig_ext = os.path.splitext(ligand_path)[1]
+    if rec_ext == ".xyz":
+        receptor_types, receptor_coords = read_xyz_file(receptor_path)
+    elif rec_ext == ".pdb":
+        receptor_df = pdbUtils.pdb2df(receptor_path)
+        receptor_types = receptor_df['ATOM_NAME'].tolist()
+        receptor_coords = receptor_df[['X', 'Y', 'Z']].to_numpy()
+    if lig_ext == ".xyz":
+        ligand_types, ligand_coords = read_xyz_file(ligand_path)
+    elif lig_ext == ".pdb":
+        ligand_df = pdbUtils.pdb2df(ligand_path)
+        ligand_types = ligand_df['ATOM_NAME'].tolist()
+        ligand_coords = ligand_df[['X', 'Y', 'Z']].to_numpy()
     
     # Calculate receptor center and extent
     center_x, center_y, center_z, receptor_size_x, receptor_size_y, receptor_size_z = calculate_center_and_extent(receptor_coords, receptor_types)
@@ -143,7 +156,8 @@ def dock(host, ing, outdir, dock_params, redocking=False, logger=None):
         "-o", outpath,
         "--atom_terms", os.path.join(outdir, "atom_terms"),
         "--exhaustiveness", str(dock_params['exhaustiveness']),
-        "--num_modes", str(dock_params['num_modes'])
+        "--num_modes", str(dock_params['num_modes']),
+        "--custom_atoms", "/home/mchrnwsk/theozymes/parameters.dat"
     ]
 
     # Include optional parameters if not None or False

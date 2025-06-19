@@ -50,7 +50,7 @@ ingredients:
 
   - &arg
     name: arg
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/arginine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/arginine_backbone_O.pdb
     charge: 1
     multiplicity: 1
     indices:
@@ -58,7 +58,7 @@ ingredients:
       
   - &lys
     name: lys
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/lysine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/lysine_backbone_O.pdb
     charge: 1
     multiplicity: 1
     indices:
@@ -66,7 +66,7 @@ ingredients:
 
   - &his
     name: his
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/histidine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/histidine_backbone_O.pdb
     charge: 0
     multiplicity: 1
     indices:
@@ -76,7 +76,7 @@ ingredients:
 
   - &cys
     name: cys
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cysteine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/cysteine_backbone_O.pdb
     charge: 0
     multiplicity: 1
     indices:
@@ -85,7 +85,7 @@ ingredients:
 
   - &ser
     name: ser
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/serine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/serine_backbone_O.pdb
     charge: 0
     multiplicity: 1
     indices:
@@ -94,7 +94,7 @@ ingredients:
 
   - &thr
     name: thr
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/threonine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/threonine_backbone_O.pdb
     charge: 0
     multiplicity: 1
     indices:
@@ -103,7 +103,7 @@ ingredients:
 
   - &tyr
     name: tyr
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/tyrosine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/tyrosine_backbone_O.pdb
     charge: 0
     multiplicity: 1
     indices:
@@ -112,7 +112,7 @@ ingredients:
 
   - &phe
     name: phe
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/phenylalanine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/phenylalanine_backbone_O.pdb
     charge: 0
     multiplicity: 1
     indices:
@@ -120,7 +120,7 @@ ingredients:
 
   - &glu
     name: glu
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/glutamate_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/glutamate_backbone_O.pdb
     charge: -1
     multiplicity: 1
     indices:
@@ -129,7 +129,7 @@ ingredients:
 
   - &gln
     name: gln
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/glutamine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/glutamine_backbone_O.pdb
     charge: 0
     multiplicity: 1
     indices:
@@ -139,7 +139,7 @@ ingredients:
 
   - &asp
     name: asp
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/aspartate_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/aspartate_backbone_O.pdb
     charge: -1
     multiplicity: 1
     indices:
@@ -149,7 +149,7 @@ ingredients:
 
   - &asn
     name: asn
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/asparagine_backbone_O.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/asparagine_backbone_O.pdb
     charge: 0
     multiplicity: 1
     indices:
