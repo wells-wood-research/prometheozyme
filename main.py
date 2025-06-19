@@ -40,12 +40,13 @@ def setup_config(configPath):
     misc = config.get("misc", {})
     dock_params = config.get("docking", {})
     redock_params = config.get("redocking", {})
+    backbone = misc.get("backbone", False)
     evaluate_backbone = misc.get("evaluate_backbone", False)
     workdir = misc.get("workdir", ".")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     outdir = os.path.join(workdir, f"output_{timestamp}")
 
-    return config, outdir, dock_params, redock_params, evaluate_backbone
+    return config, outdir, dock_params, redock_params, backbone, evaluate_backbone
 
 def setup_ingredients(config):
     ingredients = config.get("ingredients", [])
@@ -250,7 +251,7 @@ def process_constraints(docked_path, ing, host, outdir, evaluate_backbone, dock_
     
 def main(configPath):
     # Read config file
-    config, outdir, dock_params, redock_params, evaluate_backbone = setup_config(configPath)
+    config, outdir, dock_params, redock_params, backbone, evaluate_backbone = setup_config(configPath)
 
     # Prepare ingredients and roles from the configuration    
     roles, host, ingredient_map, unique_guests_constraints = setup_ingredients(config)
@@ -299,7 +300,7 @@ def main(configPath):
         else:
             logger.debug(f"Arrangement at path {arr['path']} has no failed guests.")
         # simple constrained optimisation
-        arr_optimised, arr_reactant = optimise(arr, host_atom_count, ingredient_map, logger)
+        arr_optimised, arr_reactant = optimise(arr, host_atom_count, ingredient_map, backbone, logger)
     #    # prepare product
     #    arr_product = prepare_product(arr, arr_reactant)
 

@@ -1,6 +1,7 @@
 misc:
   evaluate_backbone: False
   workdir: "/home/mchrnwsk/theozymes/docking"
+  backbone: True
 
 # Define docking params
 docking:

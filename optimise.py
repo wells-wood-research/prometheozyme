@@ -68,7 +68,7 @@ def process_constraint_mixed(path, original_comment, conformation_coords, curren
         (g_idx, h_idx), best_distance = result
         return (g_idx, h_idx), updated_xyz_coords, updated_atom_types
 
-def optimise(arr, host_atom_count, ingredient_map, logger):
+def optimise(arr, host_atom_count, ingredient_map, backbone, logger):
     path = arr["path"]
     arrName = os.path.splitext(os.path.basename(path))[0]
     orcaInputDir = os.path.join(os.path.dirname(path), arrName)
@@ -108,6 +108,10 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
         guest = guest_info["obj"]
         current_guest_atom_count = get_atom_count(ingredient_map[guest_info["obj"].name].path)
         current_guest_absolute_start_index = host_atom_count + accumulated_guest_atom_count
+        if backbone:
+            backbone_idx = current_guest_absolute_start_index + 1
+        else:
+            backbone_idx = current_guest_absolute_start_index
         for constraint_idx, constraint in enumerate(guest.constraints):
             guestIdx_orig, guestType, hostIdx_orig, hostType, val = constraint
             absolute_guest_indices = [current_guest_absolute_start_index + g_idx for g_idx in guestIdx_orig]
@@ -119,7 +123,7 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
                     continue
                 (g_idx, h_idx), best_distance = result
                 geom["keep"].append({"atoms": [g_idx, h_idx], "val": val})
-                geom_pots["pots"].append({"atoms": [current_guest_absolute_start_index, h_idx], "val": 0.5})
+                geom_pots["pots"].append({"atoms": [backbone_idx, h_idx], "val": 0.5})
 
             elif guestType == "com" and hostType == "com":
                 result = process_constraint_com(current_xyz_coords, current_atom_types, absolute_guest_indices, hostIdx_orig)
@@ -128,7 +132,7 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
                     continue
                 (g_idx, h_idx), current_xyz_coords, current_atom_types = result
                 geom["keep"].append({"atoms": [g_idx, h_idx], "val": val})
-                geom_pots["pots"].append({"atoms": [current_guest_absolute_start_index, h_idx], "val": 0.5})
+                geom_pots["pots"].append({"atoms": [backbone_idx, h_idx], "val": 0.5})
 
             elif (guestType == "iter" and hostType == "com") or (guestType == "com" and hostType == "iter"):
                 result = process_constraint_mixed(path, original_comment, current_xyz_coords, current_atom_types, absolute_guest_indices, guestType, hostIdx_orig, hostType, val)
@@ -137,7 +141,7 @@ def optimise(arr, host_atom_count, ingredient_map, logger):
                     continue
                 (g_idx, h_idx), current_xyz_coords, current_atom_types = result
                 geom["keep"].append({"atoms": [g_idx, h_idx], "val": val})
-                geom_pots["pots"].append({"atoms": [current_guest_absolute_start_index, h_idx], "val": 0.5})
+                geom_pots["pots"].append({"atoms": [backbone_idx, h_idx], "val": 0.5})
 
             else:
                 logger.error(f"guestType in constraints for role {arr['desc']} cannot be {guestType}; only allowed options are 'iter' and 'com'!")
