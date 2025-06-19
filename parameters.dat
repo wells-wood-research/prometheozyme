@@ -1,0 +1,38 @@
+# AutoDock 4 Energy Parameters
+
+# - Atomic solvation volumes and parameters
+# - Unweighted vdW and Unweighted H-bond Well Depths
+#
+# - Atom Types
+# - Rii = sum of vdW radii of two like atoms (in Angstrom)
+# - epsii = vdW well depth (in Kcal/mol)
+# - vol = atomic solvation volume (in Angstrom^3)
+# - solpar = atomic solvation parameter
+# - Rij_hb = H-bond radius of the heteroatom in contact with a hydrogen (in Angstrom)
+# - epsij_hb = well depth of H-bond (in Kcal/mol)
+# - hbond = integer indicating type of H-bonding atom (0=no H-bond)
+# - rec_index = initialised to -1, but later on holds count of how many of this atom type are in receptor
+# - map_index = initialised to -1, but later on holds the index of the AutoGrid map
+# - bond_index = used in AutoDock to detect bonds; see "mdist.h", enum {C,N,O,H,XX,P,S}
+#
+# - To obtain the Rij value for non H-bonding atoms, calculate the 
+#        arithmetic mean of the Rii values for the two atom types.
+#        Rij = (Rii + Rjj) / 2
+#
+# - To obtain the epsij value for non H-bonding atoms, calculate the 
+#        geometric mean of the epsii values for the two atom types.
+#        epsij = sqrt( epsii * epsjj )
+#
+# - Note that the Rij_hb value is non-zero for heteroatoms only, and zero for H atoms;
+#        to obtain the length of an H-bond, look up Rij_hb for the heteroatom only; 
+#        this is combined with the Rii value for H in the receptor, in AutoGrid.
+#        For example, the Rij_hb for OA-HD H-bonds will be (1.9 + 1.0) Angstrom, 
+#        and the weighted epsij_hb will be 5.0 kcal/mol * FE_coeff_hbond.
+#
+#        Atom   Rii                             Rij_hb       rec_index
+#        Type         epsii           solpar         epsij_hb    map_index
+#                            vol                          hbond     bond_index
+#        --     ----  -----  -------  --------  ---  ---  -  --  -- --
+atom_par Cx     3.00  0.000   0.0000   0.00000  0.0  0.0  0  -1  -1  0	
+atom_par Nx     3.50  0.000   0.0000   0.00000  0.0  0.0  0  -1  -1  1	
+atom_par Hx     2.00  0.000   0.0000   0.00000  0.0  0.0  0  -1  -1  3	
