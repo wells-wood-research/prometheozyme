@@ -264,7 +264,16 @@ def get_maximum_common_substructure(mol1: RDchem.Mol, mol2: RDchem.Mol) -> RDche
     Raises:
         SubstructureNotFound: If MCS cannot be found by RDKit.
     """
-    mcs = rdFMCS.FindMCS([mol1,mol2])
+
+    mcs_params = rdFMCS.MCSParameters()
+    mcs_params.AtomTyper = rdFMCS.AtomCompare.CompareAny  # Match atoms by connectivity only
+    mcs_params.BondTyper = rdFMCS.BondCompare.CompareAny  # Match bonds by connectivity only
+    mcs_params.BondCompareParameters.MatchStereo = False  # Explicitly ignore stereochemistry
+    mcs_params.AtomCompareParameters.MatchChiralTag = False  # Ignore chirality (already default)
+    mcs_params.Timeout = 3600  # Set timeout (in seconds)
+    mcs_params.Verbose = False  # Enable verbose output for debugging
+
+    mcs = rdFMCS.FindMCS([mol1,mol2], mcs_params)
     if mcs.canceled:
         raise SubstructureNotFound("Common substructure could not be found. Investigate your inputs.")
     mcs_mol = mcs.queryMol
@@ -407,10 +416,6 @@ def split_df_by_H(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     dfNotH = df[~isH].copy()  # Rows where atom is not hydrogen
     dfH = df[isH].copy()       # Rows where atom is hydrogen
 
-    # Warn if no hydrogen atoms are found
-    if len(dfH) == 0:
-        print("Warning: No hydrogen atoms found in the DataFrame. Have you provided correct input structure, including hydrogens?")
-
     return dfNotH, dfH
 
 def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple[int], match2: tuple[int], diff1: list, diff2: list) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -446,10 +451,30 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
     # Split DataFrames into non-hydrogen and hydrogen atoms
     df1NotH, df1H = split_df_by_H(df1)
     df2NotH, df2H = split_df_by_H(df2)
+
+#    print("df1NotH")
+#    print(df1NotH)
+#    print()
+#    print("df1H")
+#    print(df1H)
+#    print()
+#    print("df2NotH")
+#    print(df2NotH)
+#    print()
+#    print("df2H")
+#    print(df2H)
+#    print()
     
     # Convert tuples to lists for easier manipulation
     idx1common = list(match1)
     idx2common = list(match2)
+
+#    print("idx1common")
+#    print(idx1common)
+#    print()
+#    print("idx2common")
+#    print(idx2common)
+#    print()
 
     # Treat None as empty list
     diff1 = diff1 or []
@@ -457,7 +482,10 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
 
     # --- Reindexing for common non-hydrogen atoms ---
     # Create a new DataFrame for df1's common atoms, maintaining their original indices
-    df1common = df1NotH.loc[idx1common].copy() if idx1common else pd.DataFrame(columns=df1NotH.columns)
+    df1common = df1NotH.iloc[idx1common].copy() if idx1common else pd.DataFrame(columns=df1NotH.columns)
+#    print("df1common")
+#    print(df1common)
+#    print()
 
     # Create a temporary DataFrame for df2's common atoms, indexed by their corresponding df1 indices
     # This is the core reindexing step for common atoms.
@@ -468,6 +496,10 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
         row = df2NotH.iloc[referee_idx].copy()
         df2common_reindexed_data.append(row.rename(ref_idx)) # Rename the series index to the new index
 
+#    print("df2common_reindexed_data")
+#    print(df2common_reindexed_data)
+#    print()
+
     if df2common_reindexed_data:
         df2common = pd.DataFrame(df2common_reindexed_data, columns=df2NotH.columns)
         # Sort by the new index to ensure consistent order
@@ -475,6 +507,9 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
     else:
         df2common = pd.DataFrame(columns=df2NotH.columns)
 
+#    print("df2common")
+#    print(df2common)
+#    print()
 
     # --- Handle additional non-hydrogen elements for df1 ---
     df1_parts = [df1common]
@@ -501,6 +536,9 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
         df2_parts.append(df2diff)
     df2new = pd.concat(df2_parts)
 
+#    print("df2new")
+#    print(df2new)
+#    print()
 
     # --- Merge hydrogen atoms back into the reindexed DataFrames ---
     if not df1H.empty:
@@ -521,10 +559,18 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
         df2H_reindexed = df2H.copy()
         df2H_reindexed.index = new_df2H_indices
         df2new = pd.concat([df2new, df2H_reindexed])
+
+#    print("df2new")
+#    print(df2new)
+#    print()
     
     # Sort by index to ensure consistent order
     df1new = df1new.sort_index().reset_index(drop=True)
     df2new = df2new.sort_index().reset_index(drop=True)
+
+#    print("df2new")
+#    print(df2new)
+#    print()
 
     # Reset ATOM_ID to match new row order (1-based)
     df1new['ATOM_ID'] = range(1, len(df1new) + 1)
@@ -558,7 +604,7 @@ def pad_to_match(df1: pd.DataFrame, df2: pd.DataFrame) -> tuple[pd.DataFrame, pd
 
 #############################################################################################################
 
-def reindex(reference: str, referee: str, outDir: str, visualise=False, print=False, logger=None) -> Optional[str]:
+def reindex(reference: str, referee: str, outDir: str, visualise=False, logger=None) -> Optional[str]:
     """
     Loads reference molecule (index maintained) and referee molecule (reindexed to match reference).
     Reindexes referee to match reference using RDKit's MCS, logging specific failures and returning None if unsuccessful.
@@ -610,6 +656,22 @@ def reindex(reference: str, referee: str, outDir: str, visualise=False, print=Fa
         if logger:
             logger.error(f"Failed to compute substructure matches or differences for {name2}: {str(e)}")
         return None
+    
+#    print("match1")
+#    print(match1)
+#    print()
+
+#    print("match2")
+#    print(match2)
+#    print()
+
+#    print("diff1")
+#    print(diff1)
+#    print()
+
+#    print("diff2")
+#    print(diff2)
+#    print()
 
     # Reindex the referee dataframe to match atom indices of reference
     try:
@@ -617,6 +679,7 @@ def reindex(reference: str, referee: str, outDir: str, visualise=False, print=Fa
     except Exception as e:
         if logger:
             logger.error(f"Failed to reindex dataframes for {name2}: {str(e)}")
+        #    print(e)
         return None
 
     # Save to xyz and pdb files
@@ -627,6 +690,7 @@ def reindex(reference: str, referee: str, outDir: str, visualise=False, print=Fa
     except Exception as e:
         if logger:
             logger.error(f"Failed to save reindexed files for {name2}: {str(e)}")
+        #    print(e)
         return None
 
     if visualise:
@@ -673,6 +737,6 @@ if __name__ == "__main__":
     outDir = args.outDir
 
     try:
-        reindex(reference, referee, outDir)
+        reindex(reference, referee, outDir, None)
     except (ValueError, TypeError, RuntimeError) as e:
         print(f"Error: {e}")
