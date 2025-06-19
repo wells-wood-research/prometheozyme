@@ -1,5 +1,5 @@
 misc:
-  evaluate_backbone: False
+  evaluate_backbone_O: False
   workdir: "/home/mchrnwsk/theozymes/docking"
   backbone: True
 
@@ -50,7 +50,7 @@ ingredients:
 
   - &arg
     name: arg
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/arginine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/arginine_backbone_O.xyz
     charge: 1
     multiplicity: 1
     indices:
@@ -58,7 +58,7 @@ ingredients:
       
   - &lys
     name: lys
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/lysine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/lysine_backbone_O.xyz
     charge: 1
     multiplicity: 1
     indices:
@@ -66,96 +66,96 @@ ingredients:
 
   - &his
     name: his
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/histidine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/histidine_backbone_O.xyz
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 7
-      h_donor: 5
-      deprotonate: [7]
+      h_acceptor: 9 # 9 backbone_O, 8 backbone, 5 cb
+      h_donor: 7 # 7 backbone_O, 6 backbone, 3 cb
+      deprotonate: [9] # 9 backbone_O, 8 backbone, 5 cb
 
   - &cys
     name: cys
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cysteine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/cysteine_backbone_O.xyz
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 3
-      h_donor: 3
+      h_acceptor: 5 # 5 backbone_O, 4 backbone, 1 cb
+      h_donor: 5 # 5 backbone_O, 4 backbone, 1 cb
 
   - &ser
     name: ser
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/serine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/serine_backbone_O.xyz
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 3
-      h_donor: 3
+      h_acceptor: 5 # 5 backbone_O, 4 backbone, 1 cb
+      h_donor: 5 # 5 backbone_O, 4 backbone, 1 cb
 
   - &thr
     name: thr
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/threonine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/threonine_backbone_O.xyz
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 3
-      h_donor: 3
+      h_acceptor: 5 # 5 backbone_O, 4 backbone, 2 cb
+      h_donor: 5 # 5 backbone_O, 4 backbone, 2 cb
 
   - &tyr
     name: tyr
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/tyrosine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/tyrosine_backbone_O.xyz
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 9
-      h_donor: 9
+      h_acceptor: 11 # 11 backbone_O, 10 backbone, 5 cb
+      h_donor: 11 # 11 backbone_O, 10 backbone, 5 cb
 
   - &phe
     name: phe
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/phenylalanine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/phenylalanine_backbone_O.xyz
     charge: 0
     multiplicity: 1
     indices:
-      ring: [3, 4, 5, 6, 7, 8]
+      ring: [5, 6, 7, 8, 9, 10] # [5, 6, 7, 8, 9, 10] backbone_O, [4, 5, 6, 7, 8, 9] backbone, [1, 2, 3, 4, 5, 6] cb
 
   - &glu
     name: glu
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/glutamate_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/glutamate_backbone_O.xyz
     charge: -1
     multiplicity: 1
     indices:
-      h_acceptor: [5, 6]
-      deprotonate: [5, 6]
+      h_acceptor: [7, 8] # [7, 8] backbone_O, [6, 7] backbone, [4, 5] cb
+      deprotonate: [7, 8] # [7, 8] backbone_O, [6, 7] backbone, [4, 5] cb
 
   - &gln
     name: gln
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/glutamine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/glutamine_backbone_O.xyz
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 6
-      h_donor: 5
-      deprotonate: [6]
+      h_acceptor: 8 # 8 backbone_O, 7 backbone, 3 cb
+      h_donor: 7 # 7 backbone_O, 6 backbone, 4 cb
+      deprotonate: [8] # 8 backbone_O, 7 backbone, 3 cb
 
   - &asp
     name: asp
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/aspartate_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/aspartate_backbone_O.xyz
     charge: -1
     multiplicity: 1
     indices:
-      h_acceptor: 5
-      h_donor: 6
-      deprotonate: [5]
+      h_acceptor: 6 # 6 backbone_O, 5 backbone, 2 cb
+      h_donor: 7 # 7 backbone_O, 6 backbone, 3 cb
+      deprotonate: [6] # 6 backbone_O, 5 backbone, 2 cb
 
   - &asn
     name: asn
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/asparagine_backbone.xyz
+    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/asparagine_backbone_O.xyz
     charge: 0
     multiplicity: 1
     indices:
-      h_acceptor: 5
-      h_donor: 4
-      deprotonate: [5]
+      h_acceptor: 7 # 7 backbone_O, 6 backbone, 3 cb
+      h_donor: 6 # 6 backbone_O, 5 backbone, 2 cb
+      deprotonate: [7] # 7 backbone_O, 6 backbone, 3 cb
 
 roles:
   - name: base
