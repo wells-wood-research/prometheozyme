@@ -8,6 +8,7 @@ import sys # To ensure custom classes are found if not run as a script
 
 from utils import read_xyz, get_atom_count, convert_optimised_arr_xyz_to_pdb
 from main import setup_config, setup_ingredients
+from glycinate import add_glycine_to_pdb
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ def process_arrangement_directories(base_directory, config_path):
     logger.info(f"Starting processing in directory: {base_directory}")
 
     # Call setup_config from imported main module
-    config, _, _, _, _ = setup_config(config_path)
+    config, _, _, _, _, _ = setup_config(config_path)
     if not config:
         logger.error("Failed to load configuration. Aborting PDB conversion.")
         return
@@ -108,12 +109,16 @@ def process_arrangement_directories(base_directory, config_path):
             continue
 
         # Define output PDB path
-        output_pdb_dir = os.path.join(base_directory, "final_theozymes")
+        output_pdb_dir = os.path.join(base_directory, "final_theozymes", "no_gly")
+        output_gly_dir = os.path.join(base_directory, "final_theozymes", "gly")
         os.makedirs(output_pdb_dir, exist_ok=True) # Ensure the output directory exists
+        os.makedirs(output_gly_dir, exist_ok=True) # Ensure the output directory exists
         output_pdb_path = os.path.join(output_pdb_dir, f"arrangement_{arrangement_num}.pdb")
+        output_gly_path = os.path.join(output_gly_dir, f"arrangement_{arrangement_num}.pdb")
 
         # Call the function to write the PDB file
         convert_optimised_arr_xyz_to_pdb(output_pdb_path, pull_xyz_structure, host_atom_count, guest_names_ordered, ingredient_map, logger=logger)
+        add_glycine_to_pdb(output_pdb_path, output_gly_path, glycine_pdb="/home/mchrnwsk/theozymes/ingredients/glycine.pdb")
 
     logger.info("\nAll arrangements processed.")
 

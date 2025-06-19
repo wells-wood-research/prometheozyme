@@ -209,6 +209,8 @@ def convert_optimised_arr_xyz_to_pdb(output_pdb_path, xyz_data, host_atom_count,
                     atom_element = atom_types[current_atom_global_idx]
                     x, y, z = coords[current_atom_global_idx]
                     
+                    if i == 1 and (atom_element.upper() == "C" or atom_element.upper() == "CA" or atom_element.upper() == "CX"):
+                        atom_element = "CA"
                     line = (f"ATOM  {current_atom_global_idx + 1:5d}  "
                             f"{atom_element:<4s}"
                             f"{guest_res_name:<3s} "
@@ -216,7 +218,7 @@ def convert_optimised_arr_xyz_to_pdb(output_pdb_path, xyz_data, host_atom_count,
                             f"{current_residue_serial:4d}    "
                             f"{x:8.3f}{y:8.3f}{z:8.3f}"
                             f"  1.00  0.00          "
-                            f"{atom_element:>2s}\n")
+                            f"{atom_element[0]:>2s}\n")
                     f.write(line)
                     current_atom_global_idx += 1
                 current_residue_serial += 1 # Increment residue number for the next guest
