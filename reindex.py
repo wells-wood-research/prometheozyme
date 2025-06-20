@@ -266,7 +266,7 @@ def get_maximum_common_substructure(mol1: RDchem.Mol, mol2: RDchem.Mol) -> RDche
     """
 
     mcs_params = rdFMCS.MCSParameters()
-    mcs_params.AtomTyper = rdFMCS.AtomCompare.CompareAny  # Match atoms by connectivity only
+    mcs_params.AtomTyper = rdFMCS.AtomCompare.CompareElements  # Match atoms by connectivity only
     mcs_params.BondTyper = rdFMCS.BondCompare.CompareAny  # Match bonds by connectivity only
     mcs_params.BondCompareParameters.MatchStereo = False  # Explicitly ignore stereochemistry
     mcs_params.AtomCompareParameters.MatchChiralTag = False  # Ignore chirality (already default)
