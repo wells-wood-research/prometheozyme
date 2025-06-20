@@ -33,13 +33,31 @@
 #        Type         epsii           solpar         epsij_hb    map_index
 #                            vol                          hbond     bond_index
 #        --     ----  -----  -------  --------  ---  ---  -  --  -- --
-atom_par Cx     4.00  0.000   0.0000   0.00000  0.0  0.0  0  -1  -1  0	# Non-interacting Backbone Carbon
-atom_par Nx     3.50  0.000   0.0000   0.00000  0.0  0.0  0  -1  -1  1	# Non-interacting Backbone Nitrogen
-atom_par Ox     3.20  0.000   0.0000   0.00000  0.0  0.0  0  -1  -1  2	# Non-interacting Backbone Oxygen
-atom_par C      4.00  0.150  33.5103  -0.00143  0.0  0.0  0  -1  -1  0	# Non H-bonding Aliphatic Carbon (CB, CG, CD)
-atom_par A      4.00  0.150  33.5103  -0.00052  0.0  0.0  0  -1  -1  0	# Non H-bonding Aromatic Carbon (CD1, CD2, CE1, CE2, CZ)
-atom_par NA     3.50  0.160  22.4493  -0.00162  1.9  5.0  4  -1  -1  1	# Acceptor 1 H-bond Nitrogen (ND2, NE, NH1, NH2, NE2)
-atom_par OA     3.20  0.200  17.1573  -0.00251  1.9  5.0  5  -1  -1  2	# Acceptor 2 H-bonds Oxygen (OD1, OD2, OE1, OG)
-atom_par SA     4.00  0.200  33.5103  -0.00214  2.5  1.0  5  -1  -1  6	# Acceptor 2 H-bonds Sulphur (SG)
-atom_par H      2.00  0.020   0.0000   0.00051  0.0  0.0  0  -1  -1  3	# Non H-bonding Hydrogen (HA, HB1, HB2, HG1, HG2, HD1, HD2, HE1, HE2, HZ, H1, H2)
-atom_par HD     2.00  0.020   0.0000   0.00051  0.0  0.0  2  -1  -1  3	# Donor 1 H-bond Hydrogen (HD21, HD22, HE, HH11, HH12, HH21, HH22, HE21, HE22, HG)
+atom_par N      3.50  0.160  22.4493  -0.00162  0.0  0.0  0  -1  -1  0  # Backbone Nitrogen
+atom_par C      4.00  0.150  33.5103  -0.00143  0.0  0.0  0  -1  -1  0  # Backbone Carbonyl Carbon
+atom_par O      3.20  0.200  17.1573  -0.00251  0.0  0.0  0  -1  -1  0  # Backbone Carbonyl Oxygen
+atom_par CB     4.00  0.150  33.5103  -0.00143  0.0  0.0  0  -1  -1  0  # Beta Carbon (aliphatic)
+atom_par CG     4.00  0.150  33.5103  -0.00143  0.0  0.0  0  -1  -1  0  # Gamma Carbon (aliphatic or aromatic)
+atom_par CD     4.00  0.150  33.5103  -0.00143  0.0  0.0  0  -1  -1  0  # Delta Carbon (aliphatic or aromatic)
+atom_par CE     4.00  0.150  33.5103  -0.00143  0.0  0.0  0  -1  -1  0  # Epsilon Carbon (aliphatic)
+atom_par CZ     4.00  0.150  33.5103  -0.00052  0.0  0.0  0  -1  -1  0  # Zeta Carbon (aromatic)
+atom_par NE     3.50  0.160  22.4493  -0.00162  1.9  5.0  4  -1  -1  1  # Epsilon Nitrogen (H-bond acceptor)
+atom_par NZ     3.50  0.160  22.4493  -0.00162  0.0  0.0  0  -1  -1  1  # Zeta Nitrogen (Lysine)
+atom_par NH1    3.50  0.160  22.4493  -0.00162  1.9  5.0  4  -1  -1  1  # Guanidino Nitrogen (H-bond acceptor)
+atom_par NH2    3.50  0.160  22.4493  -0.00162  1.9  5.0  4  -1  -1  1  # Guanidino Nitrogen (H-bond acceptor)
+atom_par ND1    3.50  0.160  22.4493  -0.00162  1.9  5.0  4  -1  -1  1  # Delta Nitrogen (Histidine, H-bond acceptor)
+atom_par ND2    3.50  0.160  22.4493  -0.00162  1.9  5.0  4  -1  -1  1  # Delta Nitrogen (Asparagine, H-bond acceptor)
+atom_par NE2    3.50  0.160  22.4493  -0.00162  1.9  5.0  4  -1  -1  1  # Epsilon Nitrogen (H-bond acceptor)
+atom_par CE1    4.00  0.150  33.5103  -0.00052  0.0  0.0  0  -1  -1  0  # Epsilon Carbon (aromatic)
+atom_par CE2    4.00  0.150  33.5103  -0.00052  0.0  0.0  0  -1  -1  0  # Epsilon Carbon (aromatic)
+atom_par CD1    4.00  0.150  33.5103  -0.00052  0.0  0.0  0  -1  -1  0  # Delta Carbon (aromatic)
+atom_par CD2    4.00  0.150  33.5103  -0.00052  0.0  0.0  0  -1  -1  0  # Delta Carbon (aromatic)
+atom_par OD1    3.20  0.200  17.1573  -0.00251  1.9  5.0  5  -1  -1  2  # Delta Oxygen (H-bond acceptor)
+atom_par OD2    3.20  0.200  17.1573  -0.00251  1.9  5.0  5  -1  -1  2  # Delta Oxygen (H-bond acceptor)
+atom_par OE1    3.20  0.200  17.1573  -0.00251  1.9  5.0  5  -1  -1  2  # Epsilon Oxygen (H-bond acceptor)
+atom_par OE2    3.20  0.200  17.1573  -0.00251  1.9  5.0  5  -1  -1  2  # Epsilon Oxygen (H-bond acceptor)
+atom_par OG     3.20  0.200  17.1573  -0.00251  1.9  5.0  5  -1  -1  2  # Gamma Oxygen (H-bond acceptor)
+atom_par OG1    3.20  0.200  17.1573  -0.00251  1.9  5.0  5  -1  -1  2  # Gamma Oxygen (H-bond acceptor)
+atom_par CG2    4.00  0.150  33.5103  -0.00143  0.0  0.0  0  -1  -1  0  # Gamma Carbon (aliphatic)
+atom_par OH     3.20  0.200  17.1573  -0.00251  1.9  5.0  5  -1  -1  2  # Hydroxyl Oxygen (H-bond acceptor)
+atom_par SG     4.00  0.200  33.5103  -0.00214  0.0  0.0  0  -1  -1  6  # Sulfur (Cysteine)

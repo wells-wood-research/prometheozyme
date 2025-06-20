@@ -410,7 +410,7 @@ def split_df_by_H(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         indicating that no hydrogen atoms were found in the DataFrame. The second DataFrame in this case will be empty.
     """
     # Check if either ATOM_NAME or ELEMENT is 'H' to identify hydrogen atoms
-    isH = df['ATOM_NAME'].str.upper().str.match(r'^H\d*$')
+    isH = df['ATOM_NAME'].str.upper().str.startswith('H')
 
     # Split DataFrame
     dfNotH = df[~isH].copy()  # Rows where atom is not hydrogen
@@ -447,6 +447,13 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
         raise TypeError(f"diff1 must be a list or None, got {type(diff1)}")
     if not (isinstance(diff2, list) or diff2 is None):
         raise TypeError(f"diff2 must be a list or None, got {type(diff2)}")
+
+#    print("df1")
+#    print(df1)
+#    print()
+#    print("df2")
+#    print(df2)
+#    print()
 
     # Split DataFrames into non-hydrogen and hydrogen atoms
     df1NotH, df1H = split_df_by_H(df1)
@@ -576,6 +583,8 @@ def get_reindexed_dataframes(df1: pd.DataFrame, df2: pd.DataFrame, match1: tuple
     df1new['ATOM_ID'] = range(1, len(df1new) + 1)
     df2new['ATOM_ID'] = range(1, len(df2new) + 1)
 
+#    print("End")
+
     return df1new, df2new
 
 def pad_to_match(df1: pd.DataFrame, df2: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -679,7 +688,7 @@ def reindex(reference: str, referee: str, outDir: str, visualise=False, logger=N
     except Exception as e:
         if logger:
             logger.error(f"Failed to reindex dataframes for {name2}: {str(e)}")
-        #    print(e)
+    #    print(e)
         return None
 
     # Save to xyz and pdb files
@@ -690,7 +699,7 @@ def reindex(reference: str, referee: str, outDir: str, visualise=False, logger=N
     except Exception as e:
         if logger:
             logger.error(f"Failed to save reindexed files for {name2}: {str(e)}")
-        #    print(e)
+    #    print(e)
         return None
 
     if visualise:
@@ -736,7 +745,4 @@ if __name__ == "__main__":
     referee = args.referee
     outDir = args.outDir
 
-    try:
-        reindex(reference, referee, outDir, None)
-    except (ValueError, TypeError, RuntimeError) as e:
-        print(f"Error: {e}")
+    reindex(reference, referee, outDir, None)

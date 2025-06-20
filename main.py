@@ -172,7 +172,7 @@ def process_docking(ing, host, outdir, dock_params, redocking=False):
         return None
 
     # Prepare reference for reindexing (PDB version of original ingredient)
-    reindex_reference_path = ing.path.replace(".xyz", ".pdb")
+    reindex_reference_path = f"{os.path.splitext(ing.path)[0]}_ref.pdb"
     if not os.path.exists(reindex_reference_path):
         logger.warning("Reference ingredient in PDB format not found - using XYZ instead; consider adding a PDB reference with same atom indices and path as XYZ.")
         reindex_reference_path = ing.path
