@@ -254,8 +254,8 @@ def expand_constraints(guest, host, constraint):
       list of option tuples: (guest_atom_index, host_atom_index, val, force)
     """
     # Filter tuples whose activity matches the requested activity name
-    guest_matches = [item for item in guest.indices if item[2] == constraint.guestIdx]
-    host_matches = [item for item in host.indices if item[2] == constraint.hostIdx]
+    guest_matches = [item for item in guest.indices if constraint.guestIdx in item[2]]
+    host_matches = [item for item in host.indices if constraint.hostIdx in item[2]]
 
     keep = []
     for g_item, h_item in itertools.product(guest_matches, host_matches):

@@ -10,9 +10,10 @@ class Ingredient:
         self.charge = charge
         self.multiplicity = multiplicity
         pdb = pdbUtils.pdb2df(path)
-        pdb["ROLE"] = None
+        pdb["ROLE"] = [[] for _ in range(len(pdb))]
         for role_name, atom_names in roles.items():
-            pdb.loc[pdb["ATOM_NAME"].isin(atom_names), "ROLE"] = role_name 
+            mask = pdb["ATOM_NAME"].isin(atom_names)
+            pdb.loc[mask, "ROLE"] = pdb.loc[mask, "ROLE"].apply(lambda lst: lst + [role_name])
         self.indices = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in pdb.iterrows()]
         self.constraints = constraints
         self.name = name or os.path.splitext(os.path.basename(path))[0]
