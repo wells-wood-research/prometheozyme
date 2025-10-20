@@ -1,249 +1,184 @@
 misc:
-  evaluate_backbone_O: False
-  workdir: "/home/mchrnwsk/theozymes/docking"
-  backbone: True
+  workdir: "/home/mchrnwsk/prometheozyme/runs"
 
-# Define docking params
-docking:
-  center_x: null
-  center_y: null
-  center_z: null
-  size_x: null
-  size_y: null
-  size_z: null
-  scoring: vina
-  cnn_scoring: none
-  pose_sort_order: Energy
-  addH: false
-  stripH: false
-  exhaustiveness: 8
-  num_modes: 10000
-  no_gpu: false
-redocking:
-  num_modes: 100000
-  min_rmsd_filter: 0.5
-  temperature: 451
-  # """How many iterations each MC chain performs.
-  # By default is heuristically scaled based on number of degrees of freedom (more flexible ligands will take longer).
-  # ! SO this might not actually be better for more flexible ligands !
-  # Don't recommend using unless you want to do a "quick and dirty" docking run."""
-  num_mc_steps: 20000
-
-# Define substrate and objects
-#!#!#!#! All hydrogen atoms ABSOLUTELY MUST be specified at the end of the XYZ files
-#!#!#!#! because gnina removes non-polar hydrogens and fucks with indexing
+# Define all substrates and objects
 ingredients:
-  - &host
-    name: host
-    path: /home/mchrnwsk/theozymes/ingredients/adduct.xyz
+  - &sub
+    name: sub
+    path: /home/mchrnwsk/prometheozyme/ingredients/lmo-mandalate/adduct.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      h_acceptor: 6
-      n5: 26
-      n3: 24
-      o1: 15
-      o2: 16
-      h1: 27
-      ringMDL: [0, 1, 2, 3, 4, 5]
-      ringIAZ: [23, 25, 18, 16, 24, 33, 17, 15, 22]
+    roles:
+      deprot:
+        - OH
 
   - &arg
     name: arg
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/arginine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_arginine.pdb
     charge: 1
     multiplicity: 1
-    indices:
-      h_donor: [7, 9, 10] # [7, 9, 10] backbone_O, [6, 8, 9] backbone, [3, 5, 6] cb
+    roles:
+      h_donor:
+        - NE
+        - NH1
+        - NH2
       
   - &lys
     name: lys
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/lysine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_lysine.pdb
     charge: 1
     multiplicity: 1
-    indices:
-      h_donor: 8 # 8 backbone_O, 7 backbone, 4 cb
+    roles:
+      h_donor:
+        - NZ
 
   - &his
     name: his
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/histidine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_histidine.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      h_acceptor: 9 # 9 backbone_O, 8 backbone, 5 cb
-      h_donor: 7 # 7 backbone_O, 6 backbone, 3 cb
-      deprotonate: [9] # 9 backbone_O, 8 backbone, 5 cb
+    roles:
+      h_acceptor:
+        - ND1
+      h_donor:
+        - NE2
 
   - &cys
     name: cys
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/cysteine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_cysteine.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      h_acceptor: 5 # 5 backbone_O, 4 backbone, 1 cb
-      h_donor: 5 # 5 backbone_O, 4 backbone, 1 cb
+    roles:
+      h_acceptor:
+        - SG
+      h_donor:
+        - SG
 
   - &ser
     name: ser
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/serine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_serine.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      h_acceptor: 5 # 5 backbone_O, 4 backbone, 1 cb
-      h_donor: 5 # 5 backbone_O, 4 backbone, 1 cb
+    roles:
+      h_acceptor:
+        - OG
+      h_donor:
+        - OG
 
   - &thr
     name: thr
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/threonine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_threonine.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      h_acceptor: 5 # 5 backbone_O, 4 backbone, 2 cb
-      h_donor: 5 # 5 backbone_O, 4 backbone, 2 cb
+    roles:
+      h_acceptor:
+        - OG1
+      h_donor:
+        - OG1
 
   - &tyr
     name: tyr
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/tyrosine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_tyrosine.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      h_acceptor: 11 # 11 backbone_O, 10 backbone, 5 cb
-      h_donor: 11 # 11 backbone_O, 10 backbone, 5 cb
+    roles:
+      grease:
+        - CG
+        - CD1
+        - CD2
+        - CE1
+        - CE2
+        - CZ
+      h_acceptor:
+        - OH
+      h_donor:
+        - OH
 
   - &phe
     name: phe
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/phenylalanine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_phenylalanine.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      ring: [5, 6, 7, 8, 9, 10] # [5, 6, 7, 8, 9, 10] backbone_O, [4, 5, 6, 7, 8, 9] backbone, [1, 2, 3, 4, 5, 6] cb
+    roles:
+      grease:
+        - CG
+        - CD1
+        - CD2
+        - CE1
+        - CE2
+        - CZ
 
   - &glu
     name: glu
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/glutamate_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_glutamate.pdb
     charge: -1
     multiplicity: 1
-    indices:
-      h_acceptor: [7, 8] # [7, 8] backbone_O, [6, 7] backbone, [4, 5] cb
-      deprotonate: [7, 8] # [7, 8] backbone_O, [6, 7] backbone, [4, 5] cb
+    roles:
+      h_acceptor:
+        - OE1
+        - OE2
 
   - &gln
     name: gln
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/glutamine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_glutamine.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      h_acceptor: 8 # 8 backbone_O, 7 backbone, 3 cb
-      h_donor: 7 # 7 backbone_O, 6 backbone, 4 cb
-      deprotonate: [8] # 8 backbone_O, 7 backbone, 3 cb
+    roles:
+      h_acceptor:
+        - OE1
+      h_donor:
+        - NE2
 
   - &asp
     name: asp
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/aspartate_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_aspartate.pdb
     charge: -1
     multiplicity: 1
-    indices:
-      h_acceptor: 6 # 6 backbone_O, 5 backbone, 2 cb
-      h_donor: 7 # 7 backbone_O, 6 backbone, 3 cb
-      deprotonate: [6] # 6 backbone_O, 5 backbone, 2 cb
+    roles:
+      h_acceptor:
+        - OD1
+      h_donor:
+        - OD2
 
   - &asn
     name: asn
-    path: /home/mchrnwsk/theozymes/ingredients/amino_acids/with_custom_atoms/asparagine_backbone_O.pdb
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_asparagine.pdb
     charge: 0
     multiplicity: 1
-    indices:
-      h_acceptor: 7 # 7 backbone_O, 6 backbone, 3 cb
-      h_donor: 6 # 6 backbone_O, 5 backbone, 2 cb
-      deprotonate: [7] # 7 backbone_O, 6 backbone, 3 cb
+    roles:
+      h_acceptor:
+        - OD1
+      h_donor:
+        - ND2
 
+# Define roles and candidate ingredients
+# Docking is consecutive!
 roles:
-  - name: base
-    candidates:
-      - *his
-      - *ser
-      - *thr
-      - *cys
-    constraints:
-      - guestIdx: h_acceptor
-        hostIdx: h1
-        val: 3.0
-    priority: -1
-  - name: stabSubO
-    candidates:
-      - *arg
-      - *lys
-      - *his
-      - *tyr
-      - *gln
-      - *asn
-    constraints:
-      - guestIdx: h_donor
-        hostIdx: h_acceptor
-        val: 3.0
-    priority: 1
-  - name: stabN
-    candidates:
-      - *arg
-      - *lys
-      - *his
-    constraints:
-      - guestIdx: h_donor
-        hostIdx: n5
-        val: 3.0
-    priority: 2
-  - name: protN
-    candidates:
-      - *his
-      - *cys
-    constraints:
-      - guestIdx: h_donor
-        hostIdx: n5
-        val: 3.0
-    priority: 2
-#  - name: stabIAZpolarO1
-#    candidates:
-#      - *arg
-#      - *ser
-#    constraints:
-#      - guestIdx: h_donor
-#        hostIdx: o1
-#        val: 3.0
-#    priority: 3
-#  - name: stabIAZpolarO2
-#    candidates:
-#      - *arg
-#      - *ser
-#    constraints:
-#      - guestIdx: h_donor
-#        hostIdx: o2
-#        val: 3.0
-#    priority: 3
-#  - name: stabIAZpolarN
-#    candidates:
-#      - *gln
-#    constraints:
-#      - guestIdx: h_acceptor
-#        hostIdx: n3
-#        val: 3.0
-#    priority: 3
-#  - name: stabIAZgreasy
-#    candidates:
-#      - *phe
-#    constraints:
-#      - guestIdx: ring
-#        guestType: com
-#        hostIdx: ringIAZ
-#        hostType: com
-#        val: 4.5
-#    priority: 3
-#  - name: stabSubRing
-#    candidates:
-#      - *phe
-#    constraints:
-#      - guestIdx: ring
-#        guestType: com
-#        hostIdx: ringMDL
-#        hostType: com
-#        val: 4.5
-#    priority: 3
+  - &base1
+      name: base1
+      host_candidates:
+        - *sub
+      guest_candidates:
+        - *his
+      constraints:
+        - guestIdx: h_acceptor # TODO: allow to define atom names not only groups of atoms; allow to define centre of mass
+          guestType: any
+          hostIdx: deprot
+          hostType: any
+          val: 1.5
+          force: 100
+      priority: -1
+  - &base2
+      name: base2
+      host_candidates:
+        - guests_of: *base1
+      guest_candidates:
+        - *asp
+      constraints:
+        - guestIdx: h_acceptor
+          guestType: any
+          hostIdx: h_donor
+          hostType: any
+          val: 1.5
+          force: 100
+      priority: -1

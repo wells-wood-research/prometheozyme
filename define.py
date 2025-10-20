@@ -1,18 +1,22 @@
 import os
 import uuid
 import copy
+import pdbUtils
+import sys
 
 class Ingredient:
-    def __init__(self, path, charge, multiplicity, indices=None, constraints=[], role_title=None, name=None, conformations=None):
+    def __init__(self, path, charge, multiplicity, roles=None, constraints=[], role_title=None, name=None, conformations=None):
         self.path = path
         self.charge = charge
         self.multiplicity = multiplicity
-        self.indices = indices
+        pdb = pdbUtils.pdb2df(path)
+        pdb["ROLE"] = None
+        for role_name, atom_names in roles.items():
+            pdb.loc[pdb["ATOM_NAME"].isin(atom_names), "ROLE"] = role_name 
+        self.indices = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in pdb.iterrows()]
         self.constraints = constraints
-        self.role_title = role_title
         self.name = name or os.path.splitext(os.path.basename(path))[0]
         self.id = str(uuid.uuid4())
-        self.conformations = conformations
 
     def rewrite_xyz(self):
         """Rewrite the XYZ file with updated charge and multiplicity."""
@@ -103,18 +107,50 @@ class Role:
         self.constraints = [] if constraints is None else (constraints if isinstance(constraints, list) else [constraints])
 
 class Constraint:
-    def __init__(self, guestIdx, hostIdx, val, guestType="iter", hostType="iter"):
+    def __init__(self, guestIdx, hostIdx, val, guestType="any", hostType="any", force=100):
         self.guestIdx = guestIdx
         self.guestType = guestType
         self.hostIdx = hostIdx
         self.hostType = hostType
         self.val = val
+        self.force = force
 
-class Indices:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-            
+def get_constraints_idx(guest, host, constraints):
+    for constraint in constraints:
+        if constraint.guestIdx in guest.roles.keys():
+            print(f"Yes for guest:")
+            print(f"{constraint.guestIdx}, {guest.roles[constraint.guestIdx]}")
+        if constraint.hostIdx in host.roles.keys():
+            print(f"Yes for host:")
+            print(f"{constraint.hostIdx}, {host.roles[constraint.hostIdx]}")
+
+    sys.exit(1)
+    # Resolve guestIdx
+    if guestIdx == "all":
+        guestIdx = get_all_atom_indices(self)
+    elif isinstance(guestIdx, str):
+        guestIdx = getattr(self.indices, guestIdx, guestIdx)
+    # Resolve hostIdx
+    if hostIdx is None:
+        hostIdx = get_all_atom_indices(host)
+    elif isinstance(hostIdx, str):
+        hostIdx = getattr(host.indices, hostIdx, hostIdx)
+
+    # Check for unresolved symbolic indices
+    if isinstance(guestIdx, str) or isinstance(hostIdx, str):
+        print(f"Unresolved symbolic constraint indices: guestIdx={guestIdx}, hostIdx={hostIdx}. Check spelling and presence in indices.")
+        return self
+
+    # Ensure guestIdx and hostIdx are lists for consistent processing
+    guest_indices = guestIdx if isinstance(guestIdx, list) else [guestIdx]
+    host_indices = hostIdx if isinstance(hostIdx, list) else [hostIdx]
+
+    # Create constraints for all combinations of guest and host indices
+    keep = (guest_indices, guestType, host_indices, hostType, val)
+    if keep not in self.constraints:
+        self.constraints.append(keep)
+    return self
+
 def update_constraints(guest, host, constraint, role_title):
     guest_copy = copy.deepcopy(guest)
     guest_copy.id = str(uuid.uuid4())  # Assign a new unique ID
