@@ -1,6 +1,9 @@
 misc:
   workdir: "/home/mchrnwsk/prometheozyme/runs"
-
+  qmMethod: "XTB2" # QM method to use in docking
+  quick: true # if True, use !quickdock setting with ORCA
+  nprocs: 16 # total number of parallel processes to run docker with
+  
 # Define all substrates and objects
 ingredients:
   - &sub

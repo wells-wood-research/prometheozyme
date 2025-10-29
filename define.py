@@ -110,7 +110,7 @@ class Role:
 class Constraint:
     def __init__(self, guestIdx, hostIdx, val, guestType="any", hostType="any", force=100):
         self.guestIdx = guestIdx
-        self.guestType = guestType
+        self.guestType = guestType # TODO remove? Allow com or iter?
         self.hostIdx = hostIdx
         self.hostType = hostType
         self.val = val

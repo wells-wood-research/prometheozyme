@@ -14,6 +14,7 @@ from utils import read_xyz, merge_xyz, split_multi_pdb, write_multi_pdb, append_
 from evaluate import filter_conformations
 from arrange import arrange_guests
 from optimise import optimise
+from drOrca import make_orca_input
 
 ########################
 ## LOGGING
@@ -51,7 +52,10 @@ def setup_config(configPath):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     outdir = os.path.join(workdir, f"output_{timestamp}")
     os.makedirs(outdir, exist_ok=True)
-    return config, outdir
+    qmMethod = misc.get("qmMethod", "XTB2")
+    quick = misc.get("quick", False)
+    nprocs = misc.get("nprocs", 8)
+    return config, outdir, qmMethod, quick, nprocs
 
 def setup_ingredients(config):
     ingredients_cfg = config.get("ingredients", [])
@@ -141,6 +145,72 @@ def process_reindexing(protonated_structures, reindex_reference_path, reindex_ou
 ########################
 ## HELPER FUNCTIONS
 ########################
+
+def calculate_charge(charges):
+    return int(sum(charges))
+    
+def calculate_multiplicity(multiplicities):
+    # Assume molecules are weakly or non-interacting
+    spin = int(sum(m - 1 for m in multiplicities) / 2)
+    multiplicity = 2*spin + 1
+    return multiplicity
+
+def dock(role_name, guest, host, constraints, workdir, qmMethod, quick, nprocs):
+    inp_file_path = os.path.join(workdir, f"dock.inp")
+    title = f"Docking {'(quick)' if quick else ''}\n # role: {role_name}\n # host: {host.name}\n # guest: {guest.name}"
+
+
+    hostPathPDB = host.path
+    hostPathXYZ = hostPathPDB.replace(".pdb", ".xyz")
+    # TODO use openbabel to convert PDB to XYZ whether XYZ exists or not - to ensure atom index consistency
+    # TODO need to install obabel first
+    if not os.path.isfile(hostPathXYZ):
+        logging.error(f"""Host XYZ file not found at {hostPathXYZ}.
+                      In the future we will implement autmoatic obabel conversion.
+                      For now, please convert the PDB to XYZ to ensure atom index consistency.""")
+        
+    guestPathPDB = guest.path # TODO this needs to work with host being product of previous docking
+    guestPathXYZ = guestPathPDB.replace(".pdb", ".xyz")
+    if not os.path.isfile(guestPathXYZ): # TODO
+        logging.error(f"""Guest XYZ file not found at {guestPathXYZ}.
+                      In the future we will implement autmoatic obabel conversion.
+                      For now, please convert the PDB to XYZ to ensure atom index consistency.""")
+    
+    simpleInputLine = [qmMethod]
+    if quick:
+        simpleInputLine.append("QUICKDOCK")
+    inputFormat = "xyzfile"
+
+    # TODO this needs to work with host being product of previous docking
+    moleculeInfo = {"charge": calculate_charge([guest.charge, host.charge]),
+                    "multiplicity": calculate_multiplicity([guest.multiplicity, host.multiplicity])}
+
+    # "Bond bias potential": 
+    # Atom number for GUEST FIRST, then HOST SECOND,
+    # absolute indexing for each system independently
+    biases = []
+    for constraint in constraints:
+        bias = {"atoms": [constraint.guestIdx, constraint.hostIdx], "val": constraint.val, "force": constraint.force}
+        biases.append(bias)
+    docker = {"guestPath": guestPathXYZ, "fixHost": True, "bias": biases}
+
+    # Use the updated XYZ file for optimization
+    make_orca_input(orcaInput=inp_file_path,
+                    title=title,
+                    simpleInputLine=simpleInputLine,
+                    inputFormat=inputFormat,
+                    inputFile=hostPathXYZ,
+                    moleculeInfo=moleculeInfo,
+                    parallelize=nprocs,
+                    qmmm=None,
+                    geom=None,
+                    neb=None,
+                    scf=None,
+                    docker=docker)
+    
+    outpath = f"{inp_file_path}.docker.struc1.all.optimized.xyz"
+
+    return outpath
 
 def process_docking(ing, host, outdir, dock_params, redocking=False):
     # Handles the docking, per-conformation protonation, reindexing, and deprotonation for a single ingredient.
@@ -265,7 +335,6 @@ def expand_constraints(guest, host, constraint):
         keep.append((g_idx, h_idx, constraint.val, constraint.force))
     return keep
 
-
 def expand_role_combinations(role):
     """
     Expand roles with multiple hosts/guests into all (host, guest) pairs.
@@ -293,16 +362,18 @@ def expand_role_combinations(role):
             new_role = copy.deepcopy(role)
             new_role.host = host
             new_role.guests = guest
-            new_role.constraints = []  # or keep as-is if you prefer
+            new_role.constraints = []
             role_key = f"{role.title}_{host.name}_{guest.name}_no_constraints"
             expanded_roles[role_key] = new_role
             continue
 
-        # If any constraint had zero options, we skip (cannot satisfy constraints)
+        # If any constraint had zero options, skip (cannot satisfy constraints)
         if not options_per_constraint:
             continue
 
         # Cartesian product across lists of options (one option per constraint)
+        # If one ingredient has multiple atoms of same flavour (e.g. multiple h_donor),
+        # this creates multiple combinations, one for each of the atoms
         for combo_idx, combo in enumerate(itertools.product(*options_per_constraint)):
             # combo is a tuple of option tuples, one per constraint
             # Build new constraint objects (or simple tuples) representing these concrete constraints
@@ -322,11 +393,11 @@ def expand_role_combinations(role):
             # Make new role copy and set host/guest to the concrete candidates and constraints
             new_role = copy.deepcopy(role)
             new_role.host = host
-            new_role.guests = guest
+            new_role.guests = guest  # TODO rename to "guest" considering the 1-to-1 expansion
             new_role.constraints = concrete_constraints
 
             # Unique key: include the combination index so duplicates don't clobber
-            role_key = f"{role.title}_{host.name}_{guest.name}_combo{combo_idx}"
+            role_key = f"{role.title}_{host.name}_{guest.name}_{combo_idx}"
             expanded_roles[role_key] = new_role
 
     return expanded_roles
@@ -339,7 +410,7 @@ def main(args):
     # Read config file
     if not args.config:
         args.config = "/home/mchrnwsk/prometheozyme/config.yaml"
-    config, outdir = setup_config(args.config)
+    config, outdir, qmMethod, quick, nprocs = setup_config(args.config)
     setup_logging(outdir)
 
     # Prepare ingredients and roles from the configuration    
@@ -349,10 +420,17 @@ def main(args):
     failed = []
     for role in roles:
         expanded_roles = expand_role_combinations(role)
-        print(len(expanded_roles))
+        logging.debug(f"""Expanded ingredient and constraint combinations for
+                      role title: {role.title}
+                      number of combinations: {len(expanded_roles)}
+                      combination keys: {list(expanded_roles.keys())}""")
         for role_name, role_desc in expanded_roles.items():
-            print(role_name)
-            print(role_desc)
+            logging.info(f"Processing role: {role_name}")
+
+            # Output is organised as role/host/guest/constraints_combination
+            workdir = os.path.join(outdir, *role_name.split("_"))
+            os.makedirs(workdir, exist_ok=True)
+            outpath = dock(role_name, role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
 
     sys.exit(1)
         #if ing.name == 'host':

@@ -204,22 +204,26 @@ def write_scf_block(f, scf):
     f.write("\n")
 
 def write_docker_block(f, docker):
-    f.write(f"%docker\n")
-    f.write(f"{' '*4}guest \"{docker.get('guestPath', None)}\"\n")
-    f.write(f"{' '*4}fixhost {docker.get('fixHost', True)}\n")
-    f.write("end\n")
+    f.write(f"%DOCKER\n")
+    f.write(f"{' '*4}GUEST \"{docker.get('guestPath', None)}\"\n")
+    f.write(f"{' '*4}FIXHOST {docker.get('fixHost', True)}\n")
+    if "bias" in docker.keys():
+        biases = docker.get("bias", [])
+        f.write(f"{' '*4}BIAS\n")
+        for bias in biases:
+            atoms = bias.get("atoms", [])
+            val = bias.get("val", 0.0)
+            force = bias.get("force", 100)
+            f.write(f"{' '*8}{{ B {atoms[0]} {atoms[1]} {val} {force} }}\n")
+        f.write(f"{' '*4}END\n")
+    f.write("END\n")
     f.write("\n")
 
-def write_maxcore(f, maxcore):
-    f.write(f"%maxcore {maxcore}\n")
-    f.write("\n")
-
-def write_simple_input(f, keyword, qmMethod, method, keepDens, parallelize):
-    f.write(f"!{keyword} {qmMethod} {method}")
+def write_simple_input(f, simpleInputLine, parallelize):
+    for keyword in simpleInputLine:
+        f.write(f"!{keyword}\n")
     if parallelize != 0:
-        f.write(f" PAL{parallelize}")
-    if keepDens:
-        f.write(" KeepDens")
+        f.write(f"!PAL{parallelize}")
     f.write("\n")
     f.write("\n")
 
@@ -303,13 +307,11 @@ def modify_orca_input(input_file):
    
 def make_orca_input(orcaInput: FilePath,
                     title: str,
-                    qmMethod: str,
-                    method: str,
+                    simpleInputLine: str,
                     inputFormat: str,
                     inputFile: FilePath,
                     moleculeInfo: dict,
                     parallelize: int,
-                    maxcore: int,
                     qmmm: dict,
                     geom: dict,
                     neb: dict,
@@ -317,22 +319,19 @@ def make_orca_input(orcaInput: FilePath,
                     docker: dict
                     ) -> FilePath:
     
-    method = "Opt" # Used to be "Opt", need to go back and fix what relies on it
+    if not simpleInputLine:
+        simpleInputLine = "Opt" # Used to be "Opt", need to go back and fix what relies on it
     if neb:
-        method = neb.get("nebMethod", "NEB")
-    keepDens = None
+        simpleInputLine.append(neb.get("nebMethod", "NEB"))
     if scf:
-        keepDens = "KeepDens" if scf.get("keepDens", False) else ""
-
-    keyword = ""
+        if scf.get("keepDens", False):
+            simpleInputLine.append("KeepDens")
     if qmmm:
-        keyword = "QMMM"
+        simpleInputLine.append("QMMM")
 
     with open(orcaInput, "w") as f:
         write_title(f, title)
-        write_simple_input(f, keyword, qmMethod, method, keepDens, parallelize)
-        if maxcore != 0:
-           write_maxcore(f, maxcore)
+        write_simple_input(f, simpleInputLine, parallelize)
         if geom:
             write_geometry_block(f, geom)
         if qmmm:
