@@ -1,6 +1,8 @@
 import numpy as np
 import io
 import os
+import pandas as pd
+import re
 
 # Define atomic masses for center of mass calculation
 atomic_masses = {
@@ -70,7 +72,7 @@ def read_xyz(file_path, logger=None):
             # Only append if we have valid coordinates
             if coords and len(coords) == atom_count:
                 coordinates = np.array(coords)
-                structures.append((atom_count, comment, coordinates, atom_types))
+                structures.append((atom_count, comment, coordinates, atom_types)) # TODO is that really the best name? Why is it a list?
             else:
                 logger.warning(f"Skipping structure at line {i-atom_count-1}: expected {atom_count} atoms, found {len(coords)}")
             
@@ -81,6 +83,59 @@ def read_xyz(file_path, logger=None):
             continue
     
     return structures
+
+def parse_energy_comment(comment):
+    eopt = einter = None
+    if comment:
+        eopt_match = re.search(r"Eopt=(-?\d+\.\d+)", comment)
+        einter_match = re.search(r"Einter=(-?\d+\.\d+)", comment)
+        if eopt_match: eopt = float(eopt_match.group(1))
+        if einter_match: einter = float(einter_match.group(1))
+    return eopt, einter
+
+def split_docker_results(multi_xyz_path, logger=None):
+    """
+    - Split a multi-structure XYZ file.
+    - Extract Eopt/Einter from the comment line.
+    - Save each as a single XYZ file.
+    - Return list of (Result, DataFrame).
+    """
+    base_dir = os.path.dirname(multi_xyz_path)
+    base_name = os.path.basename(multi_xyz_path)
+
+    # Reuse universal parser
+    structures = read_xyz(multi_xyz_path, logger=logger)
+
+    results = []
+
+    for i, (atom_count, comment, coords, atom_types) in enumerate(structures, start=1):
+        # TODO use atom_count to check if it agrees with the total of ingredients atom count?
+        # --- Parse energies using regex ---
+        eopt = einter = None
+        if comment:
+            eopt, einter = parse_energy_comment(comment)
+
+        # --- Create dataframe ---
+        df = pd.DataFrame({
+            "ATOM_NAME": atom_types,
+            "X": coords[:, 0],
+            "Y": coords[:, 1],
+            "Z": coords[:, 2],
+        })
+
+        # --- Construct new output filename ---
+        new_name = re.sub(r"\.all\.optimized\.xyz$", "", base_name)
+        new_path = os.path.join(base_dir, f"{new_name}.result.{i}.xyz")
+
+        # --- Reuse write_xyz() ---
+        write_xyz(new_path, comment, coords, atom_types)
+
+        results.append((new_path, eopt, einter, df))
+
+    if logger:
+        logger.info(f"Split {multi_xyz_path} into {len(results)} results.")
+
+    return results
 
 def merge_xyz(receptor_path, ligand_path, output_path):
     """Merge receptor XYZ with each structure in a multi-XYZ ligand file."""
