@@ -329,6 +329,8 @@ def make_orca_input(orcaInput: FilePath,
     if qmmm:
         simpleInputLine.append("QMMM")
 
+    if not orcaInput.endswith(".inp"):
+        orcaInput += ".inp"
     with open(orcaInput, "w") as f:
         write_title(f, title)
         write_simple_input(f, simpleInputLine, parallelize)
