@@ -4,17 +4,31 @@ import copy
 import pdbUtils
 import sys
 
-class Ingredient:
-    def __init__(self, path, charge, multiplicity, roles=None, constraints=[], role_title=None, name=None, conformations=None):
+class Result:
+    def __init__(self, path, eopt, einter, charge, multiplicity, df):
         self.path = path
+        self.eopt = eopt
+        self.einter = einter
+        self.charge = charge
+        self.multiplicity = multiplicity
+        self.df = df
+        self.id = str(uuid.uuid4())
+
+class Ingredient:
+    def __init__(self, path, eopt, einter, charge, multiplicity, roles=None, constraints=[], role_title=None, name=None, conformations=None):
+        self.path = path
+        self.eopt = eopt
+        self.einter = einter
         self.charge = charge
         self.multiplicity = multiplicity
         pdb = pdbUtils.pdb2df(path)
-        pdb["ROLE"] = [[] for _ in range(len(pdb))]
+        pdb["ROLE"] = [[] for _ in range(len(pdb))] # TODO rename to flavour
         for role_name, atom_names in roles.items():
             mask = pdb["ATOM_NAME"].isin(atom_names)
             pdb.loc[mask, "ROLE"] = pdb.loc[mask, "ROLE"].apply(lambda lst: lst + [role_name])
-        self.indices = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in pdb.iterrows()]
+        self.df = pdb
+        # self.indices = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in pdb.iterrows()]
+        self.n_atoms = len(self.df)
         self.constraints = constraints
         self.name = name or os.path.splitext(os.path.basename(path))[0]
         self.id = str(uuid.uuid4())
