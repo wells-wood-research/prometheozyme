@@ -9,12 +9,9 @@ import itertools
 import copy
 import string
 
-from define import Ingredient, Constraint, Role, get_constraints_idx, reduce_guests, print_reduced, col_order, col_types
-from dock import dock
-from utils import read_xyz, merge_xyz, split_docker_results, split_multi_pdb, split_multi_xyz, write_multi_pdb, append_scores, get_atom_count
+from define import Ingredient, Constraint, Role, col_order, col_types
+from utils import split_docker_results
 from evaluate import filter_conformations
-from arrange import arrange_guests
-from optimise import optimise
 from drOrca import make_orca_input
 import pdbUtils
 
@@ -126,28 +123,6 @@ def setup_ingredients(config):
 
     return role_objects, ingredient_map
 
-def process_reindexing(protonated_structures, reindex_reference_path, reindex_output_dir, ing_name, ing_id, logger):
-    successful = []
-    failed = []
-    for idx, path in enumerate(protonated_structures):
-        reindexed_pdb_path = reindex(reindex_reference_path, path, reindex_output_dir, logger=logger)
-        if reindexed_pdb_path is None:
-            if logger:
-                logging.info(f"Reindexing failed for pose {idx} of ingredient {ing_name}")
-            continue
-        successful.append(reindexed_pdb_path)
-
-    # Check if all poses failed
-    if not successful:
-        failed.append(ing_id)
-        if logger:
-            logging.warning(f"No poses were successfully reindexed for ingredient {ing_name}")
-    else:
-        if logger:
-            logging.info(f"For ingredient {ing_name}, {len(successful)} out of {len(protonated_structures)} poses were successfully reindexed")
-
-    return successful, failed
-
 ########################
 ## HELPER FUNCTIONS
 ########################
@@ -253,15 +228,17 @@ def run_docking(input, orcapath):
     with open(output_file, "w") as f:
         subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=f, stderr=subprocess.STDOUT)
 
-def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, role_name, ingredient_map, logger):
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, role_key, ingredient_map, logger):
+    role_name = role_key[0]
     all_results = split_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", logger)
 
     # TODO reuse previous Result objects... eopt = new_eopt, einter = einter + new_einter
     # TODO next docking should use all poses that satisfy constraints
+    c = 0
     for result in all_results:
         (path, eopt, einter, df) = result
         # TODO evaluate output for satisfying constraints
-        new_path = os.path.join(os.path.dirname(path), "passed", os.path.basename(path))
+        new_path = os.path.join(os.path.dirname(path), f"struct{c}", "host.xyz")
         os.makedirs(os.path.dirname(new_path), exist_ok=True)
         shutil.move(path, new_path)
         # Edit df to assign ingredient names to atoms
@@ -294,109 +271,10 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
             multiplicity=curr_multiplicity,
             df=df
         )
-        ingredient_map[role_name] = product_obj
+        new_role_key = role_key + (str(c), )
+        ingredient_map[new_role_key] = product_obj
+        c+=1
     return ingredient_map
-
-def process_docking(ing, host, outdir, dock_params, redocking=False):
-    # Handles the docking, per-conformation protonation, reindexing, and deprotonation for a single ingredient.
-    logging.info(f"Processing docking for {ing.name}{' (redocking)' if redocking else ''}...")
-    # Create a temporary directory for per-conformation processing
-    temp_processing_dir = os.path.join(outdir, f"temp_processing_{ing.name}")
-    prot_output_dir = os.path.join(temp_processing_dir, f"protonation")
-    reindex_output_dir = os.path.join(temp_processing_dir, f"reindexing")
-    deprot_output_dir = os.path.join(temp_processing_dir, f"deprotonation")
-    os.makedirs(prot_output_dir, exist_ok=True)
-    os.makedirs(reindex_output_dir, exist_ok=True)
-    os.makedirs(deprot_output_dir, exist_ok=True)
-
-    reference_atom_count = get_atom_count(ing.path, logger) # Atom count of original guest molecule
-
-    # Perform initial docking
-    docked_path = dock(host, ing, outdir, dock_params, redocking, logger)
-    if not os.path.exists(docked_path) or os.path.getsize(docked_path) == 0:
-        logging.warning(f"Docked output for {ing.name} not found or is empty at {docked_path}. Skipping further processing.")
-        return None
-    
-    # get rid of protonateion/deprotonation
-    prot_path = docked_path
-
-    # Prepare reference for reindexing (PDB version of original ingredient)
-    reindex_reference_path = f"{os.path.splitext(ing.path)[0]}_ref.pdb"
-    if not os.path.exists(reindex_reference_path):
-        logging.warning("Reference ingredient in PDB format not found - using XYZ instead; consider adding a PDB reference with same atom indices and path as XYZ.")
-        reindex_reference_path = ing.path
-
-    # Split the protonated multi-PDB into individual PDB files
-    protonated_structures = split_multi_pdb(prot_path, prot_output_dir, logger)
-    # Reindex protonated PDB files individually
-    successful, failed = process_reindexing(protonated_structures, reindex_reference_path, reindex_output_dir, ing.name, ing.id, logger)
-    if failed:
-        logging.error(f"Reindexing failed for {ing.name}. Investigate output manually.")
-        logging.warning(f"Failed ingredients: {', '.join(failed)}")
-        return None, failed
-    # Merge protonated and reindexed PDB files into one multi-PDB file
-    multi_prot_path = os.path.join(outdir, ing.name, f"{ing.name}_docked_prot.pdb")
-    write_multi_pdb(successful, multi_prot_path)
-
-    # Deprotonate specific atoms
-    deprot_path, deprot_atom_count = deprotonate_selected(multi_prot_path, getattr(ing.indices, "deprotonate", []))
-    if not os.path.exists(deprot_path):
-        logging.error(f"Deprotonated file not found at expected path: {deprot_path}.")
-    if deprot_atom_count != reference_atom_count:
-        failed.append(ing.name)
-        logging.error(f"Deprotonation failed for {ing.name}. Investigate output manually.")
-        logging.warning(f"Failed ingredients: {', '.join(failed)}")
-        return None, failed
-    
-    # Convert protonated, reindexed, deprotonated multi-PDB file to multi-XYZ file
-    prot_reidx_deprot_pdb_path = deprot_path.replace(".pdb", ".xyz")
-    cmd = [
-        "obabel",
-        "-ipdb", deprot_path,
-        "-O", prot_reidx_deprot_pdb_path
-        ]
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-    # Merge this multi-XYZ guest file with the host structure
-    final_merged_host_guest_path = os.path.join(outdir, f"{ing.name}.xyz")
-    merge_xyz(host.path, prot_reidx_deprot_pdb_path, final_merged_host_guest_path)
-    logging.info(f"Final merged host-guest file saved to: {final_merged_host_guest_path}")
-
-    # Append scores from gnina docking
-    scores_file_from_dock = os.path.join(os.path.dirname(docked_path), "scores.txt")
-    if os.path.exists(scores_file_from_dock):
-        append_scores(final_merged_host_guest_path, scores_file_from_dock, logger)
-        logging.info(f"Appended scores to {final_merged_host_guest_path}")
-    else:
-        logging.warning(f"Scores file not found at {scores_file_from_dock}. Skipping score appending.")
-
-    # Clean up temporary processing directory
-    shutil.rmtree(temp_processing_dir)
-    logging.debug(f"Cleaned up temporary directory: {temp_processing_dir}")
-
-    return final_merged_host_guest_path, failed
-
-def process_constraints(docked_path, ing, host, outdir, evaluate_backbone, dock_params, redock_params, logger):
-    # Filter conformations that don't satisfy constraints - only valid written to filtered_path
-    valid_structures, filtered_path = filter_conformations(docked_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, evaluate_backbone, logger)
-
-    # Repeat docking if no valid conformations found
-    if len(valid_structures) == 0:
-        logging.warning(f"No poses that satisfy constraints found on first docking attempt. Redocking with {redock_params}...")
-        # Update dock_params with redocking parameters
-        redock_dock_params = dock_params.copy()
-        redock_dock_params.update(redock_params)
-        # Repeat docking with redocking parameters
-        redocked_path, failed = process_docking(ing, host, outdir, redock_dock_params, redocking=True)
-
-        # Repeat filtering conformations that don't satisfy constraints
-        valid_structures, filtered_path = filter_conformations(redocked_path, host.path, ing.name, ing.role_title, ing.indices, ing.constraints, evaluate_backbone, logger)
-        if len(valid_structures) == 0:
-            logging.error(f"No poses that satisfy constraints {ing.constraints} for {ing.name}, role: {ing.role_title} found on repeat docking.")
-            return
-    ing.update_conformations(filtered_path)
-    logging.info(f"Filtered conformations are saved in {filtered_path}")
-    return filtered_path
 
 def expand_constraints(guest, host, constraint):
     # Filter tuples whose activity matches the requested activity name
@@ -493,9 +371,9 @@ def main(args):
     roles, ingredient_map = setup_ingredients(config)
 
     # Run ORCA DOCKER for each role, exhaustive for host/guest mix
-    failed = []
-    prev_result_dir_base = None
-    for role in roles:
+    prev_results = []
+    prev_result_dirs = []
+    for i, role in enumerate(roles):
         expanded_roles = expand_role_combinations(role)
         logging.debug(f"""Expanded ingredient and constraint combinations for
                       role title: {role.title}
@@ -510,49 +388,14 @@ def main(args):
 
             inp_file_path, curr_charge, curr_multiplicity = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
 
-            run_docking(inp_file_path, orcapath)
-            ingredient_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key[0], ingredient_map, logging)
-
-    sys.exit(1)
-        #if ing.name == 'host':
-        #    continue
-        #logging.info(f"Running gnina for ingredient: {ing.name}")
-        #outpath, failed_i = process_docking(ing, host, outdir, dock_params)
-        #if failed_i:
-        #    failed.append(failed_i)
-    logging.info(f"Docking completed. Results saved in {outdir}\n")
-    
-    # Evaluate constraints for each ingredient (list of unique guests)
-    # for ingredient in unique_guests_constraints, delete in copy conformations that don't satisfy constraints
-    for ing in unique_guests_constraints:
-        logging.info(f"\nEvaluating constraints for ingredient: {ing.name}, role: {ing.role_title}")
-
-        docked_path = os.path.join(outdir, f"{ing.name}.xyz")
-        if not os.path.exists(docked_path):
-            logging.error(f"Docked output for {ing.name} not found at {docked_path}. Skipping constraint evaluation.")
-            continue
-
-        # Filter conformations that don't satisfy constraints
-        process_constraints(docked_path, ing, host, outdir, evaluate_backbone, dock_params, redock_params, logger)
-        
-    # Satisfy roles according to their priorities
-    sorted_final_arrangements = arrange_guests(roles, unique_guests_constraints, host_atom_count, host_coords, host_atom_types, outdir, logger)
-
-    for arr in sorted_final_arrangements:
-        failed_ids = [guest["obj"] for guest in arr["guests_info"] if guest["obj"] in failed]
-
-        if failed_ids:
-            logging.warning(f"Arrangement at path {arr['path']} includes failed guests with IDs: {failed_ids}. Protonate/reindex/deprotonate manually before proceeding.")
-        else:
-            logging.debug(f"Arrangement at path {arr['path']} has no failed guests.")
-        # simple constrained optimisation
-        arr_optimised, arr_reactant = optimise(arr, host_atom_count, ingredient_map, backbone, logger)
-    #    # prepare product
-    #    arr_product = prepare_product(arr, arr_reactant)
-
-    #for arrangement in final_arrangements_list:
-        # run NEB
-
+            # run_docking(inp_file_path, orcapath)
+            inp_file_path = "/home/mchrnwsk/prometheozyme/runs/output_2025-11-03_19-19-28/base1/his/0/dock"
+            ingredient_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key, ingredient_map, logging)
+            print(ingredient_map.items())
+            [prev_results.append(ingredient_map[key]) for key in ingredient_map.keys() if key[:3] == role_key]
+            print(prev_results)
+            sys.exit()
+ 
     logging.info("""
           Main script complete!
           ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆

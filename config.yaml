@@ -1,3 +1,5 @@
+# TODO allow DOCKLEVEL COMPLETE and NOPT
+# https://www.faccts.de/docs/orca/6.1/manual/contents/structurereactivity/docker.html?q=docker&n=0#docker-automated-docking-algorithm
 misc:
   workdir: "/home/mchrnwsk/prometheozyme/runs"
   qmMethod: "XTB2" # QM method to use in docking
@@ -175,13 +177,14 @@ roles:
   - &base2
       name: base2
       host_candidates:
-        - guests_of: *base1
+        - *sub
+        #- guests_of: *base1
       guest_candidates:
         - *asp
       constraints:
         - guestIdx: h_acceptor
           guestType: any
-          hostIdx: h_donor
+          hostIdx: deprot # h_donor
           hostType: any
           val: 1.5
           force: 100
