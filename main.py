@@ -294,14 +294,8 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
             multiplicity=curr_multiplicity,
             df=df
         )
-        print(product_obj.path)
-        print(product_obj.eopt)
-        print(product_obj.einter)
-        print(product_obj.charge)
-        print(product_obj.multiplicity)
-        print(product_obj.df)
         ingredient_map[role_name] = product_obj
-        exit()
+    return ingredient_map
 
 def process_docking(ing, host, outdir, dock_params, redocking=False):
     # Handles the docking, per-conformation protonation, reindexing, and deprotonation for a single ingredient.
@@ -479,7 +473,7 @@ def expand_role_combinations(role):
             new_role.constraints = concrete_constraints
 
             # Unique key: include the combination index so duplicates don't clobber
-            role_key = (str(role.title), str(host.name), str(guest.name), str(combo_idx)) # is a tuple
+            role_key = (str(role.title), str(guest.name), str(combo_idx)) # is a tuple
             expanded_roles[role_key] = new_role
 
     return expanded_roles
@@ -500,6 +494,7 @@ def main(args):
 
     # Run ORCA DOCKER for each role, exhaustive for host/guest mix
     failed = []
+    prev_result_dir_base = None
     for role in roles:
         expanded_roles = expand_role_combinations(role)
         logging.debug(f"""Expanded ingredient and constraint combinations for
@@ -515,16 +510,8 @@ def main(args):
 
             inp_file_path, curr_charge, curr_multiplicity = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
 
-            # run_docking(inp_file_path, orcapath)
-            inp_file_path = "runs/output_2025-11-02_21-36-01/base1/sub/his/0/dock"
-            print("I'm here!~")
-            print("this is host:")
-            print(role_desc.host.df)
-            print("this is guest:")
-            print(role_desc.guests.df)
-            process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key[0], ingredient_map, logging)
-
-
+            run_docking(inp_file_path, orcapath)
+            ingredient_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key[0], ingredient_map, logging)
 
     sys.exit(1)
         #if ing.name == 'host':
