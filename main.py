@@ -8,9 +8,9 @@ import sys
 import itertools
 import copy
 
-from define import Ingredient, Constraint, Role, get_constraints_idx, reduce_guests, print_reduced
+from define import Ingredient, Constraint, Role, Result, get_constraints_idx, reduce_guests, print_reduced
 from dock import dock
-from utils import read_xyz, merge_xyz, split_multi_pdb, write_multi_pdb, append_scores, get_atom_count
+from utils import read_xyz, merge_xyz, split_docker_results, split_multi_pdb, split_multi_xyz, write_multi_pdb, append_scores, get_atom_count
 from evaluate import filter_conformations
 from arrange import arrange_guests
 from optimise import optimise
@@ -55,7 +55,8 @@ def setup_config(configPath):
     qmMethod = misc.get("qmMethod", "XTB2")
     quick = misc.get("quick", False)
     nprocs = misc.get("nprocs", 8)
-    return config, outdir, qmMethod, quick, nprocs
+    orcapth = misc.get("orcapth", "orca")
+    return config, outdir, qmMethod, quick, nprocs, orcapth
 
 def setup_ingredients(config):
     ingredients_cfg = config.get("ingredients", [])
@@ -71,6 +72,8 @@ def setup_ingredients(config):
         roles_dict = ing.get('roles', {})
         ingredient_obj = Ingredient(
             path=ing['path'],
+            eopt=None,
+            einter=None,
             charge=ing['charge'],
             multiplicity=ing['multiplicity'],
             roles=roles_dict,
@@ -155,10 +158,9 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 
-def dock(role_name, guest, host, constraints, workdir, qmMethod, quick, nprocs):
-    inp_file_path = os.path.join(workdir, f"dock.inp")
+def write_docking_input(role_name, guest, host, constraints, workdir, qmMethod, quick, nprocs):
+    inp_file_path = os.path.join(workdir, f"dock")
     title = f"Docking {'(quick)' if quick else ''}\n # role: {role_name}\n # host: {host.name}\n # guest: {guest.name}"
-
 
     hostPathPDB = host.path
     hostPathXYZ = hostPathPDB.replace(".pdb", ".xyz")
@@ -208,9 +210,51 @@ def dock(role_name, guest, host, constraints, workdir, qmMethod, quick, nprocs):
                     scf=None,
                     docker=docker)
     
-    outpath = f"{inp_file_path}.docker.struc1.all.optimized.xyz"
+    # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
+    return inp_file_path, moleculeInfo['charge'], moleculeInfo['multiplicity'], [host, guest]
 
-    return outpath
+def run_docking(input, orcapath):
+    output_file = f"{input}.out"
+    with open(output_file, "w") as f:
+        subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=f, stderr=subprocess.STDOUT)
+
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, curr_ingredients, role_name, ingredient_map, logger):
+    all_results = split_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", logger)
+    print(curr_ingredients[0].name, curr_ingredients[0].n_atoms)
+
+    # TODO reuse previous Result objects... eopt = new_eopt, einter = einter + new_einter
+    # TODO next docking should use all poses that satisfy constraints
+    for result in all_results:
+        (path, eopt, einter, df) = result
+        # TODO evaluate output for satisfying constraints
+        new_path = os.path.join(os.path.dirname(path), "passed", os.path.basename(path))
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
+        shutil.move(path, new_path)
+        # Edit df to assign ingredient names to atoms
+        df[["ING", "DISH"]] = None, None
+        first_atom = 0
+        # Don't want to be rewriting previous ingredients when reusing result of previous docking - this is just initial setup?
+        for ing in curr_ingredients:
+            last_atom = first_atom + ing.n_atoms
+            df.loc[first_atom:last_atom-1, "ING"] = ing.name
+            df.loc[first_atom:last_atom-1, "DISH"] = role_name
+            first_atom = last_atom
+        product_obj = Result(
+            path=new_path,
+            eopt=eopt,
+            einter=einter,
+            charge=curr_charge,
+            multiplicity=curr_multiplicity,
+            df=df
+        )
+        print(product_obj.path)
+        print(product_obj.eopt)
+        print(product_obj.einter)
+        print(product_obj.charge)
+        print(product_obj.multiplicity)
+        print(product_obj.df)
+        ingredient_map[role_name] = product_obj
+        exit()
 
 def process_docking(ing, host, outdir, dock_params, redocking=False):
     # Handles the docking, per-conformation protonation, reindexing, and deprotonation for a single ingredient.
@@ -314,18 +358,9 @@ def process_constraints(docked_path, ing, host, outdir, evaluate_backbone, dock_
     return filtered_path
 
 def expand_constraints(guest, host, constraint):
-    """
-    Given:
-      - guest.indices: list of tuples (atom_index, atom_name, activity_or_None)
-      - host.indices: same structure
-      - constraint: object with fields guestIdx (activity name), hostIdx (activity name),
-                    val, force, guestType, hostType (we only handle 'any' here but keep fields)
-    Return:
-      list of option tuples: (guest_atom_index, host_atom_index, val, force)
-    """
     # Filter tuples whose activity matches the requested activity name
-    guest_matches = [item for item in guest.indices if constraint.guestIdx in item[2]]
-    host_matches = [item for item in host.indices if constraint.hostIdx in item[2]]
+    guest_matches = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in guest.df.iterrows() if constraint.guestIdx in row["ROLE"]]
+    host_matches = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in host.df.iterrows() if constraint.hostIdx in row["ROLE"]]
 
     keep = []
     for g_item, h_item in itertools.product(guest_matches, host_matches):
@@ -397,7 +432,7 @@ def expand_role_combinations(role):
             new_role.constraints = concrete_constraints
 
             # Unique key: include the combination index so duplicates don't clobber
-            role_key = f"{role.title}_{host.name}_{guest.name}_{combo_idx}"
+            role_key = (str(role.title), str(host.name), str(guest.name), str(combo_idx)) # is a tuple
             expanded_roles[role_key] = new_role
 
     return expanded_roles
@@ -410,7 +445,7 @@ def main(args):
     # Read config file
     if not args.config:
         args.config = "/home/mchrnwsk/prometheozyme/config.yaml"
-    config, outdir, qmMethod, quick, nprocs = setup_config(args.config)
+    config, outdir, qmMethod, quick, nprocs, orcapath = setup_config(args.config)
     setup_logging(outdir)
 
     # Prepare ingredients and roles from the configuration    
@@ -424,13 +459,19 @@ def main(args):
                       role title: {role.title}
                       number of combinations: {len(expanded_roles)}
                       combination keys: {list(expanded_roles.keys())}""")
-        for role_name, role_desc in expanded_roles.items():
-            logging.info(f"Processing role: {role_name}")
+        for role_key, role_desc in expanded_roles.items():
+            logging.info(f"Processing role: {role_key}")
 
             # Output is organised as role/host/guest/constraints_combination
-            workdir = os.path.join(outdir, *role_name.split("_"))
+            workdir = os.path.join(outdir, *role_key)
             os.makedirs(workdir, exist_ok=True)
-            outpath = dock(role_name, role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
+            inp_file_path, curr_charge, curr_multiplicity, curr_ingredients = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
+
+            # run_docking(inp_file_path, orcapath)
+            inp_file_path = "runs/output_2025-11-02_21-36-01/base1/sub/his/0/dock"
+            process_docking_output(inp_file_path, curr_charge, curr_multiplicity, curr_ingredients, role_key[0], ingredient_map, logging)
+
+
 
     sys.exit(1)
         #if ing.name == 'host':
