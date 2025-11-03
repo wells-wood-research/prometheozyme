@@ -7,14 +7,16 @@ import shutil
 import sys
 import itertools
 import copy
+import string
 
-from define import Ingredient, Constraint, Role, Result, get_constraints_idx, reduce_guests, print_reduced
+from define import Ingredient, Constraint, Role, get_constraints_idx, reduce_guests, print_reduced, col_order, col_types
 from dock import dock
 from utils import read_xyz, merge_xyz, split_docker_results, split_multi_pdb, split_multi_xyz, write_multi_pdb, append_scores, get_atom_count
 from evaluate import filter_conformations
 from arrange import arrange_guests
 from optimise import optimise
 from drOrca import make_orca_input
+import pdbUtils
 
 ########################
 ## LOGGING
@@ -77,7 +79,8 @@ def setup_ingredients(config):
             charge=ing['charge'],
             multiplicity=ing['multiplicity'],
             roles=roles_dict,
-            name=ing['name']
+            name=ing['name'],
+            df=None
         )
         ingredient_map[ing['name']] = ingredient_obj
     logging.debug(f"""Ingredient map is:
@@ -149,6 +152,38 @@ def process_reindexing(protonated_structures, reindex_reference_path, reindex_ou
 ## HELPER FUNCTIONS
 ########################
 
+def assign_chain_ids(df):
+    """
+    Ensures that every unique (ING, DISH) pair has a unique CHAIN_ID.
+    Keeps existing CHAIN_IDs if consistent, assigns new ones in A, B, C... order otherwise.
+    """
+    # Get all unique (ING, DISH) pairs in the order they appear
+    unique_pairs = []
+    for _, row in df.iterrows():
+        pair = (row["ING"], row["DISH"])
+        if pair not in unique_pairs:
+            unique_pairs.append(pair)
+    
+    # Generate chain labels A, B, C, ..., AA, AB, ...
+    def get_chain_label(i):
+        letters = string.ascii_uppercase
+        label = ""
+        while True:
+            i, r = divmod(i, 26)
+            label = letters[r] + label
+            if i == 0:
+                break
+            i -= 1
+        return label
+
+    # Assign chain labels to each unique (ING, DISH)
+    chain_map = {pair: get_chain_label(i) for i, pair in enumerate(unique_pairs)}
+    
+    # Apply mapping to the DataFrame
+    df["CHAIN_ID"] = [chain_map[(ing, dish)] for ing, dish in zip(df["ING"], df["DISH"])]
+    
+    return df
+
 def calculate_charge(charges):
     return int(sum(charges))
     
@@ -211,16 +246,15 @@ def write_docking_input(role_name, guest, host, constraints, workdir, qmMethod, 
                     docker=docker)
     
     # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
-    return inp_file_path, moleculeInfo['charge'], moleculeInfo['multiplicity'], [host, guest]
+    return inp_file_path, moleculeInfo['charge'], moleculeInfo['multiplicity']
 
 def run_docking(input, orcapath):
     output_file = f"{input}.out"
     with open(output_file, "w") as f:
         subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=f, stderr=subprocess.STDOUT)
 
-def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, curr_ingredients, role_name, ingredient_map, logger):
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, role_name, ingredient_map, logger):
     all_results = split_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", logger)
-    print(curr_ingredients[0].name, curr_ingredients[0].n_atoms)
 
     # TODO reuse previous Result objects... eopt = new_eopt, einter = einter + new_einter
     # TODO next docking should use all poses that satisfy constraints
@@ -231,15 +265,28 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, curr_i
         os.makedirs(os.path.dirname(new_path), exist_ok=True)
         shutil.move(path, new_path)
         # Edit df to assign ingredient names to atoms
-        df[["ING", "DISH"]] = None, None
-        first_atom = 0
-        # Don't want to be rewriting previous ingredients when reusing result of previous docking - this is just initial setup?
-        for ing in curr_ingredients:
-            last_atom = first_atom + ing.n_atoms
-            df.loc[first_atom:last_atom-1, "ING"] = ing.name
-            df.loc[first_atom:last_atom-1, "DISH"] = role_name
-            first_atom = last_atom
-        product_obj = Result(
+        df[["ROLE", "ING", "DISH"]] = None, None, None
+        n_host, n_guest = host.n_atoms, guest.n_atoms
+        # transfer original labels
+        for col in ["ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "ROLE", "ING"]:
+            df.loc[:n_host - 1, col] = host.df[col].values
+            df.loc[n_host:n_host + n_guest - 1, col] = guest.df[col].values
+        # transfer dish labels
+        df.loc[:n_host - 1, "DISH"] = host.df["DISH"].values
+        df.loc[n_host:n_host + n_guest - 1, "DISH"] = role_name
+
+        # Make sure each molecule gets a new CHAIN_ID so that ATOM_IDs can be individually 1-based per each molecule
+        df = assign_chain_ids(df)
+
+        # TODO ATOM_ID should probably continue... of chain id should be changed...
+        df = df[col_order].astype(col_types)
+
+        # Save PDB
+        df_to_save = df.loc[:, ~df.columns.isin(["ROLE", "ING", "DISH"])]
+        pdbUtils.df2pdb(df_to_save, new_path.replace(".xyz", ".pdb"))
+        print(f"Saved to {new_path.replace('.xyz', '.pdb')}")
+        
+        product_obj = Ingredient(
             path=new_path,
             eopt=eopt,
             einter=einter,
@@ -465,11 +512,17 @@ def main(args):
             # Output is organised as role/host/guest/constraints_combination
             workdir = os.path.join(outdir, *role_key)
             os.makedirs(workdir, exist_ok=True)
-            inp_file_path, curr_charge, curr_multiplicity, curr_ingredients = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
+
+            inp_file_path, curr_charge, curr_multiplicity = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
 
             # run_docking(inp_file_path, orcapath)
             inp_file_path = "runs/output_2025-11-02_21-36-01/base1/sub/his/0/dock"
-            process_docking_output(inp_file_path, curr_charge, curr_multiplicity, curr_ingredients, role_key[0], ingredient_map, logging)
+            print("I'm here!~")
+            print("this is host:")
+            print(role_desc.host.df)
+            print("this is guest:")
+            print(role_desc.guests.df)
+            process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key[0], ingredient_map, logging)
 
 
 

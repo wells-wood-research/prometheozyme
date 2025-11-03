@@ -4,29 +4,46 @@ import copy
 import pdbUtils
 import sys
 
-class Result:
-    def __init__(self, path, eopt, einter, charge, multiplicity, df):
-        self.path = path
-        self.eopt = eopt
-        self.einter = einter
-        self.charge = charge
-        self.multiplicity = multiplicity
-        self.df = df
-        self.id = str(uuid.uuid4())
+col_order = [
+    "ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID",
+    "X", "Y", "Z", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "ROLE", "ING", "DISH"
+]
+
+col_types = {
+    "ATOM": str,
+    "ATOM_ID": int,
+    "ATOM_NAME": str,
+    "RES_NAME": str,
+    "CHAIN_ID": str,
+    "RES_ID": int,
+    "X": float,
+    "Y": float,
+    "Z": float,
+    "OCCUPANCY": float,
+    "BETAFACTOR": float,
+    "ELEMENT": str,
+    "ROLE": str,
+    "ING": str,
+    "DISH": str
+}
 
 class Ingredient:
-    def __init__(self, path, eopt, einter, charge, multiplicity, roles=None, constraints=[], role_title=None, name=None, conformations=None):
+    def __init__(self, path, eopt, einter, charge, multiplicity, roles=None, constraints=[], role_title=None, name=None, conformations=None, df=None):
         self.path = path
         self.eopt = eopt
         self.einter = einter
         self.charge = charge
         self.multiplicity = multiplicity
-        pdb = pdbUtils.pdb2df(path)
-        pdb["ROLE"] = [[] for _ in range(len(pdb))] # TODO rename to flavour
-        for role_name, atom_names in roles.items():
-            mask = pdb["ATOM_NAME"].isin(atom_names)
-            pdb.loc[mask, "ROLE"] = pdb.loc[mask, "ROLE"].apply(lambda lst: lst + [role_name])
-        self.df = pdb
+        if path.endswith(".pdb") and df is None:
+            df = pdbUtils.pdb2df(path)
+            df["ROLE"] = [[] for _ in range(len(df))] # TODO rename to flavour
+            for role_name, atom_names in roles.items():
+                mask = df["ATOM_NAME"].isin(atom_names)
+                df.loc[mask, "ROLE"] = df.loc[mask, "ROLE"].apply(lambda lst: lst + [role_name])
+            df["ING"] = name
+            df["DISH"] = "init"
+            df = df[col_order].astype(col_types)
+        self.df = df
         # self.indices = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in pdb.iterrows()]
         self.n_atoms = len(self.df)
         self.constraints = constraints
@@ -129,6 +146,21 @@ class Constraint:
         self.hostType = hostType
         self.val = val
         self.force = force
+
+def next_chain_id(n):
+    """Generate chain IDs: A-Z, then AA, AB, ..., AZ, BA, BB, etc."""
+    letters = string.ascii_uppercase
+    out = []
+    for i in range(1, n + 1):
+        x = i - 1
+        s = ""
+        while True:
+            s = letters[x % 26] + s
+            x = x // 26 - 1
+            if x < 0:
+                break
+        out.append(s)
+    return out
 
 def get_constraints_idx(guest, host, constraints):
     for constraint in constraints:

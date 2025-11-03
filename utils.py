@@ -117,7 +117,7 @@ def split_docker_results(multi_xyz_path, logger=None):
 
         # --- Create dataframe ---
         df = pd.DataFrame({
-            "ATOM_NAME": atom_types,
+            "ELEMENT": atom_types,
             "X": coords[:, 0],
             "Y": coords[:, 1],
             "Z": coords[:, 2],
