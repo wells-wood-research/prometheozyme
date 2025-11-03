@@ -3,6 +3,7 @@ misc:
   qmMethod: "XTB2" # QM method to use in docking
   quick: true # if True, use !quickdock setting with ORCA
   nprocs: 16 # total number of parallel processes to run docker with
+  orcapth: /home/mchrnwsk/orca_6_1_0/orca # absolute path to orca executable
   
 # Define all substrates and objects
 ingredients:
