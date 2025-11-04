@@ -71,8 +71,8 @@ def setup_ingredients(config):
         roles_dict = ing.get('roles', {})
         ingredient_obj = Ingredient(
             path=ing['path'],
-            eopt=None,
-            einter=None,
+            eopt=0,
+            einter=0,
             charge=ing['charge'],
             multiplicity=ing['multiplicity'],
             roles=roles_dict,
@@ -84,30 +84,30 @@ def setup_ingredients(config):
                 {ingredient_map}\n""")
 
     # Create Role objects from YAML
-    role_objects = []
+    role_objects = {}
     for role in roles_cfg:
-        # Map candidates to Ingredient objects
-        host_candidates = []
-        for host_cand in role["host_candidates"]:
-            if "guests_of" in host_cand:
-                host_candidates = [ingredient_map[cand['name']] for cand in host_cand["guests_of"]["guest_candidates"]]
-            else:
-                host_candidates = [ingredient_map[cand['name']] for cand in role['host_candidates']]
-        guest_candidates = [ingredient_map[cand['name']] for cand in role['guest_candidates']]
-        
-        # Handle constraints if present
-        constraints_data = role.get('constraints', [])
-        constraints = []
-        for cons in constraints_data:
-            constraint = Constraint(
-                guestIdx=cons['guestIdx'],
-                guestType=cons.get('guestType'),
-                hostIdx=cons['hostIdx'],
-                hostType=cons.get('hostType'),
-                val=cons['val'],
-                force=cons['force']
-            )
-            constraints.append(constraint)
+        if role['name'] == 'init':
+            host_candidates = None
+            guest_candidates = [ingredient_map["sub"]] # list for consistent typing
+            constraints = None
+        else:
+            # Map candidates to Ingredient objects
+            host_candidates = role['host_candidates']['name']
+            guest_candidates = [ingredient_map[cand['name']] for cand in role['guest_candidates']]
+            
+            # Handle constraints if present
+            constraints_data = role.get('constraints', [])
+            constraints = []
+            for cons in constraints_data:
+                constraint = Constraint(
+                    guestIdx=cons['guestIdx'],
+                    guestType=cons.get('guestType'),
+                    hostIdx=cons['hostIdx'],
+                    hostType=cons.get('hostType'),
+                    val=cons['val'],
+                    force=cons['force']
+                )
+                constraints.append(constraint)
         
         # Create Role object
         role_obj = Role(
@@ -117,7 +117,7 @@ def setup_ingredients(config):
             host=host_candidates,
             constraints=constraints
         )
-        role_objects.append(role_obj) 
+        role_objects[role_obj.title] = role_obj 
     logging.debug(f"""Role objects are:
                 {role_objects}""")
 
@@ -228,9 +228,10 @@ def run_docking(input, orcapath):
     with open(output_file, "w") as f:
         subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=f, stderr=subprocess.STDOUT)
 
-def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, role_key, ingredient_map, logger):
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, role_key, logger):
     role_name = role_key[0]
     all_results = split_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", logger)
+    results_map = {}
 
     # TODO reuse previous Result objects... eopt = new_eopt, einter = einter + new_einter
     # TODO next docking should use all poses that satisfy constraints
@@ -245,6 +246,9 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         df[["ROLE", "ING", "DISH"]] = None, None, None
         n_host, n_guest = host.n_atoms, guest.n_atoms
         # transfer original labels
+
+        # TODO probably host df here is just the constrained element, not all
+        
         for col in ["ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "ROLE", "ING"]:
             df.loc[:n_host - 1, col] = host.df[col].values
             df.loc[n_host:n_host + n_guest - 1, col] = guest.df[col].values
@@ -253,6 +257,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         df.loc[n_host:n_host + n_guest - 1, "DISH"] = role_name
 
         # Make sure each molecule gets a new CHAIN_ID so that ATOM_IDs can be individually 1-based per each molecule
+        print(df)
         df = assign_chain_ids(df)
 
         # TODO ATOM_ID should probably continue... of chain id should be changed...
@@ -272,13 +277,20 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
             df=df
         )
         new_role_key = role_key + (str(c), )
-        ingredient_map[new_role_key] = product_obj
+        results_map[new_role_key] = product_obj
         c+=1
-    return ingredient_map
+    return results_map
 
 def expand_constraints(guest, host, constraint):
     # Filter tuples whose activity matches the requested activity name
+    print("For guest:")
+    print(guest.df)
+    print(constraint.guestIdx)
+    print()
     guest_matches = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in guest.df.iterrows() if constraint.guestIdx in row["ROLE"]]
+    print("For host:")
+    print(host.df)
+    print(constraint.hostIdx)
     host_matches = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in host.df.iterrows() if constraint.hostIdx in row["ROLE"]]
 
     keep = []
@@ -360,6 +372,17 @@ def expand_role_combinations(role):
 ## MAIN LOOP
 ########################
 
+def dock(outdir, role_key, role_desc, orcapath, qmMethod, quick, nprocs): # TODO pass qmMethod, quick, nprocs as a dict of parameters
+    # Output is organised as role/host/guest/constraints_combination
+    workdir = os.path.join(outdir, *role_key)
+    os.makedirs(workdir, exist_ok=True)
+
+    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
+
+    run_docking(inp_file_path, orcapath)
+    results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key, logging)
+    return results_map
+
 def main(args):
     # Read config file
     if not args.config:
@@ -370,32 +393,49 @@ def main(args):
     # Prepare ingredients and roles from the configuration    
     roles, ingredient_map = setup_ingredients(config)
 
-    # Run ORCA DOCKER for each role, exhaustive for host/guest mix
+    # Prepare the substrate as a fake result of first docking
     prev_results = []
-    prev_result_dirs = []
-    for i, role in enumerate(roles):
-        expanded_roles = expand_role_combinations(role)
-        logging.debug(f"""Expanded ingredient and constraint combinations for
-                      role title: {role.title}
-                      number of combinations: {len(expanded_roles)}
-                      combination keys: {list(expanded_roles.keys())}""")
-        for role_key, role_desc in expanded_roles.items():
-            logging.info(f"Processing role: {role_key}")
+    init_host = roles["init"].guests[0]
+    init_host_dir = os.path.join(outdir, "init")
+    init_host_path = os.path.join(init_host_dir, "host.pdb") # TODO do you want "prev_results" to be PDB or XYZ based? DO you want to always (!) write both XYZ and PDB?
+    os.makedirs(init_host_dir)
+    shutil.copy(init_host.path, init_host_path)
+    # TODO assumes there's xyz present - need to expect user only to prepare PDBs
+    shutil.copy(init_host.path.replace(".pdb", ".xyz"), init_host_path.replace(".pdb", ".xyz"))
+    init_host.path = init_host_path
+    prev_results.append(init_host)
 
-            # Output is organised as role/host/guest/constraints_combination
-            workdir = os.path.join(outdir, *role_key)
-            os.makedirs(workdir, exist_ok=True)
+    # Run ORCA DOCKER for each role, exhaustive for host/guest mix
+    for i, (role_name, role) in enumerate(roles.items()):
+        if role_name == "init":
+            continue
+        for result in prev_results:
+            new_host_ing_for_docking = result
+            new_host_df = new_host_ing_for_docking.df
+            new_host_df_for_constraints = new_host_df[new_host_df["DISH"] == role.host]
+            new_host_name = new_host_df_for_constraints["ING"].unique()[0]
+            new_host_ing_for_constraints = ingredient_map[new_host_name]
+            new_host_ing_for_constraints.df = new_host_df_for_constraints
+            new_host_ing_for_constraints.path = result.path
 
-            inp_file_path, curr_charge, curr_multiplicity = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
+            new_role = copy.deepcopy(role)
+            new_role.host = [new_host_ing_for_constraints]
 
-            # run_docking(inp_file_path, orcapath)
-            inp_file_path = "/home/mchrnwsk/prometheozyme/runs/output_2025-11-03_19-19-28/base1/his/0/dock"
-            ingredient_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key, ingredient_map, logging)
-            print(ingredient_map.items())
-            [prev_results.append(ingredient_map[key]) for key in ingredient_map.keys() if key[:3] == role_key]
-            print(prev_results)
-            sys.exit()
- 
+            expanded_roles = expand_role_combinations(new_role)
+            logging.debug(f"""Expanded ingredient and constraint combinations for
+                        role title: {role.title}
+                        number of combinations: {len(expanded_roles)}
+                        combination keys: {list(expanded_roles.keys())}""")
+
+            new_prev_results = []
+            for role_key, role_desc in expanded_roles.items():
+                logging.info(f"Processing role: {role_key}")
+                role_desc.host = new_host_ing_for_docking
+                outdir = os.path.dirname(result.path)
+                results_map = dock(outdir, role_key, role_desc, orcapath, qmMethod, quick, nprocs)
+                [new_prev_results.append(results_map[key]) for key in results_map.keys() if key[:3] == role_key]
+        prev_results = new_prev_results
+
     logging.info("""
           Main script complete!
           ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆

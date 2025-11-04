@@ -44,7 +44,6 @@ class Ingredient:
             df["DISH"] = "init"
             df = df[col_order].astype(col_types)
         self.df = df
-        # self.indices = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in pdb.iterrows()]
         self.n_atoms = len(self.df)
         self.constraints = constraints
         self.name = name or os.path.splitext(os.path.basename(path))[0]

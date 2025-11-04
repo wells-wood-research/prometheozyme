@@ -8,6 +8,7 @@ misc:
   orcapth: /home/mchrnwsk/orca_6_1_0/orca # absolute path to orca executable
   
 # Define all substrates and objects
+# ATOM NAME LIMIT TO 3 symbols!
 ingredients:
   - &sub
     name: sub
@@ -48,6 +49,8 @@ ingredients:
         - ND1
       h_donor:
         - NE2
+      deprot:
+        - HE2
 
   - &cys
     name: cys
@@ -160,10 +163,21 @@ ingredients:
 # Define roles and candidate ingredients
 # Docking is consecutive!
 roles:
+  - &init
+      name: init
+      host_candidates:
+        None
+      guest_candidates:
+        - *sub
+      constraints:
+        None
+      priority: 0
   - &base1
       name: base1
       host_candidates:
-        - *sub
+      # TODO this is misleading: host xyz is always result of previous docking, here you specify only what molecule acts as HOST OF CONSTRAINT
+        # TODO not a list - only one "type" of host constraints can be defined
+        *init # (constraint w.r.t sub) 
       guest_candidates:
         - *his
       constraints:
@@ -177,14 +191,13 @@ roles:
   - &base2
       name: base2
       host_candidates:
-        - *sub
-        #- guests_of: *base1
+        *base1 # guests_of (constraint w.r.t hist)
       guest_candidates:
         - *asp
       constraints:
         - guestIdx: h_acceptor
           guestType: any
-          hostIdx: deprot # h_donor
+          hostIdx: deprot
           hostType: any
           val: 1.5
           force: 100
