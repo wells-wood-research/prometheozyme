@@ -16,28 +16,15 @@ from drOrca import make_orca_input
 import pdbUtils
 
 ########################
-## LOGGING
-########################
-
-def setup_logging(workdir):
-    # Remove existing handlers
-    root_logger = logging.getLogger()
-    for handler in list(root_logger.handlers):
-        root_logger.removeHandler(handler)
-
-    # Log to both console and file
-    handlers = [logging.StreamHandler()]  # console
-    handlers.append(logging.FileHandler(os.path.join(workdir, "log.txt")))  # file
-
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.DEBUG,
-        handlers=handlers,
-    )
-
-########################
 ## SETUP
 ########################
+
+def setup(configPath):
+    config, outdir, orca = setup_config(configPath)
+    setup_logging(outdir)
+    # Prepare ingredients and roles from the configuration    
+    courses, ingredients = setup_ingredients(config) # TODO renamed roles --> courses, ingredient_map --> ingredients here
+    return config, outdir, orca, courses, ingredients
 
 def setup_config(configPath):
     if not os.path.isfile(configPath):
@@ -61,46 +48,64 @@ def setup_config(configPath):
 
     return config, outdir, orca
 
+def setup_logging(workdir):
+    # Remove existing handlers
+    root_logger = logging.getLogger()
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+
+    # Log to both console and file
+    handlers = [logging.StreamHandler()]  # console
+    handlers.append(logging.FileHandler(os.path.join(workdir, "log.txt")))  # file
+
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        level=logging.DEBUG,
+        handlers=handlers,
+    )
+
 def setup_ingredients(config):
     ingredients_cfg = config.get("ingredients", [])
-    roles_cfg = config.get("roles", [])
+    courses_cfg = config.get("courses", [])
 
     logging.debug(f"""Ingredients are:
                 {ingredients_cfg}\n""")
-    logging.debug(f"""Roles are:
-                {roles_cfg}\n""")
+    logging.debug(f"""Courses are:
+                {courses_cfg}\n""")
 
-    ingredient_map = {}  # Map ingredient names to objects for role processing
+    # Create 'Ingredient' objects
+    # TODO is ingredients map really useful?
+    # TODO are all fields useful?
+    ingredients = {}
     for ing in ingredients_cfg:
-        roles_dict = ing.get('roles', {})
         ingredient_obj = Ingredient(
+            name=ing['name'],
             path=ing['path'],
             eopt=0,
             einter=0,
             charge=ing['charge'],
             multiplicity=ing['multiplicity'],
-            roles=roles_dict,
-            name=ing['name'],
+            flavours=ing.get('flavours', {}),
             df=None
         )
-        ingredient_map[ing['name']] = ingredient_obj
+        ingredients[ing['name']] = ingredient_obj
     logging.debug(f"""Ingredient map is:
-                {ingredient_map}\n""")
+                {ingredients}\n""")
 
-    # Create Role objects from YAML
-    role_objects = {}
-    for role in roles_cfg:
-        if role['name'] == 'init':
+    # Create 'Course' objects
+    course_objects = {}
+    for course in courses_cfg:
+        if course['name'] == 'init':
             host_candidates = None
-            guest_candidates = [ingredient_map["sub"]] # list for consistent typing
+            guest_candidates = [ingredients["sub"]] # list for consistent typing
             constraints = None
         else:
             # Map candidates to Ingredient objects
-            host_candidates = role['host_candidates']['name']
-            guest_candidates = [ingredient_map[cand['name']] for cand in role['guest_candidates']]
+            host_candidates = course['host_candidates']['name']
+            guest_candidates = [ingredients[cand['name']] for cand in course['guest_candidates']]
             
             # Handle constraints if present
-            constraints_data = role.get('constraints', [])
+            constraints_data = course.get('constraints', [])
             constraints = []
             for cons in constraints_data:
                 constraint = Constraint(
@@ -113,19 +118,18 @@ def setup_ingredients(config):
                 )
                 constraints.append(constraint)
         
-        # Create Role object
-        role_obj = Role(
-            title=role['name'],
-            priority=role['priority'],
-            guests=guest_candidates,
+        # Create Course object
+        course_obj = Course(
+            name=course['name'],
             host=host_candidates,
+            guests=guest_candidates,
             constraints=constraints
         )
-        role_objects[role_obj.title] = role_obj 
-    logging.debug(f"""Role objects are:
-                {role_objects}""")
+        course_objects[course_obj.title] = course_obj 
+    logging.debug(f"""course objects are:
+                {course_objects}""")
 
-    return role_objects, ingredient_map
+    return course_objects, ingredients
 
 ########################
 ## HELPER FUNCTIONS
@@ -393,12 +397,9 @@ def expand_role_combinations(role):
 def main(args):
     # Read config file
     if not args.config:
+        # TODO del when finished testing
         args.config = "/home/mchrnwsk/prometheozyme/config.yaml"
-    config, outdir, orca = setup_config(args.config)
-    setup_logging(outdir)
-
-    # Prepare ingredients and roles from the configuration    
-    roles, ingredient_map = setup_ingredients(config)
+    outdir, orca, roles, ingredients = setup(args.config)
 
     # Prepare the substrate as a fake result of first docking
     prev_results = []
@@ -421,7 +422,7 @@ def main(args):
             new_host_df = new_host_ing_for_docking.df
             new_host_df_for_constraints = new_host_df[new_host_df["DISH"] == role.host]
             new_host_name = new_host_df_for_constraints["ING"].unique()[0]
-            new_host_ing_for_constraints = ingredient_map[new_host_name]
+            new_host_ing_for_constraints = ingredients[new_host_name]
             new_host_ing_for_constraints.df = new_host_df_for_constraints
             new_host_ing_for_constraints.path = result.path
 

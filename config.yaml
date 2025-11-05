@@ -35,15 +35,17 @@ orca:
   # default: 8
   nprocs: 16
   
-# Define all substrates and objects
-# ATOM NAME LIMIT TO 3 symbols!
+# Define all molecular objects to participate in the docking pipeline
+# Recommended strategy: create PDB files and assign unique atom names to all atoms,
+# or at least all atoms that will be used in any constraints
+# WARNING: atom name length is limited to 3 symbols!
 ingredients:
   - &sub
     name: sub
     path: /home/mchrnwsk/prometheozyme/ingredients/lmo-mandalate/adduct.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       deprot:
         - OH
 
@@ -52,7 +54,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_arginine.pdb
     charge: 1
     multiplicity: 1
-    roles:
+    flavours:
       h_donor:
         - NE
         - NH1
@@ -63,7 +65,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_lysine.pdb
     charge: 1
     multiplicity: 1
-    roles:
+    flavours:
       h_donor:
         - NZ
 
@@ -72,7 +74,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_histidine.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       h_acceptor:
         - ND1
       h_donor:
@@ -85,7 +87,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_cysteine.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       h_acceptor:
         - SG
       h_donor:
@@ -96,7 +98,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_serine.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       h_acceptor:
         - OG
       h_donor:
@@ -107,7 +109,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_threonine.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       h_acceptor:
         - OG1
       h_donor:
@@ -118,7 +120,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_tyrosine.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       grease:
         - CG
         - CD1
@@ -136,7 +138,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_phenylalanine.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       grease:
         - CG
         - CD1
@@ -150,7 +152,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_glutamate.pdb
     charge: -1
     multiplicity: 1
-    roles:
+    flavours:
       h_acceptor:
         - OE1
         - OE2
@@ -160,7 +162,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_glutamine.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       h_acceptor:
         - OE1
       h_donor:
@@ -171,7 +173,7 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_aspartate.pdb
     charge: -1
     multiplicity: 1
-    roles:
+    flavours:
       h_acceptor:
         - OD1
       h_donor:
@@ -182,51 +184,48 @@ ingredients:
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_asparagine.pdb
     charge: 0
     multiplicity: 1
-    roles:
+    flavours:
       h_acceptor:
         - OD1
       h_donor:
         - ND2
 
-# Define roles and candidate ingredients
-# Docking is consecutive!
-roles:
+# DEFINE COURSES AS COMBINATION OF POTENTIAL GUESTS AND THEIR RESTRAINTS
+# First course must be 'init' and specify as guest the substrate object,
+# which will then become the host of the first real docking step in the pipeline.
+# Docking is consecutive! so the next course always reuses output of the previous docking step.
+# However, as restraints are defined between GUEST and HOST atoms, you can define here restrainst
+# by pointing to the name of a particular previous course
+# in which molecules that you want to restrain to as HOSTS, were added as guest_candidates;
+# these host_candidates must contain 'flavours' matching hostIdx in the course currently being defined.
+courses:
   - &init
       name: init
       host_candidates:
-        None
+        - None
       guest_candidates:
         - *sub
-      constraints:
+      restraints:
         None
-      priority: 0
   - &base1
       name: base1
       host_candidates:
-      # TODO this is misleading: host xyz is always result of previous docking, here you specify only what molecule acts as HOST OF CONSTRAINT
-        # TODO not a list - only one "type" of host constraints can be defined
-        *init # (constraint w.r.t sub) 
+        - *init
       guest_candidates:
         - *his
-      constraints:
-        - guestIdx: h_acceptor # TODO: allow to define atom names not only groups of atoms; allow to define centre of mass
-          guestType: any
+      restraints:
+        - guestIdx: h_acceptor
           hostIdx: deprot
-          hostType: any
           val: 1.5
           force: 100
-      priority: -1
   - &base2
       name: base2
       host_candidates:
-        *base1 # guests_of (constraint w.r.t hist)
+        *base1
       guest_candidates:
         - *asp
-      constraints:
+      restraints:
         - guestIdx: h_acceptor
-          guestType: any
           hostIdx: deprot
-          hostType: any
           val: 1.5
           force: 100
-      priority: -1
