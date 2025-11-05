@@ -46,16 +46,20 @@ def setup_config(configPath):
     with open(configPath, "r") as file:
         config = yaml.safe_load(file)
     logging.info(f"Loaded configuration from {configPath}\n")
+
+    # Get miscellaneous parameters
     misc = config.get("misc", {})
     workdir = misc.get("workdir", ".")
+
+    # Get orca docker parameters
+    orca = config.get("orca", {})
+
+    # Setup output dir
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     outdir = os.path.join(workdir, f"output_{timestamp}")
     os.makedirs(outdir, exist_ok=True)
-    qmMethod = misc.get("qmMethod", "XTB2")
-    quick = misc.get("quick", False)
-    nprocs = misc.get("nprocs", 8)
-    orcapth = misc.get("orcapth", "orca")
-    return config, outdir, qmMethod, quick, nprocs, orcapth
+
+    return config, outdir, orca
 
 def setup_ingredients(config):
     ingredients_cfg = config.get("ingredients", [])
@@ -168,43 +172,60 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 
-def write_docking_input(role_name, guest, host, constraints, workdir, qmMethod, quick, nprocs):
-    inp_file_path = os.path.join(workdir, f"dock")
-    title = f"Docking {'(quick)' if quick else ''}\n # role: {role_name}\n # host: {host.name}\n # guest: {guest.name}"
+def dock(outdir, role_key, role_desc, orca):
+    # Read orca parameters
+    orcapath = orca.get("orcapth", "./orca")
+    qmMethod = orca.get("qmMethod", "XTB2")
+    strategy = orca.get("strategy", "normal")
+    optLevel = orca.get("optLevel", "sloppyopt")
+    nOpt = orca.get("nOpt", 5)
+    gridExtent = orca.get("gridExtent", 15)
+    nprocs = orca.get("nprocs", 8) 
 
+    # Output of each docking step is organised as role/guest/constraints_combination
+    workdir = os.path.join(outdir, *role_key)
+    os.makedirs(workdir, exist_ok=True)
+
+    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
+
+    run_docking(inp_file_path, orcapath)
+    results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key, logging)
+    return results_map
+
+def write_docking_input(role_name, guest, host, constraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs):
+    inp_file_path = os.path.join(workdir, f"dock")
+    title = f"ORCA DOCKER: Automated Docking Algorithm for\n # role: {role_name}\n # host: {host.name}\n # guest: {guest.name}"
+
+    # Prepare host and guest molecular structure files as XYZ
     hostPathPDB = host.path
     hostPathXYZ = hostPathPDB.replace(".pdb", ".xyz")
-    # TODO use openbabel to convert PDB to XYZ whether XYZ exists or not - to ensure atom index consistency
-    # TODO need to install obabel first
+    # TODO convert PDB to XYZ whether XYZ exists or not - to ensure atom index consistency
     if not os.path.isfile(hostPathXYZ):
         logging.error(f"""Host XYZ file not found at {hostPathXYZ}.
                       In the future we will implement autmoatic obabel conversion.
                       For now, please convert the PDB to XYZ to ensure atom index consistency.""")
-        
-    guestPathPDB = guest.path # TODO this needs to work with host being product of previous docking
+    guestPathPDB = guest.path
     guestPathXYZ = guestPathPDB.replace(".pdb", ".xyz")
-    if not os.path.isfile(guestPathXYZ): # TODO
+    if not os.path.isfile(guestPathXYZ):
         logging.error(f"""Guest XYZ file not found at {guestPathXYZ}.
                       In the future we will implement autmoatic obabel conversion.
                       For now, please convert the PDB to XYZ to ensure atom index consistency.""")
     
     simpleInputLine = [qmMethod]
-    if quick:
-        simpleInputLine.append("QUICKDOCK")
     inputFormat = "xyzfile"
 
-    # TODO this needs to work with host being product of previous docking
-    moleculeInfo = {"charge": calculate_charge([guest.charge, host.charge]),
-                    "multiplicity": calculate_multiplicity([guest.multiplicity, host.multiplicity])}
+    # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
+    moleculeInfo = {"charge": host.charge, "multiplicity": host.multiplicity}
 
-    # "Bond bias potential": 
-    # Atom number for GUEST FIRST, then HOST SECOND,
-    # absolute indexing for each system independently
+    # Define bond bias potential to impose restraints of distance between guest and host atoms
+    # Must be defined by atom numbers for GUEST FIRST, then HOST SECOND, absolute indexing for each molecule independently
+    # For example, to add a bond bias between atom 2 from the GUEST and atom 19 from the HOST, write: BIAS { B 2 19 } END 
     biases = []
     for constraint in constraints:
         bias = {"atoms": [constraint.guestIdx, constraint.hostIdx], "val": constraint.val, "force": constraint.force}
         biases.append(bias)
-    docker = {"guestPath": guestPathXYZ, "fixHost": True, "bias": biases}
+    
+    docker = {"guestPath": guestPathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": True, "bias": biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
 
     # Use the updated XYZ file for optimization
     make_orca_input(orcaInput=inp_file_path,
@@ -214,14 +235,10 @@ def write_docking_input(role_name, guest, host, constraints, workdir, qmMethod, 
                     inputFile=hostPathXYZ,
                     moleculeInfo=moleculeInfo,
                     parallelize=nprocs,
-                    qmmm=None,
-                    geom=None,
-                    neb=None,
-                    scf=None,
                     docker=docker)
     
     # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
-    return inp_file_path, moleculeInfo['charge'], moleculeInfo['multiplicity']
+    return inp_file_path, calculate_charge([guest.charge, host.charge]), calculate_multiplicity([guest.multiplicity, host.multiplicity])
 
 def run_docking(input, orcapath):
     output_file = f"{input}.out"
@@ -239,6 +256,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
     for result in all_results:
         (path, eopt, einter, df) = result
         # TODO evaluate output for satisfying constraints
+        # TODO after optmisation there might be duplicated results - need to remove
         new_path = os.path.join(os.path.dirname(path), f"struct{c}", "host.xyz")
         os.makedirs(os.path.dirname(new_path), exist_ok=True)
         shutil.move(path, new_path)
@@ -372,22 +390,11 @@ def expand_role_combinations(role):
 ## MAIN LOOP
 ########################
 
-def dock(outdir, role_key, role_desc, orcapath, qmMethod, quick, nprocs): # TODO pass qmMethod, quick, nprocs as a dict of parameters
-    # Output is organised as role/host/guest/constraints_combination
-    workdir = os.path.join(outdir, *role_key)
-    os.makedirs(workdir, exist_ok=True)
-
-    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, quick, nprocs)
-
-    run_docking(inp_file_path, orcapath)
-    results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key, logging)
-    return results_map
-
 def main(args):
     # Read config file
     if not args.config:
         args.config = "/home/mchrnwsk/prometheozyme/config.yaml"
-    config, outdir, qmMethod, quick, nprocs, orcapath = setup_config(args.config)
+    config, outdir, orca = setup_config(args.config)
     setup_logging(outdir)
 
     # Prepare ingredients and roles from the configuration    
@@ -432,7 +439,7 @@ def main(args):
                 logging.info(f"Processing role: {role_key}")
                 role_desc.host = new_host_ing_for_docking
                 outdir = os.path.dirname(result.path)
-                results_map = dock(outdir, role_key, role_desc, orcapath, qmMethod, quick, nprocs)
+                results_map = dock(outdir, role_key, role_desc, orca)
                 [new_prev_results.append(results_map[key]) for key in results_map.keys() if key[:3] == role_key]
         prev_results = new_prev_results
 

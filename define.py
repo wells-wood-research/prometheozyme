@@ -32,8 +32,8 @@ class Ingredient:
         self.path = path
         self.eopt = eopt
         self.einter = einter
-        self.charge = charge
-        self.multiplicity = multiplicity
+        self.charge = int(charge)
+        self.multiplicity = int(multiplicity)
         if path.endswith(".pdb") and df is None:
             df = pdbUtils.pdb2df(path)
             df["ROLE"] = [[] for _ in range(len(df))] # TODO rename to flavour

@@ -1,7 +1,4 @@
 import re
-from os import path as p
-from subprocess import call
-## CLEAN CODE ##
 class FilePath:
     pass
 class DirectoryPath:
@@ -205,8 +202,12 @@ def write_scf_block(f, scf):
 
 def write_docker_block(f, docker):
     f.write(f"%DOCKER\n")
+    f.write(f"{' '*4}DOCKLEVEL {docker.get('strategy', 'NORMAL')}\n")
     f.write(f"{' '*4}GUEST \"{docker.get('guestPath', None)}\"\n")
+    f.write(f"{' '*4}GUESTCHARGE {docker.get('guestCharge', 0)}\n")
+    f.write(f"{' '*4}GUESTMULT {docker.get('guestMultiplicity', 1)}\n")
     f.write(f"{' '*4}FIXHOST {docker.get('fixHost', True)}\n")
+    f.write(f"{' '*4}GRIDEXTENT {docker.get('gridExtent', 15)}\n")
     if "bias" in docker.keys():
         biases = docker.get("bias", [])
         f.write(f"{' '*4}BIAS\n")
@@ -216,6 +217,8 @@ def write_docker_block(f, docker):
             force = bias.get("force", 100)
             f.write(f"{' '*8}{{ B {atoms[0]} {atoms[1]} {val} {force} }}\n")
         f.write(f"{' '*4}END\n")
+    f.write(f"{' '*4}OPTLEVEL {docker.get('optLevel', 'sloppyopt')}\n")
+    f.write(f"{' '*4}NOPT {docker.get('nOpt', 5)}\n")
     f.write("END\n")
     f.write("\n")
 
@@ -312,11 +315,11 @@ def make_orca_input(orcaInput: FilePath,
                     inputFile: FilePath,
                     moleculeInfo: dict,
                     parallelize: int,
-                    qmmm: dict,
-                    geom: dict,
-                    neb: dict,
-                    scf: dict,
-                    docker: dict
+                    qmmm: dict = None,
+                    geom: dict = None,
+                    neb: dict = None,
+                    scf: dict = None,
+                    docker: dict = None
                     ) -> FilePath:
     
     if not simpleInputLine:

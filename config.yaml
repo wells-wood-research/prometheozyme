@@ -1,11 +1,39 @@
-# TODO allow DOCKLEVEL COMPLETE and NOPT
-# https://www.faccts.de/docs/orca/6.1/manual/contents/structurereactivity/docker.html?q=docker&n=0#docker-automated-docking-algorithm
 misc:
+  # set directory for output
+  # automatically writes %Y-%m-%d_%H-%M-%S directory under the path specified below
+  # and places all output there
   workdir: "/home/mchrnwsk/prometheozyme/runs"
-  qmMethod: "XTB2" # QM method to use in docking
-  quick: true # if True, use !quickdock setting with ORCA
-  nprocs: 16 # total number of parallel processes to run docker with
-  orcapth: /home/mchrnwsk/orca_6_1_0/orca # absolute path to orca executable
+  
+# Settings for ORCA DOCKER: Automated Docking Algorithm
+# Read more here: https://www.faccts.de/docs/orca/6.1/manual/contents/structurereactivity/docker.html?q=docker&n=0#docker-automated-docking-algorithm
+# TODO not implemented options: SWARMMINITER, SWARMMAXITER, %GEOM block, GRIDCENTER, DOCKLEVEL
+orca:
+  # absolute path to orca executable
+  # default: ./orca
+  orcapth: /home/mchrnwsk/orca_6_1_0/orca
+  # QM method to use in docking
+  # DOCKER as of ORCA 6.1 is only working with the GFN-XTB and GFN-FF methods and the ALPB solvation model
+  # default: XTB2
+  qmMethod: "XTB2"
+  # define a general strategy of docking procedure, 
+  # from faster but less accurate, to more elaborate
+  # alters population density and final number of optimised structures (TODO does it override?)
+  # available options: SCREENING, QUICK, NORMAL (default) and COMPLETE
+  strategy: QUICK
+  # "Use default optimization criteria inside the DOCKER"
+  # available options: sloppyopt (default), looseopt, normalopt
+  optLevel: sloppyopt
+  # define fixed final number of structures to be optimised at the end of each docking step
+  # default: 5
+  nOpt: 3
+  # defines extent of the grid around the center (of host; could be overridden by GRIDCENTER)
+  # cube of all dimensions equal
+  # units: Ang
+  # default: 15
+  gridExtent: 15
+  # total number of parallel processes to run docker with
+  # default: 8
+  nprocs: 16
   
 # Define all substrates and objects
 # ATOM NAME LIMIT TO 3 symbols!
