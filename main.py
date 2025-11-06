@@ -458,7 +458,7 @@ def main(args):
         leftovers = new_leftovers
 
     logging.info("""
-          Main script complete!
+          Cooking complete -- bon appetit!
           ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆
           """)
 
