@@ -67,7 +67,6 @@ def setup_ingredients(config):
                 {courses_cfg}\n""")
 
     # Create 'Ingredient' objects
-    # TODO are all fields of these objects useful?
     ingredients = {}
     for ing in ingredients_cfg:
         ingredient_obj = Ingredient(
@@ -85,7 +84,6 @@ def setup_ingredients(config):
                 {ingredients}\n""")
 
     # Create 'Course' objects
-    # TODO are all fields of these objects useful?
     courses = {}
     for course in courses_cfg:
         if course['name'] == 'init':
@@ -259,8 +257,6 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
     all_results = split_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", logger)
     results_map = {}
 
-    # TODO reuse previous Result objects... eopt = new_eopt, einter = einter + new_einter
-    # TODO next docking should use all poses that satisfy restraints
     c = 0
     for result in all_results:
         (path, eopt, einter, df) = result
@@ -272,10 +268,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         # Edit df to assign ingredient names to atoms
         df[["FLAVOUR", "ING", "DISH"]] = None, None, None
         n_host, n_guest = host.n_atoms, guest.n_atoms
-        # transfer original labels
 
-        # TODO probably host df here is just the constrained element, not all
-        
         for col in ["ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "FLAVOUR", "ING"]:
             df.loc[:n_host - 1, col] = host.df[col].values
             df.loc[n_host:n_host + n_guest - 1, col] = guest.df[col].values
@@ -284,14 +277,14 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         df.loc[n_host:n_host + n_guest - 1, "DISH"] = course_name
 
         # Make sure each molecule gets a new CHAIN_ID so that ATOM_IDs can be individually 1-based per each molecule
-        logging.debug(f"Result of this docking step: {df}")
         df = assign_chain_ids(df)
         df = df[col_order].astype(col_types)
+        logging.debug(f"Result of this docking step:\n{df}")
 
         # Save PDB
         df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
         pdbUtils.df2pdb(df_to_save, new_path.replace(".xyz", ".pdb"))
-        print(f"Saved to {new_path.replace('.xyz', '.pdb')}")
+        logging.info(f"Saved result to {new_path.replace('.xyz', '.pdb')}")
         
         new_course_key = course_key + (str(c), )
         product_obj = Ingredient(
@@ -315,15 +308,15 @@ def assign_restraint_idx(guest, host, restraint):
     # TODO add error prints here
     guest_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in guest.df.iterrows() if restraint.guestIdx in row["FLAVOUR"]]
     logging.debug("Expanding restraints for guest:")
-    logging.debug("\n", guest.df)
+    logging.debug(f"\n{guest.df}")
     logging.debug(f"Original guestIdx to be restrained: {restraint.guestIdx}")
-    logging.debug(f"Actual guest atoms matching the original: {guest_matches}\n")
+    logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {guest_matches}\n")
     
     host_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in host.df.iterrows() if restraint.hostIdx in row["FLAVOUR"]]
     logging.debug("Expanding restraints for host:")
-    logging.debug("\n", host.df)
+    logging.debug(f"\n{host.df}")
     logging.debug(f"Original hostIdx to be restrained: {restraint.hostIdx}")
-    logging.debug(f"Actual host atoms matching the original: {host_matches}\n")
+    logging.debug(f"Host atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {host_matches}\n")
 
     return guest_matches, host_matches
 
