@@ -338,11 +338,10 @@ def expand_restraints(guest, host, restraint, course_name):
         bias_params.append((g_idx, h_idx, restraint.val, restraint.force))
     return bias_params
 
-def expand_ingredient_and_restraint_combinations(course):
+def expand_ingredient_and_restraint_combinations(course, host):
     expanded_course = {}
 
     # Loop all candidate host/guest pairs
-    host = course.host
     for guest in course.guests:
         # For each restraint compute the list of concrete options (g_idx, h_idx, val, force)
         bias_params_per_restraint = []
@@ -443,10 +442,7 @@ def main(args):
             new_host_for_restraints_ing = ingredients[new_host_for_restraints_name]
             new_host_for_restraints_ing.df = new_host_for_restraints_df
 
-            new_course_for_restraints = copy.deepcopy(course)
-            new_course_for_restraints.host = new_host_for_restraints_ing
-
-            expanded_course = expand_ingredient_and_restraint_combinations(new_course_for_restraints)
+            expanded_course = expand_ingredient_and_restraint_combinations(course, new_host_for_restraints_ing)
             logging.debug(f"""Expanded ingredient and restraint combinations for
                         course name: {course.name}
                         number of combinations: {len(expanded_course)}
