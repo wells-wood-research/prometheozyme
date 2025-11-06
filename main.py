@@ -304,25 +304,30 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
 ## RESTRAINTS
 ########################
 
-def assign_restraint_idx(guest, host, restraint):
-    # TODO add error prints here
+def assign_restraint_idx(guest, host, restraint, course_name):
     guest_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in guest.df.iterrows() if restraint.guestIdx in row["FLAVOUR"]]
-    logging.debug("Expanding restraints for guest:")
-    logging.debug(f"\n{guest.df}")
-    logging.debug(f"Original guestIdx to be restrained: {restraint.guestIdx}")
-    logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {guest_matches}\n")
+    if not guest_matches:
+        logging.error(f"Guest {guest.name} has no atoms matching flavour of restraint {restraint.guestIdx} for course {course_name}")
+    else:
+        logging.debug("Expanding restraints for guest:")
+        logging.debug(f"\n{guest.df}")
+        logging.debug(f"Original guestIdx to be restrained: {restraint.guestIdx}")
+        logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {guest_matches}\n")
     
     host_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in host.df.iterrows() if restraint.hostIdx in row["FLAVOUR"]]
-    logging.debug("Expanding restraints for host:")
-    logging.debug(f"\n{host.df}")
-    logging.debug(f"Original hostIdx to be restrained: {restraint.hostIdx}")
-    logging.debug(f"Host atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {host_matches}\n")
+    if not host_matches:
+        logging.error(f"Host {host.name} has no atoms matching flavour of restraint {restraint.hostIdx} for course {course_name}")
+    else:
+        logging.debug("Expanding restraints for host:")
+        logging.debug(f"\n{host.df}")
+        logging.debug(f"Original hostIdx to be restrained: {restraint.hostIdx}")
+        logging.debug(f"Host atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {host_matches}\n")
 
     return guest_matches, host_matches
 
-def expand_restraints(guest, host, restraint):
+def expand_restraints(guest, host, restraint, course_name):
     # Filter tuples whose activity matches the requested flavour name
-    guest_matches, host_matches = assign_restraint_idx(guest, host, restraint)
+    guest_matches, host_matches = assign_restraint_idx(guest, host, restraint, course_name)
 
     # To define bond bias potential in ORCA DOCKING step
     bias_params = []
@@ -344,7 +349,7 @@ def expand_ingredient_and_restraint_combinations(course):
         # TODO how would this work for multiple course restraints, e.g. distance and angle?
         # TODO desired behaviour is to make all combinations of one restraint, and all combinations of the other (separately), and then combine them directlyin all possibilities
         for restraint in course.restraints or []:
-            bias_params = expand_restraints(guest, host, restraint)
+            bias_params = expand_restraints(guest, host, restraint, course.name)
             # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
             if not bias_params:
                 # skip this host/guest pair entirely
