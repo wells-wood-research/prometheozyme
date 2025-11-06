@@ -192,7 +192,7 @@ def dock(outdir, course_key, course_desc, orca):
     nprocs = orca.get("nprocs", 8) 
 
     # Output of each docking step is organised as course/guest/restraints_combination
-    workdir = os.path.join(outdir, *course_key)
+    workdir = os.path.join(outdir, *course_key[1:])
     os.makedirs(workdir, exist_ok=True)
 
     inp_file_path, curr_charge, curr_multiplicity = write_docking_input(course_key[0], course_desc.guests, course_desc.host, course_desc.restraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
@@ -284,10 +284,8 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         df.loc[n_host:n_host + n_guest - 1, "DISH"] = course_name
 
         # Make sure each molecule gets a new CHAIN_ID so that ATOM_IDs can be individually 1-based per each molecule
-        print(df)
+        logging.debug(f"Result of this docking step: {df}")
         df = assign_chain_ids(df)
-
-        # TODO ATOM_ID should probably continue... of chain id should be changed...
         df = df[col_order].astype(col_types)
 
         # Save PDB
@@ -317,13 +315,13 @@ def assign_restraint_idx(guest, host, restraint):
     # TODO add error prints here
     guest_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in guest.df.iterrows() if restraint.guestIdx in row["FLAVOUR"]]
     logging.debug("Expanding restraints for guest:")
-    logging.debug(guest.df)
+    logging.debug("\n", guest.df)
     logging.debug(f"Original guestIdx to be restrained: {restraint.guestIdx}")
     logging.debug(f"Actual guest atoms matching the original: {guest_matches}\n")
     
     host_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in host.df.iterrows() if restraint.hostIdx in row["FLAVOUR"]]
     logging.debug("Expanding restraints for host:")
-    logging.debug(host.df)
+    logging.debug("\n", host.df)
     logging.debug(f"Original hostIdx to be restrained: {restraint.hostIdx}")
     logging.debug(f"Actual host atoms matching the original: {host_matches}\n")
 
@@ -450,8 +448,6 @@ def main(args):
             new_course_for_restraints = copy.deepcopy(course)
             new_course_for_restraints.host = new_host_for_restraints_ing
 
-            # TODO I am passing here a fake host for restraints which e..g is only df of molecule C from ABCD
-            # TODO does that interrupt with other things?
             expanded_course = expand_ingredient_and_restraint_combinations(new_course_for_restraints)
             logging.debug(f"""Expanded ingredient and restraint combinations for
                         course name: {course.name}
@@ -462,9 +458,8 @@ def main(args):
             for course_key, course_desc in expanded_course.items():
                 logging.info(f"Processing course: {course_key}")
                 course_desc.host = new_host_for_docking_ing
-                # TODO don't nest directories so deep - more vertical structure
-                outdir = os.path.dirname(serving.path)
-                waste_bucket = dock(outdir, course_key, course_desc, orca)
+                curr_outdir = os.path.join(outdir, f"course{i}")
+                waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
                 [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
         leftovers = new_leftovers
 
