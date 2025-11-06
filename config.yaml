@@ -18,7 +18,7 @@ orca:
   qmMethod: "XTB2"
   # define a general strategy of docking procedure, 
   # from faster but less accurate, to more elaborate
-  # alters population density and final number of optimised structures (TODO does it override?)
+  # alters population density and final number of optimised structures (but nOpt is decisive)
   # available options: SCREENING, QUICK, NORMAL (default) and COMPLETE
   strategy: QUICK
   # "Use default optimization criteria inside the DOCKER"
