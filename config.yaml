@@ -1,10 +1,11 @@
+# MISCELLANEOUS INFORMATION
 misc:
   # set directory for output
   # automatically writes %Y-%m-%d_%H-%M-%S directory under the path specified below
   # and places all output there
   workdir: "/home/mchrnwsk/prometheozyme/runs"
   
-# Settings for ORCA DOCKER: Automated Docking Algorithm
+# SETTINGS FOR ORCA DOCKER: Automated Docking Algorithm
 # Read more here: https://www.faccts.de/docs/orca/6.1/manual/contents/structurereactivity/docker.html?q=docker&n=0#docker-automated-docking-algorithm
 # TODO not implemented options: SWARMMINITER, SWARMMAXITER, %GEOM block, GRIDCENTER, DOCKLEVEL
 orca:
@@ -35,7 +36,7 @@ orca:
   # default: 8
   nprocs: 16
   
-# Define all molecular objects to participate in the docking pipeline
+# DEFINE ALL MOLECULAR OBJECTS TO PARTICIPATE IN THE DOCKING PIPELINE
 # Recommended strategy: create PDB files and assign unique atom names to all atoms,
 # or at least all atoms that will be used in any constraints
 # WARNING: atom name length is limited to 3 symbols!
@@ -201,16 +202,14 @@ ingredients:
 courses:
   - &init
       name: init
-      host_candidates:
-        - None
+      host_candidates: None
       guest_candidates:
         - *sub
       restraints:
         None
   - &base1
       name: base1
-      host_candidates:
-        - *init
+      host_candidates: *init
       guest_candidates:
         - *his
       restraints:
@@ -220,8 +219,7 @@ courses:
           force: 100
   - &base2
       name: base2
-      host_candidates:
-        *base1
+      host_candidates: *base1
       guest_candidates:
         - *asp
       restraints:

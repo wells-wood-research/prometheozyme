@@ -9,7 +9,7 @@ import itertools
 import copy
 import string
 
-from define import Ingredient, Constraint, Role, col_order, col_types
+from define import Ingredient, Restraint, Course, col_order, col_types
 from utils import split_docker_results
 from evaluate import filter_conformations
 from drOrca import make_orca_input
@@ -18,13 +18,6 @@ import pdbUtils
 ########################
 ## SETUP
 ########################
-
-def setup(configPath):
-    config, outdir, orca = setup_config(configPath)
-    setup_logging(outdir)
-    # Prepare ingredients and roles from the configuration    
-    courses, ingredients = setup_ingredients(config) # TODO renamed roles --> courses, ingredient_map --> ingredients here
-    return config, outdir, orca, courses, ingredients
 
 def setup_config(configPath):
     if not os.path.isfile(configPath):
@@ -74,13 +67,12 @@ def setup_ingredients(config):
                 {courses_cfg}\n""")
 
     # Create 'Ingredient' objects
-    # TODO is ingredients map really useful?
-    # TODO are all fields useful?
+    # TODO are all fields of these objects useful?
     ingredients = {}
     for ing in ingredients_cfg:
         ingredient_obj = Ingredient(
-            name=ing['name'],
             path=ing['path'],
+            name=ing['name'],
             eopt=0,
             einter=0,
             charge=ing['charge'],
@@ -88,48 +80,57 @@ def setup_ingredients(config):
             flavours=ing.get('flavours', {}),
             df=None
         )
-        ingredients[ing['name']] = ingredient_obj
+        ingredients[ingredient_obj.name] = ingredient_obj
     logging.debug(f"""Ingredient map is:
                 {ingredients}\n""")
 
     # Create 'Course' objects
-    course_objects = {}
+    # TODO are all fields of these objects useful?
+    courses = {}
     for course in courses_cfg:
         if course['name'] == 'init':
-            host_candidates = None
-            guest_candidates = [ingredients["sub"]] # list for consistent typing
-            constraints = None
+            # At any given time course.host is a single value describing name of a course to take guests from for docking restraints
+            # Or the one currently considered host, however keep name as plural for underlying idea
+            host_candidate = None
+            # There is a list of mutliple potential guests for any course
+            guest_candidates = [ingredients["sub"]]
+            restraints = None
         else:
             # Map candidates to Ingredient objects
-            host_candidates = course['host_candidates']['name']
+            host_candidate = course['host_candidates']['name'] # this will be name of a previous Course - not actual molecular hosts yet
             guest_candidates = [ingredients[cand['name']] for cand in course['guest_candidates']]
             
-            # Handle constraints if present
-            constraints_data = course.get('constraints', [])
-            constraints = []
-            for cons in constraints_data:
-                constraint = Constraint(
-                    guestIdx=cons['guestIdx'],
-                    guestType=cons.get('guestType'),
-                    hostIdx=cons['hostIdx'],
-                    hostType=cons.get('hostType'),
-                    val=cons['val'],
-                    force=cons['force']
+            # Handle restraints if present
+            restraints_data = course.get('restraints', [])
+            restraints = []
+            for restr in restraints_data:
+                restraint = Restraint(
+                    guestIdx=restr['guestIdx'],
+                    hostIdx=restr['hostIdx'],
+                    val=restr['val'],
+                    force=restr['force']
                 )
-                constraints.append(constraint)
+                restraints.append(restraint)
         
         # Create Course object
         course_obj = Course(
             name=course['name'],
-            host=host_candidates,
+            host=host_candidate,
             guests=guest_candidates,
-            constraints=constraints
+            restraints=restraints
         )
-        course_objects[course_obj.title] = course_obj 
-    logging.debug(f"""course objects are:
-                {course_objects}""")
+        courses[course_obj.name] = course_obj 
+    logging.debug(f"""Course map is:
+                {courses}""")
 
-    return course_objects, ingredients
+    return courses, ingredients
+
+def setup(configPath):
+    config, outdir, orca = setup_config(configPath)
+    setup_logging(outdir)
+    # Prepare ingredients and courses from the configuration    
+    courses, ingredients = setup_ingredients(config)
+    return outdir, orca, courses, ingredients
 
 ########################
 ## HELPER FUNCTIONS
@@ -167,6 +168,10 @@ def assign_chain_ids(df):
     
     return df
 
+########################
+## DOCKING
+########################
+
 def calculate_charge(charges):
     return int(sum(charges))
     
@@ -176,7 +181,7 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 
-def dock(outdir, role_key, role_desc, orca):
+def dock(outdir, course_key, course_desc, orca):
     # Read orca parameters
     orcapath = orca.get("orcapth", "./orca")
     qmMethod = orca.get("qmMethod", "XTB2")
@@ -186,19 +191,19 @@ def dock(outdir, role_key, role_desc, orca):
     gridExtent = orca.get("gridExtent", 15)
     nprocs = orca.get("nprocs", 8) 
 
-    # Output of each docking step is organised as role/guest/constraints_combination
-    workdir = os.path.join(outdir, *role_key)
+    # Output of each docking step is organised as course/guest/restraints_combination
+    workdir = os.path.join(outdir, *course_key)
     os.makedirs(workdir, exist_ok=True)
 
-    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(role_key[0], role_desc.guests, role_desc.host, role_desc.constraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
+    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(course_key[0], course_desc.guests, course_desc.host, course_desc.restraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
 
     run_docking(inp_file_path, orcapath)
-    results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, role_desc.guests, role_desc.host, role_key, logging)
+    results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, course_desc.guests, course_desc.host, course_key, logging)
     return results_map
 
-def write_docking_input(role_name, guest, host, constraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs):
+def write_docking_input(course_name, guest, host, restraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs):
     inp_file_path = os.path.join(workdir, f"dock")
-    title = f"ORCA DOCKER: Automated Docking Algorithm for\n # role: {role_name}\n # host: {host.name}\n # guest: {guest.name}"
+    title = f"ORCA DOCKER: Automated Docking Algorithm for\n # course: {course_name}\n # host: {host.name}\n # guest: {guest.name}"
 
     # Prepare host and guest molecular structure files as XYZ
     hostPathPDB = host.path
@@ -225,8 +230,8 @@ def write_docking_input(role_name, guest, host, constraints, workdir, qmMethod, 
     # Must be defined by atom numbers for GUEST FIRST, then HOST SECOND, absolute indexing for each molecule independently
     # For example, to add a bond bias between atom 2 from the GUEST and atom 19 from the HOST, write: BIAS { B 2 19 } END 
     biases = []
-    for constraint in constraints:
-        bias = {"atoms": [constraint.guestIdx, constraint.hostIdx], "val": constraint.val, "force": constraint.force}
+    for restraint in restraints:
+        bias = {"atoms": [restraint.guestIdx, restraint.hostIdx], "val": restraint.val, "force": restraint.force}
         biases.append(bias)
     
     docker = {"guestPath": guestPathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": True, "bias": biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
@@ -249,34 +254,34 @@ def run_docking(input, orcapath):
     with open(output_file, "w") as f:
         subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=f, stderr=subprocess.STDOUT)
 
-def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, role_key, logger):
-    role_name = role_key[0]
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, course_key, logger):
+    course_name = course_key[0]
     all_results = split_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", logger)
     results_map = {}
 
     # TODO reuse previous Result objects... eopt = new_eopt, einter = einter + new_einter
-    # TODO next docking should use all poses that satisfy constraints
+    # TODO next docking should use all poses that satisfy restraints
     c = 0
     for result in all_results:
         (path, eopt, einter, df) = result
-        # TODO evaluate output for satisfying constraints
+        # TODO evaluate output for satisfying restraints
         # TODO after optmisation there might be duplicated results - need to remove
         new_path = os.path.join(os.path.dirname(path), f"struct{c}", "host.xyz")
         os.makedirs(os.path.dirname(new_path), exist_ok=True)
         shutil.move(path, new_path)
         # Edit df to assign ingredient names to atoms
-        df[["ROLE", "ING", "DISH"]] = None, None, None
+        df[["FLAVOUR", "ING", "DISH"]] = None, None, None
         n_host, n_guest = host.n_atoms, guest.n_atoms
         # transfer original labels
 
         # TODO probably host df here is just the constrained element, not all
         
-        for col in ["ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "ROLE", "ING"]:
+        for col in ["ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "FLAVOUR", "ING"]:
             df.loc[:n_host - 1, col] = host.df[col].values
             df.loc[n_host:n_host + n_guest - 1, col] = guest.df[col].values
         # transfer dish labels
         df.loc[:n_host - 1, "DISH"] = host.df["DISH"].values
-        df.loc[n_host:n_host + n_guest - 1, "DISH"] = role_name
+        df.loc[n_host:n_host + n_guest - 1, "DISH"] = course_name
 
         # Make sure each molecule gets a new CHAIN_ID so that ATOM_IDs can be individually 1-based per each molecule
         print(df)
@@ -286,109 +291,124 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         df = df[col_order].astype(col_types)
 
         # Save PDB
-        df_to_save = df.loc[:, ~df.columns.isin(["ROLE", "ING", "DISH"])]
+        df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
         pdbUtils.df2pdb(df_to_save, new_path.replace(".xyz", ".pdb"))
         print(f"Saved to {new_path.replace('.xyz', '.pdb')}")
         
+        new_course_key = course_key + (str(c), )
         product_obj = Ingredient(
             path=new_path,
+            name=("_").join(new_course_key),
             eopt=eopt,
             einter=einter,
             charge=curr_charge,
             multiplicity=curr_multiplicity,
             df=df
         )
-        new_role_key = role_key + (str(c), )
-        results_map[new_role_key] = product_obj
+        results_map[new_course_key] = product_obj
         c+=1
     return results_map
 
-def expand_constraints(guest, host, constraint):
-    # Filter tuples whose activity matches the requested activity name
-    print("For guest:")
-    print(guest.df)
-    print(constraint.guestIdx)
-    print()
-    guest_matches = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in guest.df.iterrows() if constraint.guestIdx in row["ROLE"]]
-    print("For host:")
-    print(host.df)
-    print(constraint.hostIdx)
-    host_matches = [(i, row["ATOM_NAME"], row["ROLE"]) for i, row in host.df.iterrows() if constraint.hostIdx in row["ROLE"]]
+########################
+## RESTRAINTS
+########################
 
-    keep = []
+def assign_restraint_idx(guest, host, restraint):
+    # TODO add error prints here
+    guest_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in guest.df.iterrows() if restraint.guestIdx in row["FLAVOUR"]]
+    logging.debug("Expanding restraints for guest:")
+    logging.debug(guest.df)
+    logging.debug(f"Original guestIdx to be restrained: {restraint.guestIdx}")
+    logging.debug(f"Actual guest atoms matching the original: {guest_matches}\n")
+    
+    host_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in host.df.iterrows() if restraint.hostIdx in row["FLAVOUR"]]
+    logging.debug("Expanding restraints for host:")
+    logging.debug(host.df)
+    logging.debug(f"Original hostIdx to be restrained: {restraint.hostIdx}")
+    logging.debug(f"Actual host atoms matching the original: {host_matches}\n")
+
+    return guest_matches, host_matches
+
+def expand_restraints(guest, host, restraint):
+    # Filter tuples whose activity matches the requested flavour name
+    guest_matches, host_matches = assign_restraint_idx(guest, host, restraint)
+
+    # To define bond bias potential in ORCA DOCKING step
+    bias_params = []
     for g_item, h_item in itertools.product(guest_matches, host_matches):
         # g_item and h_item are tuples like (index, name, activity)
         g_idx = g_item[0]  # numeric index in the PDB/molecule
         h_idx = h_item[0]
-        keep.append((g_idx, h_idx, constraint.val, constraint.force))
-    return keep
+        bias_params.append((g_idx, h_idx, restraint.val, restraint.force))
+    return bias_params
 
-def expand_role_combinations(role):
-    """
-    Expand roles with multiple hosts/guests into all (host, guest) pairs.
-    For each host/guest pair, expand constraints so that for every possible
-    combination of concrete atom-pairs (one per constraint) we produce a unique Role.
-    """
-    expanded_roles = {}
+def expand_ingredient_and_restraint_combinations(course):
+    expanded_course = {}
 
     # Loop all candidate host/guest pairs
-    for host, guest in itertools.product(role.host, role.guests):
-        # For each constraint compute the list of concrete options (g_idx, h_idx, val, force)
-        options_per_constraint = []
-        for constraint in role.constraints or []:
-            opts = expand_constraints(guest, host, constraint)
-            # If a constraint has no matching atoms, this role/host/guest pair can't satisfy it:
-            if not opts:
+    host = course.host
+    for guest in course.guests:
+        # For each restraint compute the list of concrete options (g_idx, h_idx, val, force)
+        bias_params_per_restraint = []
+        # TODO how would this work for multiple course restraints, e.g. distance and angle?
+        # TODO desired behaviour is to make all combinations of one restraint, and all combinations of the other (separately), and then combine them directlyin all possibilities
+        for restraint in course.restraints or []:
+            bias_params = expand_restraints(guest, host, restraint)
+            # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
+            if not bias_params:
                 # skip this host/guest pair entirely
-                options_per_constraint = []
+                bias_params_per_restraint = []
                 break
-            options_per_constraint.append(opts)
+            bias_params_per_restraint.append(bias_params)
 
-        # If there were no constraints, create a single entry (no-constraint case)
-        if not options_per_constraint and (not role.constraints):
-            # Create single role copy with no concrete constraints
-            new_role = copy.deepcopy(role)
-            new_role.host = host
-            new_role.guests = guest
-            new_role.constraints = []
-            role_key = f"{role.title}_{host.name}_{guest.name}_no_constraints"
-            expanded_roles[role_key] = new_role
+        # Case 1) no restraints were defined for this course:
+        if not course.restraints:
+            # Create single course copy with no concrete restraints
+            new_course = copy.deepcopy(course)
+            new_course.host = host
+            new_course.guests = guest
+            new_course.restraints = []
+            course_key = f"{course.name}_{host.name}_{guest.name}_constrX"
+            logging.debug(f"No restraints defined for course {course_key}")
+            expanded_course[course_key] = new_course
             continue
 
-        # If any constraint had zero options, skip (cannot satisfy constraints)
-        if not options_per_constraint:
+        # Case 2) restraints cannot be satisfied
+        if not bias_params_per_restraint:
+            # TODO add error prints here
             continue
 
-        # Cartesian product across lists of options (one option per constraint)
+        # Cartesian product across lists of options (one option per restraint)
         # If one ingredient has multiple atoms of same flavour (e.g. multiple h_donor),
-        # this creates multiple combinations, one for each of the atoms
-        for combo_idx, combo in enumerate(itertools.product(*options_per_constraint)):
-            # combo is a tuple of option tuples, one per constraint
-            # Build new constraint objects (or simple tuples) representing these concrete constraints
-            concrete_constraints = []
-            for orig_constraint, option in zip(role.constraints, combo):
-                g_idx, h_idx, val, force = option
-                # Create a copy of the original constraint but with resolved atom indices
-                new_cons = copy.deepcopy(orig_constraint)
+        # this creates multiple combinations (a "mash-up"), one for each of the atoms
+        for mash_idx, mash in enumerate(itertools.product(*bias_params_per_restraint)):
+            # 'mash' is a tuple of option tuples, one per restraint
+            # Build new restraint tuples representing these concrete restraint
+            mashed_restraints = []
+            for orig_restraint, bias_params in zip(course.restraints, mash):
+                g_idx, h_idx, val, force = bias_params
+                # Create a copy of the original restraint but with resolved atom indices
+                new_restraint = copy.deepcopy(orig_restraint)
                 # Overwrite guestIdx/hostIdx with the concrete atom indices
-                new_cons.guestIdx = g_idx
-                new_cons.hostIdx = h_idx
+                new_restraint.guestIdx = g_idx
+                new_restraint.hostIdx = h_idx
                 # Ensure val/force are set to the chosen option (val likely same as orig)
-                new_cons.val = val
-                new_cons.force = force
-                concrete_constraints.append(new_cons)
+                new_restraint.val = val
+                new_restraint.force = force
+                mashed_restraints.append(new_restraint)
 
-            # Make new role copy and set host/guest to the concrete candidates and constraints
-            new_role = copy.deepcopy(role)
-            new_role.host = host
-            new_role.guests = guest  # TODO rename to "guest" considering the 1-to-1 expansion
-            new_role.constraints = concrete_constraints
+            # Make new course copy and set host/guest to the concrete candidates and restraints
+            new_course = copy.deepcopy(course)
+            new_course.host = host
+            new_course.guests = guest  # TODO guests vs guest... typing... should this be a list here?
+            new_course.restraints = mashed_restraints
 
-            # Unique key: include the combination index so duplicates don't clobber
-            role_key = (str(role.title), str(guest.name), str(combo_idx)) # is a tuple
-            expanded_roles[role_key] = new_role
+            # Unique key: include the combination index so expansion products of same host and guest don't overwrite themselves
+            # is a tuple
+            course_key = (str(course.name), str(guest.name), str(mash_idx))
+            expanded_course[course_key] = new_course
 
-    return expanded_roles
+    return expanded_course
 
 ########################
 ## MAIN LOOP
@@ -396,53 +416,57 @@ def expand_role_combinations(role):
 
 def main(args):
     # Read config file
-    if not args.config:
-        # TODO del when finished testing
-        args.config = "/home/mchrnwsk/prometheozyme/config.yaml"
-    outdir, orca, roles, ingredients = setup(args.config)
+    outdir, orca, courses, ingredients = setup(args.config)
 
-    # Prepare the substrate as a fake result of first docking
-    prev_results = []
-    init_host = roles["init"].guests[0]
-    init_host_dir = os.path.join(outdir, "init")
-    init_host_path = os.path.join(init_host_dir, "host.pdb") # TODO do you want "prev_results" to be PDB or XYZ based? DO you want to always (!) write both XYZ and PDB?
+    # Results of previous course, carried over as starting point (HOST) of next docking step
+    leftovers = []
+    
+    # Prepare the substrate as a fake result of first docking for processing consistency
+    init_host = courses["init"].guests[0]
+    init_host_dir = os.path.join(outdir, f"base_stock")
+    init_host_path = os.path.join(init_host_dir, "host.pdb") # TODO do you want "leftovers" to be PDB or XYZ based? DO you want to always (!) write both XYZ and PDB?
     os.makedirs(init_host_dir)
     shutil.copy(init_host.path, init_host_path)
     # TODO assumes there's xyz present - need to expect user only to prepare PDBs
     shutil.copy(init_host.path.replace(".pdb", ".xyz"), init_host_path.replace(".pdb", ".xyz"))
     init_host.path = init_host_path
-    prev_results.append(init_host)
+    leftovers.append(init_host)
 
-    # Run ORCA DOCKER for each role, exhaustive for host/guest mix
-    for i, (role_name, role) in enumerate(roles.items()):
-        if role_name == "init":
+    # Run ORCA DOCKER for each course, exhaustive for host/guest mix
+    for i, (course_name, course) in enumerate(courses.items()):
+        if course_name == "init":
             continue
-        for result in prev_results:
-            new_host_ing_for_docking = result
-            new_host_df = new_host_ing_for_docking.df
-            new_host_df_for_constraints = new_host_df[new_host_df["DISH"] == role.host]
-            new_host_name = new_host_df_for_constraints["ING"].unique()[0]
-            new_host_ing_for_constraints = ingredients[new_host_name]
-            new_host_ing_for_constraints.df = new_host_df_for_constraints
-            new_host_ing_for_constraints.path = result.path
+        for serving in leftovers:
+            # There's two kinds of "HOSTS" in every docking step:
+            # 1) host file which is the complete product of previous course
+            # 2) host molecule to restrain guest towards (for seleciton of atom indices in BIAS block of ORCA input file)
+            new_host_for_docking_ing = serving
+            new_host_for_docking_df = new_host_for_docking_ing.df
+            new_host_for_restraints_df = new_host_for_docking_df[new_host_for_docking_df["DISH"] == course.host]
+            new_host_for_restraints_name = new_host_for_restraints_df["ING"].unique()[0]
+            new_host_for_restraints_ing = ingredients[new_host_for_restraints_name]
+            new_host_for_restraints_ing.df = new_host_for_restraints_df
 
-            new_role = copy.deepcopy(role)
-            new_role.host = [new_host_ing_for_constraints]
+            new_course_for_restraints = copy.deepcopy(course)
+            new_course_for_restraints.host = new_host_for_restraints_ing
 
-            expanded_roles = expand_role_combinations(new_role)
-            logging.debug(f"""Expanded ingredient and constraint combinations for
-                        role title: {role.title}
-                        number of combinations: {len(expanded_roles)}
-                        combination keys: {list(expanded_roles.keys())}""")
+            # TODO I am passing here a fake host for restraints which e..g is only df of molecule C from ABCD
+            # TODO does that interrupt with other things?
+            expanded_course = expand_ingredient_and_restraint_combinations(new_course_for_restraints)
+            logging.debug(f"""Expanded ingredient and restraint combinations for
+                        course name: {course.name}
+                        number of combinations: {len(expanded_course)}
+                        combination keys: {list(expanded_course.keys())}""")
 
-            new_prev_results = []
-            for role_key, role_desc in expanded_roles.items():
-                logging.info(f"Processing role: {role_key}")
-                role_desc.host = new_host_ing_for_docking
-                outdir = os.path.dirname(result.path)
-                results_map = dock(outdir, role_key, role_desc, orca)
-                [new_prev_results.append(results_map[key]) for key in results_map.keys() if key[:3] == role_key]
-        prev_results = new_prev_results
+            new_leftovers = []
+            for course_key, course_desc in expanded_course.items():
+                logging.info(f"Processing course: {course_key}")
+                course_desc.host = new_host_for_docking_ing
+                # TODO don't nest directories so deep - more vertical structure
+                outdir = os.path.dirname(serving.path)
+                waste_bucket = dock(outdir, course_key, course_desc, orca)
+                [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
+        leftovers = new_leftovers
 
     logging.info("""
           Main script complete!
@@ -451,7 +475,10 @@ def main(args):
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Process some ingredients and roles.")
+    parser = argparse.ArgumentParser(description="Process some ingredients and courses.")
     parser.add_argument('--config', type=str, default=None, help="Path to the configuration YAML file")
     args = parser.parse_args()
+    if not args.config:
+        # TODO del static assignemnt when finished testing
+        args.config = "/home/mchrnwsk/prometheozyme/config.yaml"
     main(args)

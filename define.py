@@ -6,7 +6,7 @@ import sys
 
 col_order = [
     "ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID",
-    "X", "Y", "Z", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "ROLE", "ING", "DISH"
+    "X", "Y", "Z", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "FLAVOUR", "ING", "DISH"
 ]
 
 col_types = {
@@ -22,14 +22,15 @@ col_types = {
     "OCCUPANCY": float,
     "BETAFACTOR": float,
     "ELEMENT": str,
-    "ROLE": str,
+    "FLAVOUR": str,
     "ING": str,
     "DISH": str
 }
 
 class Ingredient:
-    def __init__(self, name, path, charge=0, multiplicity=1, eopt=0, einter=0,  flavours=None, restraints=[], df=None):
+    def __init__(self, path, name, eopt=0, einter=0, charge=0, multiplicity=1, flavours=None, restraints=[], df=None):
         self.path = path
+        self.name = name or os.path.splitext(os.path.basename(path))[0]
         self.eopt = eopt
         self.einter = einter
         self.charge = int(charge)
@@ -37,17 +38,16 @@ class Ingredient:
         # TODO consistency with PDB paths
         if path.endswith(".pdb") and df is None:
             df = pdbUtils.pdb2df(path)
-            df["ROLE"] = [[] for _ in range(len(df))] # TODO rename to flavour
+            df["FLAVOUR"] = [[] for _ in range(len(df))]
             for role_name, atom_names in flavours.items():
                 mask = df["ATOM_NAME"].isin(atom_names)
-                df.loc[mask, "ROLE"] = df.loc[mask, "ROLE"].apply(lambda lst: lst + [role_name])
+                df.loc[mask, "FLAVOUR"] = df.loc[mask, "FLAVOUR"].apply(lambda lst: lst + [role_name])
             df["ING"] = name
             df["DISH"] = "init"
             df = df[col_order].astype(col_types)
         self.df = df
         self.n_atoms = len(self.df)
         self.restraints = restraints
-        self.name = name or os.path.splitext(os.path.basename(path))[0]
         self.id = str(uuid.uuid4())
 
 class Course:
