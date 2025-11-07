@@ -300,6 +300,254 @@ def write_xyz(file, comment, coords, atom_types):
         with open(file, 'w') as f:
             write_to_file(f)
 
+
+
+def calculate_distance(coord1, coord2):
+    """Calculate Euclidean distance between two 3D coordinates."""
+    return np.sqrt(np.sum((coord1 - coord2) ** 2))
+
+def calculate_center_of_mass(coordinates, indices, atom_types):
+    """Calculate center of mass for given indices, weighted by atomic masses."""
+    if not indices:
+        return None
+    
+    # Atomic masses in atomic mass units (u) for common elements
+    atomic_masses = {
+        'H': 1.00794, 'He': 4.002602, 'C': 12.0107, 'N': 14.0067, 'O': 15.9994,
+        'F': 18.998403, 'P': 30.973762, 'S': 32.065, 'Cl': 35.453,
+        # Add more elements as needed
+    }
+    
+    selected_coords = np.array([coordinates[i] for i in indices])
+    masses = np.array([atomic_masses.get(atom_types[i], 1.0) for i in indices])  # Default to 1.0 if unknown
+    
+    # Weighted average: sum(mass * coord) / sum(mass)
+    weighted_coords = selected_coords * masses[:, np.newaxis]
+    center_of_mass = np.sum(weighted_coords, axis=0) / np.sum(masses)
+    
+    return center_of_mass
+
+def read_score(filepath, logger=None):
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+
+    # Find the start of the results table
+    start_index = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("mode |  affinity"):
+            start_index = i + 3  # data starts 3 lines after the header line
+            break
+
+    # Parse the affinity column
+    affinities = []
+    if start_index is not None:
+        for line in lines[start_index:]:
+            parts = line.split()
+            if len(parts) >= 2:
+                try:
+                    affinity = float(parts[1])  # Second column is "affinity"
+                    affinities.append(affinity)
+                except ValueError:
+                    continue  # Skip lines that don't contain floats in expected place
+    else:
+        logger.error(f"No scores found in {filepath}!")
+
+    # Convert to NumPy array or DataFrame
+    affinity_array = np.array(affinities)
+
+    return affinity_array
+
+def append_scores(xyz_file, scores_file, logger=None):
+    structures = read_xyz(xyz_file, logger=logger)
+    scores = read_score(scores_file, logger=logger)
+
+    if len(structures) != len(scores):
+        if logger:
+            logger.error(f"Mismatch: {len(structures)} structures vs {len(scores)} scores in {xyz_file}")
+        else:
+            raise ValueError(f"Mismatch: {len(structures)} structures vs {len(scores)} scores")
+
+    temp_output = xyz_file + ".tmp"
+
+    with open(temp_output, 'w') as f:
+        for i, (atom_count, comment, coordinates, atom_types) in enumerate(structures):
+            score = scores[i]
+            new_comment = f"{score:.7f}"
+            write_xyz(f, new_comment, coordinates, atom_types)
+
+    # Replace original file only after successful write
+    os.replace(temp_output, xyz_file)
+
+def split_multi_xyz(multi_xyz_path, output_dir, logger=None):
+    """
+    Splits a multi-XYZ file into individual XYZ files.
+    """
+    individual_xyz_paths = []
+    structures = read_xyz(multi_xyz_path, logger)
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for i, (atom_count, comment, coords, atom_types) in enumerate(structures):
+        output_file_path = os.path.join(output_dir, f"structure_{i+1:04d}.xyz")
+        with open(output_file_path, 'w') as f:
+            write_xyz(f, comment, coords, atom_types)
+        individual_xyz_paths.append(output_file_path)
+
+    if logger:
+        logger.info(f"Split {multi_xyz_path} into {len(individual_xyz_paths)} individual XYZ files in {output_dir}")
+    return individual_xyz_paths
+
+def split_multi_pdb(multi_pdb_path, output_dir, logger=None):
+    """
+    Splits a multi-structure PDB file into individual PDB files,
+    including the CONECT records from the end of the multi-structure file
+    in each split file.
+
+    Args:
+        multi_pdb_path (str): Path to the input multi-structure PDB file.
+        output_dir (str): Directory to save the split PDB files.
+        logger (logging.Logger, optional): Logger instance. Defaults to None.
+
+    Returns:
+        list: A list of paths to the individual PDB files created.
+    """
+    individual_pdb_paths = []
+    current_model_lines = []
+    model_count = 0
+    conect_section = []
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        if logger:
+            logger.info(f"Created output directory: {output_dir}")
+
+    try:
+        with open(multi_pdb_path, 'r') as f:
+            lines = f.readlines()
+
+        # --- Extract CONECT records from the end of the file ---
+        # Find the start of CONECT records by searching backwards
+        conect_records_start_index = -1
+        # Iterate backwards to find the block of CONECT records
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].startswith("CONECT"):
+                conect_records_start_index = i
+            elif conect_records_start_index != -1 and not lines[i].strip():
+                # Found an empty line after a CONECT, so the CONECT block starts from conect_records_start_index
+                break
+            elif conect_records_start_index != -1 and not lines[i].startswith("CONECT"):
+                 # Found a non-CONECT line after a CONECT, means the CONECT block started earlier
+                 # This handles cases where there might be non-CONECT lines between CONECT blocks or before the first CONECT.
+                 # We want the *last contiguous block* of CONECT records.
+                 conect_records_start_index = i + 1 # The block starts from the next line
+                 break
+
+
+        if conect_records_start_index != -1:
+            conect_section = [line for line in lines[conect_records_start_index:] if line.startswith("CONECT")]
+            # Remove CONECT records from the main lines list to avoid re-processing them
+            # We only remove them if they were found at the very end of the file as expected.
+            if conect_records_start_index == len(lines) - len(conect_section): # Check if it's the last block
+                lines = lines[:conect_records_start_index]
+        else:
+            if logger:
+                logger.warning("No CONECT records found at the end of the PDB file.")
+
+        # --- Process models ---
+        for line in lines:
+            if line.startswith("MODEL"):
+                # If we were already processing a model, save it before starting a new one
+                if current_model_lines:
+                    model_count += 1
+                    output_file_name = f"model_{model_count:06d}.pdb"
+                    output_file_path = os.path.join(output_dir, output_file_name)
+                    
+                    with open(output_file_path, 'w') as out_file:
+                        out_file.writelines(current_model_lines)
+                        # Add CONECT records after the model data and its ENDMDL
+                        for conect_line in conect_section:
+                            out_file.write(conect_line)
+                    individual_pdb_paths.append(output_file_path)
+                    current_model_lines = [] # Reset for the next model
+                current_model_lines.append(line) # Add the current MODEL line to the new set
+            elif line.startswith("ENDMDL"):
+                current_model_lines.append(line)
+                # This ENDMDL signals the end of a model, so we save it immediately
+                model_count += 1
+                output_file_name = f"model_{model_count:06d}.pdb"
+                output_file_path = os.path.join(output_dir, output_file_name)
+
+                with open(output_file_path, 'w') as out_file:
+                    out_file.writelines(current_model_lines)
+                    # Add CONECT records after the model data and its ENDMDL
+                    for conect_line in conect_section:
+                        out_file.write(conect_line)
+                individual_pdb_paths.append(output_file_path)
+                current_model_lines = [] # Reset for the next model
+            else:
+                # Accumulate lines that are part of the current model (ATOM, HETATM, REMARK, etc.)
+                current_model_lines.append(line)
+
+        # Handle the case where the file might not end with ENDMDL after the last MODEL
+        # or if it's a single model file without MODEL/ENDMDL
+        if current_model_lines:
+            # Check if this model has already been saved (i.e., if it ended with ENDMDL)
+            # This logic can be tricky if the file format is inconsistent.
+            # A more robust check: if the last saved path corresponds to the current model_count
+            # then it's already saved.
+            
+            # Simple check for now: if current_model_lines isn't empty, and it wasn't
+            # explicitly ended by ENDMDL (which would have cleared it), save it.
+            # This primarily catches the very last model if it lacks an ENDMDL or if it's a single model file.
+            if not individual_pdb_paths or (model_count == 0 and current_model_lines): # Case: single PDB or last model of multi-PDB
+                model_count += 1
+                output_file_name = f"model_{model_count:06d}.pdb"
+                output_file_path = os.path.join(output_dir, output_file_name)
+                
+                with open(output_file_path, 'w') as out_file:
+                    out_file.writelines(current_model_lines)
+                    # Add CONECT records
+                    for conect_line in conect_section:
+                        out_file.write(conect_line)
+                    # Ensure ENDMDL if not present for single-model files or last model
+                    if not any(line.startswith("ENDMDL") for line in current_model_lines):
+                        out_file.write("ENDMDL\n")
+                individual_pdb_paths.append(output_file_path)
+
+    except FileNotFoundError:
+        logger.error(f"Multi-PDB file not found: {multi_pdb_path}")
+        return []
+    except Exception as e:
+        logger.error(f"Error splitting multi-PDB file {multi_pdb_path}: {e}")
+        return []
+
+    logger.info(f"Split {multi_pdb_path} into {len(individual_pdb_paths)} individual PDB files, each with CONECT records.")
+    return individual_pdb_paths
+
+def write_multi_pdb(pdb_paths, output_path):
+    """
+    Merge a list of individual PDB files into a single multi-model PDB file.
+
+    This function reads each input PDB file, extracts its "HETATM" lines until a "TER" line
+    (if present), and writes them to the output file as a separate model, enclosed between
+    "MODEL" and "ENDMDL" lines.
+
+    Args:
+        pdb_paths (list): List of file paths to the individual PDB files.
+        output_path (str): Path to the output multi-model PDB file.
+    """
+    with open(output_path, 'w') as out_file:
+        for i, pdb_path in enumerate(pdb_paths, start=1):
+            out_file.write(f"MODEL        {i}\n")
+            with open(pdb_path, 'r') as in_file:
+                for line in in_file:
+                    if line.startswith("HETATM") or line.startswith("ATOM"):
+                        out_file.write(line.replace("ATOM  ", "HETATM"))
+                    elif line.startswith("TER"):
+                        break
+            out_file.write("ENDMDL\n")
+
 def add_dummy_atom_to_xyz(xyz_coords, atom_types, dummy_atom_coords):
     """
     Appends a dummy atom to existing XYZ coordinates and atom types.

@@ -3,6 +3,54 @@ import numpy as np
 
 from utils import read_xyz, write_xyz
 
+def get_atom_count(path, logger=None):
+    """Read molecule file (XYZ or PDB) and return number of atoms."""
+    _, ext = os.path.splitext(path)
+    ext = ext.lower()
+
+    if ext == '.xyz':
+        try:
+            with open(path, 'r') as f:
+                lines = f.readlines()
+                if len(lines) < 1:
+                    if logger:
+                        logger.warning(f"XYZ file {path} is empty.")
+                    return 0
+                return int(lines[0].strip())  # First line is atom count
+        except FileNotFoundError:
+            if logger:
+                logger.error(f"XYZ file not found: {path}")
+            return 0
+        except ValueError:
+            if logger:
+                logger.error(f"Invalid atom count in XYZ file: {path}")
+            return 0
+        except Exception as e:
+            if logger:
+                logger.error(f"Error reading XYZ atom count from {path}: {e}")
+            return 0
+    elif ext == '.pdb':
+        try:
+            from pdbUtils import pdb2df
+            df = pdb2df(path)
+            return len(df) # Number of rows in DataFrame is atom count
+        except FileNotFoundError:
+            if logger:
+                logger.error(f"PDB file not found: {path}")
+            return 0
+        except ImportError:
+            if logger:
+                logger.error("pdbUtils.pdb2df is required to read PDB files but could not be imported.")
+            return 0
+        except Exception as e:
+            if logger:
+                logger.error(f"Error reading PDB atom count from {path}: {e}")
+            return 0
+    else:
+        if logger:
+            logger.warning(f"Unsupported file format for atom count: {ext} for file {path}")
+        return 0
+    
 def calculate_distance(coord1, coord2):
     """Calculate Euclidean distance between two 3D coordinates."""
     return np.sqrt(np.sum((coord1 - coord2) ** 2))
