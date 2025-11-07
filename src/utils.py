@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 import pdbUtils
-from typing import Optional, Tuple, Any
+from typing import Tuple, List, Dict, Optional, Union, Any
 
 ########################
 ## LOGGING
@@ -52,45 +52,81 @@ col_types = {
 }
 
 class Ingredient:
-    def __init__(self, pathPDB, pathXYZ, name, eopt=0, einter=0, charge=0, multiplicity=1, flavours=None, df=None):
-        self.pathPDB = pathPDB
-        self.pathXYZ = pathXYZ
-        self.name = name or os.path.splitext(os.path.basename(pathPDB))[0]
-        self.eopt = eopt
-        self.einter = einter
-        self.charge = int(charge)
-        self.multiplicity = int(multiplicity)
-        # pathPDB and df could contain different information so don't overwrite df if it's passed in
+    def __init__(
+        self,
+        pathPDB: str,
+        pathXYZ: str,
+        name: Optional[str],
+        eopt: float = 0.0,
+        einter: float = 0.0,
+        charge: int = 0,
+        multiplicity: int = 1,
+        flavours: Optional[Dict[str, List[str]]] = None,
+        df: Optional[pd.DataFrame] = None,
+    ) -> None:
+        self.pathPDB: str = pathPDB
+        self.pathXYZ: str = pathXYZ
+        self.name: str = name or os.path.splitext(os.path.basename(pathPDB))[0]
+        self.eopt: float = eopt
+        self.einter: float = einter
+        self.charge: int = int(charge)
+        self.multiplicity: int = int(multiplicity)
+
+        # DataFrame setup
         if df is None:
             df = pdb2df(self.pathPDB)
-        # Fill in missing df columns
+        if df is None:
+            raise ValueError(f"Failed to load PDB data from {self.pathPDB}")
+
+        # Fill in missing columns
         if "FLAVOUR" not in df.columns:
             df["FLAVOUR"] = [[] for _ in range(len(df))]
-            for role_name, atom_names in flavours.items():
-                mask = df["ATOM_NAME"].isin(atom_names)
-                df.loc[mask, "FLAVOUR"] = df.loc[mask, "FLAVOUR"].apply(lambda lst: lst + [role_name])
+            if flavours:
+                for role_name, atom_names in flavours.items():
+                    mask = df["ATOM_NAME"].isin(atom_names)
+                    df.loc[mask, "FLAVOUR"] = df.loc[mask, "FLAVOUR"].apply(
+                        lambda lst: lst + [role_name]
+                    )
+
         if "ING" not in df.columns:
             df["ING"] = self.name
         if "DISH" not in df.columns:
             df["DISH"] = "init"
+
+        # col_order and col_types are assumed global
         df = df[col_order].astype(col_types)
-        self.df = df
-        self.n_atoms = len(self.df)
-        self.id = str(uuid.uuid4())
+
+        self.df: pd.DataFrame = df
+        self.n_atoms: int = len(self.df)
+        self.id: str = str(uuid.uuid4())
+
 
 class Course:
-    def __init__(self, name, host, guests, restraints=None):
-        self.name = name
-        self.host = host
-        self.guests = guests
-        self.restraints = [] if restraints is None else (restraints if isinstance(restraints, list) else [restraints])
+    def __init__(
+        self,
+        name: str,
+        host: Ingredient,
+        guests: List[Ingredient],
+        restraints: Optional[List["Restraint"]] = None,
+    ) -> None:
+        self.name: str = name
+        self.host: Ingredient = host
+        self.guests: List[Ingredient] = guests
+        self.restraints: List[Restraint] = restraints
+
 
 class Restraint:
-    def __init__(self, guestIdx, hostIdx, val, force=100):
-        self.guestIdx = guestIdx
-        self.hostIdx = hostIdx
-        self.val = val
-        self.force = force
+    def __init__(
+        self,
+        guestIdx: int,
+        hostIdx: int,
+        val: float,
+        force: float = 100.0,
+    ) -> None:
+        self.guestIdx: int = guestIdx
+        self.hostIdx: int = hostIdx
+        self.val: float = val
+        self.force: float = force
 
 ########################
 ## FILE TYPE CONVERSION
@@ -112,7 +148,7 @@ def isXYZ(pathXYZ: str) -> bool:
     if not isinstance(pathXYZ, str):
         print("pathXYZ must be a string.")
         return False
-    if not pathXYZ.lower().endswith(".pdb"):
+    if not pathXYZ.lower().endswith(".xyz"):
         print(f"File must be XYZ type (.xyz), provided file is: {pathXYZ}")
         return False
     if not os.path.exists(pathXYZ):
@@ -156,7 +192,7 @@ def df2pdb(df: pd.DataFrame, outPDB: str, logger: Optional[logging.Logger] = Non
         return None
 
 
-def df2xyz(df: pd.DataFrame, comment: str, outXYZ: str) -> None:
+def df2xyz(df: pd.DataFrame, comment: str, outXYZ: str, logger: Optional[logging.Logger] = None) -> None:
     """Write DataFrame to XYZ file format."""
     logger = get_logger(logger)
 
@@ -176,7 +212,6 @@ def df2xyz(df: pd.DataFrame, comment: str, outXYZ: str) -> None:
         logger.error("df2xyz did not return a correct XYZ file.")
         return None
 
-
 def pdb2xyz(pathPDB: str, outXYZ: str, logger: Optional[logging.Logger] = None) -> None:
     """Convert a PDB file to XYZ format."""
     logger = get_logger(logger)
@@ -188,7 +223,7 @@ def pdb2xyz(pathPDB: str, outXYZ: str, logger: Optional[logging.Logger] = None) 
 
     try:
         structure_name = os.path.basename(pathPDB).split(".")[0]
-        df2xyz(df, comment=structure_name, outfile=outXYZ)
+        df2xyz(df, comment=structure_name, outXYZ=outXYZ)
         if not isXYZ(outXYZ):
             logger.error("pdb2xyz did not return a correct XYZ file.")
             return None

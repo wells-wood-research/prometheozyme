@@ -119,6 +119,7 @@ def setup_ingredients(config):
             restraints=restraints
         )
         courses[course_obj.name] = course_obj 
+        print(f"Restraints are: {course_obj.restraints}")
     logging.debug(f"""Course map is:
                 {courses}\n""")
 
@@ -390,7 +391,6 @@ def expand_ingredient_and_restraint_combinations(course, host):
             new_course.restraints = mashed_restraints
 
             # Unique key: include the combination index so expansion products of same host and guest don't overwrite themselves
-            # is a tuple
             course_key = (str(course.name), str(guest.name), str(mash_idx))
             expanded_course[course_key] = new_course
 
