@@ -24,6 +24,16 @@ def get_vdw_radius(atom):
     """Return the Van der Waals radius of an element."""
     return vdw_radii.get(atom, 1.7)  # Default to carbon if unknown
 
+def df2xyz(df, comment, filename):
+    with open(filename, "w") as f:
+        # comment line
+        f.write(f"{comment or ''}\n")
+        # number of atoms
+        f.write(f"{len(df)}\n")
+        # coordinates
+        for _, row in df.iterrows():
+            f.write(f"{row['ELEMENT']} {row['X']:27.17f} {row['Y']:27.17f} {row['Z']:27.17f}\n")
+
 def read_xyz(file_path, logger=None):
     """Read an XYZ file and return a list of (atom_count, comment, coordinates, atom_types) where coordinates is a numpy array."""
     with open(file_path, 'r') as f:
