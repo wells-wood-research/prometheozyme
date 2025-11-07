@@ -13,7 +13,6 @@ from define import Ingredient, Restraint, Course, col_order, col_types
 from utils import split_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb
 from evaluate import filter_conformations
 from drOrca import make_orca_input
-import pdbUtils
 
 ########################
 ## SETUP
