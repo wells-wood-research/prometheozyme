@@ -3,6 +3,29 @@ import io
 import os
 import pandas as pd
 import re
+import pdbUtils
+from typing import Optional, Tuple, Any
+import logging
+
+########################
+## LOGGING
+########################
+
+def get_logger(logger: Optional[logging.Logger] = None) -> logging.Logger:
+    """Return a valid logger, creating one if not provided."""
+    if logger is None:
+        logger = logging.getLogger(__name__)
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+    return logger
+
+########################
+## ATOM PHYSICAL DATA
+########################
 
 # Define atomic masses for center of mass calculation
 atomic_masses = {
@@ -24,15 +47,152 @@ def get_vdw_radius(atom):
     """Return the Van der Waals radius of an element."""
     return vdw_radii.get(atom, 1.7)  # Default to carbon if unknown
 
-def df2xyz(df, comment, filename):
-    with open(filename, "w") as f:
-        # comment line
-        f.write(f"{comment or ''}\n")
-        # number of atoms
+########################
+## FILE TYPE CONVERSION
+########################
+
+def isPDB(pathPDB: str) -> bool:
+    if not isinstance(pathPDB, str):
+        print("pathPDB must be a string.")
+        return False
+    if not pathPDB.lower().endswith(".pdb"):
+        print(f"File must be PDB type (.pdb), provided file is: {pathPDB}")
+        return False
+    if not os.path.exists(pathPDB):
+        print(f"File does not exist: {pathPDB}")
+        return False
+    return True
+
+def isXYZ(pathXYZ: str) -> bool:
+    if not isinstance(pathXYZ, str):
+        print("pathXYZ must be a string.")
+        return False
+    if not pathXYZ.lower().endswith(".pdb"):
+        print(f"File must be XYZ type (.xyz), provided file is: {pathXYZ}")
+        return False
+    if not os.path.exists(pathXYZ):
+        print(f"File does not exist: {pathXYZ}")
+        return False
+    return True
+
+def pdb2df(pathPDB: str, logger: Optional[logging.Logger] = None) -> Optional[pd.DataFrame]:
+    """Convert a PDB file to a DataFrame."""
+    loggger = get_logger()
+
+    if not isPDB(pathPDB):
+        return None
+
+    try:
+        df = pdbUtils.pdb2df(pathPDB)
+        if not isinstance(df, pd.DataFrame):
+            logger.error("pdbUtils.pdb2df did not return a DataFrame.")
+            return None
+        return df
+    except Exception as e:
+        logger.exception(f"Exception during PDB → DataFrame conversion: {e}")
+        return None
+
+
+def df2pdb(df: pd.DataFrame, outPDB: str, logger: Optional[logging.Logger] = None) -> Optional[Any]:
+    """Convert a DataFrame to a PDB file."""
+    logger = get_logger(logger)
+
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        logger.error("Invalid or empty DataFrame provided.")
+        return None
+
+    try:
+        pdbUtils.df2pdb(df=df, outFile=outPDB)
+        if not isPDB(outPDB):
+            logger.error("pdbUtils.df2pdb did not return a correct PDB file.")
+            return None
+    except Exception as e:
+        logger.exception(f"Exception during DataFrame → PDB conversion: {e}")
+        return None
+
+
+def df2xyz(df: pd.DataFrame, comment: str, outXYZ: str) -> None:
+    """Write DataFrame to XYZ file format."""
+    logger = get_logger(logger)
+
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        raise ValueError("Invalid or empty DataFrame provided.")
+
+    if not all(col in df.columns for col in ["ELEMENT", "X", "Y", "Z"]):
+        raise ValueError("DataFrame must contain columns: ELEMENT, X, Y, Z")
+
+    with open(outXYZ, "w") as f:
         f.write(f"{len(df)}\n")
-        # coordinates
+        f.write(f"{comment or ''}\n")
         for _, row in df.iterrows():
             f.write(f"{row['ELEMENT']} {row['X']:27.17f} {row['Y']:27.17f} {row['Z']:27.17f}\n")
+    
+    if not isXYZ(outXYZ):
+        logger.error("df2xyz did not return a correct XYZ file.")
+        return None
+
+
+def pdb2xyz(pathPDB: str, outXYZ: str, logger: Optional[logging.Logger] = None) -> None:
+    """Convert a PDB file to XYZ format."""
+    logger = get_logger(logger)
+
+    df = pdb2df(pathPDB, logger)
+    if df is None:
+        logger.error("Failed to load PDB file; aborting conversion.")
+        return
+
+    try:
+        structure_name = os.path.basename(pathPDB).split(".")[0]
+        df2xyz(df, comment=structure_name, outfile=outXYZ)
+        if not isXYZ(outXYZ):
+            logger.error("pdb2xyz did not return a correct XYZ file.")
+            return None
+    except Exception as e:
+        logger.exception(f"Exception during PDB → XYZ conversion: {e}")
+
+
+def xyz2df(pathXYZ: str, logger: Optional[logging.Logger] = None) -> Optional[Tuple[int, str, pd.DataFrame]]:
+    """Convert an XYZ file to a DataFrame."""
+    logger = get_logger(logger)
+
+    if not isXYZ(pathXYZ):
+        return None
+
+    try:
+        atom_count, comment, coords, atom_types = read_xyz(pathXYZ, logger)
+        df = pd.DataFrame({
+            "ELEMENT": atom_types,
+            "X": coords[:, 0],
+            "Y": coords[:, 1],
+            "Z": coords[:, 2],
+        })
+        return atom_count, comment, df
+    except Exception as e:
+        logger.exception(f"Exception during XYZ → DataFrame conversion: {e}")
+        return None
+
+
+def xyz2pdb(pathXYZ: str, outPDB: str, logger: Optional[logging.Logger] = None) -> None:
+    """Convert an XYZ file to a PDB format."""
+    logger = get_logger(logger)
+
+    xyz_data = xyz2df(pathXYZ, logger)
+    if xyz_data is None:
+        logger.error("Failed to read XYZ file; aborting conversion.")
+        return
+
+    _, _, df = xyz_data
+    try:
+        df2pdb(df, outPDB, logger)
+        if not isXYZ(outPDB):
+            logger.error("xyz2pdb did not return a correct PDB file.")
+            return None
+    except Exception as e:
+        logger.exception(f"Exception during XYZ → PDB conversion: {e}")
+
+########################
+## FILE READING
+########################
 
 def read_xyz(file_path, logger=None):
     """Read an XYZ file and return a list of (atom_count, comment, coordinates, atom_types) where coordinates is a numpy array."""
