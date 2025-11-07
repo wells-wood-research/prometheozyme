@@ -10,7 +10,7 @@ import copy
 import string
 
 from define import Ingredient, Restraint, Course, col_order, col_types
-from utils import split_docker_results
+from utils import split_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb
 from evaluate import filter_conformations
 from drOrca import make_orca_input
 import pdbUtils
@@ -69,8 +69,12 @@ def setup_ingredients(config):
     # Create 'Ingredient' objects
     ingredients = {}
     for ing in ingredients_cfg:
+        pathPDB=ing['path']
+        pathXYZ=pathPDB.replace(".pdb", ".xyz")
+        pdb2xyz(pathPDB=pathPDB, outXYZ=pathXYZ, logger=logging)
         ingredient_obj = Ingredient(
-            path=ing['path'],
+            pathPDB=pathPDB,
+            pathXYZ=pathXYZ,
             name=ing['name'],
             eopt=0,
             einter=0,
@@ -196,6 +200,7 @@ def dock(outdir, course_key, course_desc, orca):
     inp_file_path, curr_charge, curr_multiplicity = write_docking_input(course_key[0], course_desc.guests, course_desc.host, course_desc.restraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
     logging.debug(f"Docking input written at path: {inp_file_path}.inp\n")
 
+    logging.debug(f"Running docking...")
     run_docking(inp_file_path, orcapath)
     logging.debug(f"Docking complete. See details at path: {inp_file_path}.out\n")
 
@@ -208,24 +213,6 @@ def write_docking_input(course_name, guest, host, restraints, workdir, qmMethod,
     inp_file_path = os.path.join(workdir, f"dock")
     title = f"ORCA DOCKER: Automated Docking Algorithm for\n # course: {course_name}\n # host: {host.name}\n # guest: {guest.name}"
 
-    # Prepare host and guest molecular structure files as XYZ
-    hostPathPDB = host.path
-    hostPathXYZ = hostPathPDB.replace(".pdb", ".xyz")
-    # TODO convert PDB to XYZ whether XYZ exists or not - to ensure atom index consistency
-    if not os.path.isfile(hostPathXYZ):
-        logging.error(f"""Host XYZ file not found at {hostPathXYZ}.
-                      In the future we will implement autmoatic obabel conversion.
-                      For now, please convert the PDB to XYZ to ensure atom index consistency.""")
-    guestPathPDB = guest.path
-    guestPathXYZ = guestPathPDB.replace(".pdb", ".xyz")
-    if not os.path.isfile(guestPathXYZ):
-        logging.error(f"""Guest XYZ file not found at {guestPathXYZ}.
-                      In the future we will implement autmoatic obabel conversion.
-                      For now, please convert the PDB to XYZ to ensure atom index consistency.""")
-    
-    simpleInputLine = [qmMethod]
-    inputFormat = "xyzfile"
-
     # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
     moleculeInfo = {"charge": host.charge, "multiplicity": host.multiplicity}
 
@@ -237,14 +224,14 @@ def write_docking_input(course_name, guest, host, restraints, workdir, qmMethod,
         bias = {"atoms": [restraint.guestIdx, restraint.hostIdx], "val": restraint.val, "force": restraint.force}
         biases.append(bias)
     
-    docker = {"guestPath": guestPathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": True, "bias": biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
+    docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": True, "bias": biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
 
     # Use the updated XYZ file for optimization
     make_orca_input(orcaInput=inp_file_path,
                     title=title,
-                    simpleInputLine=simpleInputLine,
-                    inputFormat=inputFormat,
-                    inputFile=hostPathXYZ,
+                    simpleInputLine=[qmMethod],
+                    inputFormat="xyzfile",
+                    inputFile=host.pathXYZ,
                     moleculeInfo=moleculeInfo,
                     parallelize=nprocs,
                     docker=docker)
@@ -264,12 +251,12 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
 
     c = 0
     for result in all_results:
-        (path, eopt, einter, df) = result
+        (pathXYZ, eopt, einter, df) = result
         # TODO evaluate output for satisfying restraints
         # TODO after optmisation there might be duplicated results - need to remove
-        new_path = os.path.join(os.path.dirname(path), f"serving{c}", "host.xyz")
-        os.makedirs(os.path.dirname(new_path), exist_ok=True)
-        shutil.move(path, new_path)
+        new_pathXYZ = os.path.join(os.path.dirname(pathXYZ), f"serving{c}", "host.xyz")
+        os.makedirs(os.path.dirname(new_pathXYZ), exist_ok=True)
+        shutil.move(pathXYZ, new_pathXYZ)
         # Edit df to assign ingredient names to atoms
         df[["FLAVOUR", "ING", "DISH"]] = None, None, None
         n_host, n_guest = host.n_atoms, guest.n_atoms
@@ -288,13 +275,15 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
 
         # Save PDB
         df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
-        pdbUtils.df2pdb(df_to_save, new_path.replace(".xyz", ".pdb"))
-        logging.info(f"Saved result to {new_path.replace('.xyz', '.pdb')}\n")
+        new_pathPDB = new_pathXYZ.replace(".xyz", ".pdb")
+        df2pdb(df=df_to_save, outPDB=new_pathPDB, logger=logging)
+        logging.info(f"Saved result to {new_pathPDB}\n")
         
         new_course_key = course_key + (str(c), )
         product_obj = Ingredient(
-            path=new_path,
-            name=("_").join(new_course_key),
+            pathPDB=new_pathPDB,
+            pathXYZ=new_pathXYZ,
+            name=f"result of {new_course_key}",
             eopt=eopt,
             einter=einter,
             charge=curr_charge,
@@ -424,12 +413,13 @@ def main(args):
     # Prepare the substrate as a fake result of first docking for processing consistency
     init_host = courses["init"].guests[0]
     init_host_dir = os.path.join(outdir, f"base_stock")
-    init_host_path = os.path.join(init_host_dir, "host.pdb") # TODO do you want "leftovers" to be PDB or XYZ based? DO you want to always (!) write both XYZ and PDB?
+    init_host_pathPDB = os.path.join(init_host_dir, "host.pdb")
+    init_host_pathXYZ = init_host_pathPDB.replace(".pdb", ".xyz")
     os.makedirs(init_host_dir)
-    shutil.copy(init_host.path, init_host_path)
-    # TODO assumes there's xyz present - need to expect user only to prepare PDBs
-    shutil.copy(init_host.path.replace(".pdb", ".xyz"), init_host_path.replace(".pdb", ".xyz"))
-    init_host.path = init_host_path
+    shutil.copy(init_host.pathPDB, init_host_pathPDB)
+    shutil.copy(init_host.pathXYZ, init_host_pathXYZ)
+    init_host.pathPDB = init_host_pathPDB
+    init_host.pathXYZ = init_host_pathXYZ
     leftovers.append(init_host)
 
     # Run ORCA DOCKER for each course, exhaustive for host/guest mix
@@ -457,14 +447,13 @@ def main(args):
             for course_key, course_desc in expanded_course.items():
                 logging.info(f"Processing course: {course_key}\n")
                 course_desc.host = new_host_for_docking_ing
-                curr_outdir = os.path.join(outdir, f"course{i}", f"serving{j}")
-                # TODO do we want host .xyz and .pdb to be copied/moved to the nest docking starting dir?
+                curr_outdir = os.path.join(outdir, f"course{i}_{course_key[0]}", f"serving{j}")
                 waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
                 [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
         leftovers = new_leftovers
 
     logging.info("""
-          Cooking complete -- bon appetit!
+          Cooking complete - bon appetit!
           ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆
           """)
 

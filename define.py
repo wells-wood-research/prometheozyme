@@ -1,8 +1,6 @@
 import os
 import uuid
-import copy
-import pdbUtils
-import sys
+from utils import pdb2df
 
 col_order = [
     "ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID",
@@ -28,26 +26,30 @@ col_types = {
 }
 
 class Ingredient:
-    def __init__(self, path, name, eopt=0, einter=0, charge=0, multiplicity=1, flavours=None, restraints=[], df=None):
-        self.path = path
-        self.name = name or os.path.splitext(os.path.basename(path))[0]
+    def __init__(self, pathPDB, pathXYZ, name, eopt=0, einter=0, charge=0, multiplicity=1, flavours=None, df=None):
+        self.pathPDB = pathPDB
+        self.pathXYZ = pathXYZ
+        self.name = name or os.path.splitext(os.path.basename(pathPDB))[0]
         self.eopt = eopt
         self.einter = einter
         self.charge = int(charge)
         self.multiplicity = int(multiplicity)
-        # TODO consistency with PDB paths
-        if path.endswith(".pdb") and df is None:
-            df = pdbUtils.pdb2df(path)
+        # pathPDB and df could contain different information so don't overwrite df if it's passed in
+        if df is None:
+            df = pdb2df(self.pathPDB)
+        # Fill in missing df columns
+        if "FLAVOUR" not in df.columns:
             df["FLAVOUR"] = [[] for _ in range(len(df))]
             for role_name, atom_names in flavours.items():
                 mask = df["ATOM_NAME"].isin(atom_names)
                 df.loc[mask, "FLAVOUR"] = df.loc[mask, "FLAVOUR"].apply(lambda lst: lst + [role_name])
-            df["ING"] = name
+        if "ING" not in df.columns:
+            df["ING"] = self.name
+        if "DISH" not in df.columns:
             df["DISH"] = "init"
-            df = df[col_order].astype(col_types)
+        df = df[col_order].astype(col_types)
         self.df = df
         self.n_atoms = len(self.df)
-        self.restraints = restraints
         self.id = str(uuid.uuid4())
 
 class Course:
