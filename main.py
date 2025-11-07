@@ -119,7 +119,7 @@ def setup_ingredients(config):
         )
         courses[course_obj.name] = course_obj 
     logging.debug(f"""Course map is:
-                {courses}""")
+                {courses}\n""")
 
     return courses, ingredients
 
@@ -194,9 +194,14 @@ def dock(outdir, course_key, course_desc, orca):
     os.makedirs(workdir, exist_ok=True)
 
     inp_file_path, curr_charge, curr_multiplicity = write_docking_input(course_key[0], course_desc.guests, course_desc.host, course_desc.restraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
+    logging.debug(f"Docking input written at path: {inp_file_path}.inp\n")
 
     run_docking(inp_file_path, orcapath)
+    logging.debug(f"Docking complete. See details at path: {inp_file_path}.out\n")
+
     results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, course_desc.guests, course_desc.host, course_key, logging)
+
+
     return results_map
 
 def write_docking_input(course_name, guest, host, restraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs):
@@ -262,7 +267,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         (path, eopt, einter, df) = result
         # TODO evaluate output for satisfying restraints
         # TODO after optmisation there might be duplicated results - need to remove
-        new_path = os.path.join(os.path.dirname(path), f"struct{c}", "host.xyz")
+        new_path = os.path.join(os.path.dirname(path), f"serving{c}", "host.xyz")
         os.makedirs(os.path.dirname(new_path), exist_ok=True)
         shutil.move(path, new_path)
         # Edit df to assign ingredient names to atoms
@@ -284,7 +289,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         # Save PDB
         df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
         pdbUtils.df2pdb(df_to_save, new_path.replace(".xyz", ".pdb"))
-        logging.info(f"Saved result to {new_path.replace('.xyz', '.pdb')}")
+        logging.info(f"Saved result to {new_path.replace('.xyz', '.pdb')}\n")
         
         new_course_key = course_key + (str(c), )
         product_obj = Ingredient(
@@ -307,7 +312,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
 def assign_restraint_idx(guest, host, restraint, course_name):
     guest_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in guest.df.iterrows() if restraint.guestIdx in row["FLAVOUR"]]
     if not guest_matches:
-        logging.error(f"Guest {guest.name} has no atoms matching flavour of restraint {restraint.guestIdx} for course {course_name}")
+        logging.error(f"Guest {guest.name} has no atoms matching flavour of restraint {restraint.guestIdx} for course {course_name}\n")
     else:
         logging.debug("Expanding restraints for guest:")
         logging.debug(f"\n{guest.df}")
@@ -364,7 +369,7 @@ def expand_ingredient_and_restraint_combinations(course, host):
             new_course.guests = guest
             new_course.restraints = []
             course_key = f"{course.name}_{host.name}_{guest.name}_constrX"
-            logging.debug(f"No restraints defined for course {course_key}")
+            logging.debug(f"No restraints defined for course {course_key}\n")
             expanded_course[course_key] = new_course
             continue
 
@@ -431,7 +436,7 @@ def main(args):
     for i, (course_name, course) in enumerate(courses.items()):
         if course_name == "init":
             continue
-        for serving in leftovers:
+        for j, serving in enumerate(leftovers):
             # There's two kinds of "HOSTS" in every docking step:
             # 1) host file which is the complete product of previous course
             # 2) host molecule to restrain guest towards (for seleciton of atom indices in BIAS block of ORCA input file)
@@ -446,13 +451,14 @@ def main(args):
             logging.debug(f"""Expanded ingredient and restraint combinations for
                         course name: {course.name}
                         number of combinations: {len(expanded_course)}
-                        combination keys: {list(expanded_course.keys())}""")
+                        combination keys: {list(expanded_course.keys())}\n""")
 
             new_leftovers = []
             for course_key, course_desc in expanded_course.items():
-                logging.info(f"Processing course: {course_key}")
+                logging.info(f"Processing course: {course_key}\n")
                 course_desc.host = new_host_for_docking_ing
-                curr_outdir = os.path.join(outdir, f"course{i}")
+                curr_outdir = os.path.join(outdir, f"course{i}", f"serving{j}")
+                # TODO do we want host .xyz and .pdb to be copied/moved to the nest docking starting dir?
                 waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
                 [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
         leftovers = new_leftovers
