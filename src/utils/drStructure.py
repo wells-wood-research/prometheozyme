@@ -219,7 +219,7 @@ def read_xyz(file_path, logger=None):
             # Only append if we have valid coordinates
             if coords and len(coords) == atom_count:
                 coordinates = np.array(coords)
-                structures.append((atom_count, comment, coordinates, atom_types)) # TODO is that really the best name? Why is it a list?
+                structures.append((atom_count, comment, coordinates, atom_types))
             else:
                 logger.warning(f"Skipping structure at line {i-atom_count-1}: expected {atom_count} atoms, found {len(coords)}")
             
@@ -257,15 +257,16 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, biases, logger=None)
 
     for i, (atom_count, comment, coords, atom_types) in enumerate(structures):
         # TODO use atom_count to check if it agrees with the total of ingredients atom count?
-        # TODO after optmisation there might be duplicated results - need to remove
+        # TODO after optmisation there might be duplicated results - need to remove based on RMSD
         allOk = True
         for bias in biases:
             [guestIdx, hostIdx] = bias.get("atoms", [0, 0])
             val = bias.get("val", 0)
             tol = bias.get("tol", 0.5)
             distance = evaluate_distance(coords, guestIdx, hostIdx, n_atoms_host)
-            logger.debug(f"Distance between restrained atoms: {distance}, expected {val} within {tol} tolerance.")
-            if not val - tol <= distance <= val + tol:
+            isOk = val - tol <= distance <= val + tol
+            logger.info(f"Distance between restrained atoms: {distance}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
+            if not isOk:
                 allOk = False
                 break
         if not allOk:
@@ -297,7 +298,7 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, biases, logger=None)
         logger.info(f"Split {multi_xyz_path} into {len(results)} results.")
 
     if len(results) < 1:
-        logger.error("No docker result structures passed the restraint test. Consider increasing tolerance or force on the relevant restraint.")
+        logger.warning("No docker result structures passed the restraint test for this host seed. This is not critical unless no subsequent results exist. To increase success rate, consider increasing tolerance or force on the relevant restraint.")
     
     return results
 

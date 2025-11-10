@@ -51,7 +51,8 @@ def setup_logging(workdir):
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.DEBUG,
+        # TODO set level of verbosity in config file
+        level=logging.INFO,
         handlers=handlers,
     )
 
@@ -122,7 +123,7 @@ def setup_ingredients(config):
             restraints=restraints
         )
         courses[course_obj.name] = course_obj 
-        print(f"Restraints are: {course_obj.restraints}")
+        logging.debug(f"Restraints are: {course_obj.restraints}")
     logging.debug(f"""Course map is:
                 {courses}\n""")
 
@@ -184,32 +185,45 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 
-def dock(outdir, course_key, course_desc, orca):
-    # Read orca parameters
-    orcapath = orca.get("orcapth", "./orca")
-    qmMethod = orca.get("qmMethod", "XTB2")
-    strategy = orca.get("strategy", "normal")
-    optLevel = orca.get("optLevel", "sloppyopt")
-    nOpt = orca.get("nOpt", 5)
-    gridExtent = orca.get("gridExtent", 15)
-    nprocs = orca.get("nprocs", 8) 
+def dock(outdir, course_key, course_desc, orca, logger):
+    try:
+        # Read orca parameters
+        orcapath = orca.get("orcapth", "./orca")
+        qmMethod = orca.get("qmMethod", "XTB2")
+        strategy = orca.get("strategy", "normal")
+        optLevel = orca.get("optLevel", "sloppyopt")
+        nOpt = orca.get("nOpt", 5)
+        gridExtent = orca.get("gridExtent", 15)
+        nprocs = orca.get("nprocs", 8) 
 
-    # Output of each docking step is organised as course/guest/restraints_combination
-    workdir = os.path.join(outdir, *course_key[1:])
-    os.makedirs(workdir, exist_ok=True)
+        workdir = os.path.join(outdir, *course_key[1:])
+        os.makedirs(workdir, exist_ok=True)
 
-    biases = process_biases(course_desc.restraints)
+        biases = process_biases(course_desc.restraints)
+        inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
+            course_key[0], course_desc.guests, course_desc.host, biases,
+            workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs
+        )
+        logger.info(f"Docking input written at path: {inp_file_path}.inp")
+        logger.info(f"Running docking...")
+        run_docking(inp_file_path, orcapath)
+        logger.info(f"Docking complete. See details at path: {inp_file_path}.out")
 
-    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(course_key[0], course_desc.guests, course_desc.host, biases, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
-    logging.debug(f"Docking input written at path: {inp_file_path}.inp\n")
+        results_map = process_docking_output(
+            inp_file_path, curr_charge, curr_multiplicity,
+            course_desc.guests, course_desc.host, biases, course_key, logger
+        )
+        if not results_map:
+            logger.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
 
-    logging.debug(f"Running docking...")
-    run_docking(inp_file_path, orcapath)
-    logging.debug(f"Docking complete. See details at path: {inp_file_path}.out\n")
+        return results_map
 
-    results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, course_desc.guests, course_desc.host, biases, course_key, logging)
-
-    return results_map
+    except subprocess.CalledProcessError as e:
+        logger.exception(f"Critical error during ORCA run: {e}")
+        return {}
+    except Exception as e:
+        logger.exception(f"Unexpected error in docking step: {e}")
+        return {}
 
 def process_biases(restraints):
     # Define bond bias potential to impose restraints of distance between guest and host atoms
@@ -282,7 +296,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
         new_pathPDB = new_pathXYZ.replace(".xyz", ".pdb")
         df2pdb(df=df_to_save, outPDB=new_pathPDB, logger=logging)
-        logging.info(f"Saved result to {new_pathPDB}\n")
+        logging.info(f"Saved result to {new_pathPDB}")
         
         new_course_key = course_key + (str(c), )
         product_obj = Ingredient(
@@ -363,7 +377,7 @@ def expand_ingredient_and_restraint_combinations(course, host):
             new_course.guests = guest
             new_course.restraints = []
             course_key = f"{course.name}_{host.name}_{guest.name}_constrX"
-            logging.debug(f"No restraints defined for course {course_key}\n")
+            logging.info(f"No restraints defined for course {course_key}\n")
             expanded_course[course_key] = new_course
             continue
 
@@ -409,59 +423,91 @@ def expand_ingredient_and_restraint_combinations(course, host):
 ########################
 
 def main(args):
+    allOk = True
     # Read config file
     outdir, orca, courses, ingredients = setup(args.config)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Cooking begins - recipe from {args.config}")
 
     # Results of previous course, carried over as starting point (HOST) of next docking step
     leftovers = []
     
     # Prepare the substrate as a fake result of first docking for processing consistency
-    init_host = courses["init"].guests[0]
-    init_host_dir = os.path.join(outdir, f"base_stock")
-    init_host_pathPDB = os.path.join(init_host_dir, "host.pdb")
-    init_host_pathXYZ = init_host_pathPDB.replace(".pdb", ".xyz")
-    os.makedirs(init_host_dir)
-    shutil.copy(init_host.pathPDB, init_host_pathPDB)
-    shutil.copy(init_host.pathXYZ, init_host_pathXYZ)
-    init_host.pathPDB = init_host_pathPDB
-    init_host.pathXYZ = init_host_pathXYZ
-    leftovers.append(init_host)
+    try:
+        init_host = courses["init"].guests[0]
+        init_host_dir = os.path.join(outdir, f"base_stock")
+        init_host_pathPDB = os.path.join(init_host_dir, "host.pdb")
+        init_host_pathXYZ = init_host_pathPDB.replace(".pdb", ".xyz")
+        os.makedirs(init_host_dir)
+        shutil.copy(init_host.pathPDB, init_host_pathPDB)
+        shutil.copy(init_host.pathXYZ, init_host_pathXYZ)
+        init_host.pathPDB = init_host_pathPDB
+        init_host.pathXYZ = init_host_pathXYZ
+        leftovers.append(init_host)
+    except Exception as e:
+        logger.exception(f"Critical error while preparing base stock (initial host) from substrate: {e}")
+        allOk = False
+        return
 
     # Run ORCA DOCKER for each course, exhaustive for host/guest mix
     for i, (course_name, course) in enumerate(courses.items()):
+        if not allOk:
+            logger.error("Terminating remaining docking steps due to previous critical error.")
+            break
+
         if course_name == "init":
             continue
+
+        new_leftovers = []
         for j, serving in enumerate(leftovers):
-            # There's two kinds of "HOSTS" in every docking step:
-            # 1) host file which is the complete product of previous course
-            # 2) host molecule to restrain guest towards (for seleciton of atom indices in BIAS block of ORCA input file)
-            new_host_for_docking_ing = serving
-            new_host_for_docking_df = new_host_for_docking_ing.df
-            new_host_for_restraints_df = new_host_for_docking_df[new_host_for_docking_df["DISH"] == course.host]
-            new_host_for_restraints_name = new_host_for_restraints_df["ING"].unique()[0]
-            new_host_for_restraints_ing = ingredients[new_host_for_restraints_name]
-            new_host_for_restraints_ing.df = new_host_for_restraints_df
+            try:
+                # There's two kinds of "HOSTS" in every docking step:
+                # 1) host file which is the complete product of previous course
+                # 2) host molecule to restrain guest towards (for seleciton of atom indices in BIAS block of ORCA input file)
+                new_host_for_docking_ing = serving
+                new_host_for_docking_df = new_host_for_docking_ing.df
+                new_host_for_restraints_df = new_host_for_docking_df[new_host_for_docking_df["DISH"] == course.host]
+                new_host_for_restraints_name = new_host_for_restraints_df["ING"].unique()[0]
+                new_host_for_restraints_ing = ingredients[new_host_for_restraints_name]
+                new_host_for_restraints_ing.df = new_host_for_restraints_df
+            except Exception as e:
+                logger.exception(f"Critical error preparing host for course {course_name}: {e}")
+                allOk = False
+                break
 
             expanded_course = expand_ingredient_and_restraint_combinations(course, new_host_for_restraints_ing)
-            logging.debug(f"""Expanded ingredient and restraint combinations for
-                        course name: {course.name}
-                        number of combinations: {len(expanded_course)}
-                        combination keys: {list(expanded_course.keys())}\n""")
-
-            new_leftovers = []
+            logging.info(f"""Expanded ingredient and restraint combinations for course {course.name} ({len(expanded_course)} combinations),
+                            keys: {list(expanded_course.keys())}""")
+            
             for course_key, course_desc in expanded_course.items():
-                logging.info(f"Processing course: {course_key}\n")
-                course_desc.host = new_host_for_docking_ing
-                curr_outdir = os.path.join(outdir, f"course{i}_{course_key[0]}", f"serving{j}")
-                waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
-                [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
+                try:
+                    logger.info(f"""
+                                Processing course: {course_key}""")
+                    course_desc.host = new_host_for_docking_ing
+                    curr_outdir = os.path.join(outdir, f"course{i}_{course_key[0]}", f"serving{j}")
+                    waste_bucket = dock(curr_outdir, course_key, course_desc, orca, logger)
+                    [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
+                except Exception as e:
+                    logger.exception(f"Critical error in course {course_key}: {e}")
+                    allOk = False
+                    break
         leftovers = new_leftovers
+        if len(leftovers) < 1:
+            allOk = False
+            logger.warning(f"Critical failure during docking of course {course_key} - docking produced no usable results.")
+            break
 
-    # TODO only print this if nothing failed on the way (need to carry over some check variable)
-    logging.info("""
-          Cooking complete - bon appetit!
-          ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆
-          """)
+    if allOk:
+        logging.info("""
+            Cooking complete - bon appetit!
+            ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆
+            """)
+    else:
+        logging.info("""
+            Oh, crepe - something's gone wrong.
+                     Try different settings?
+            ☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆
+            """)
 
 if __name__ == "__main__":
     import argparse
