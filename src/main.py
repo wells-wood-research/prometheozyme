@@ -28,6 +28,7 @@ def setup_config(configPath):
     # Get miscellaneous parameters
     misc = config.get("misc", {})
     workdir = misc.get("workdir", ".")
+    verbosity = misc.get("verbosity", ".")
 
     # Get orca docker parameters
     orca = config.get("orca", {})
@@ -37,9 +38,19 @@ def setup_config(configPath):
     outdir = os.path.join(workdir, f"output_{timestamp}")
     os.makedirs(outdir, exist_ok=True)
 
-    return config, outdir, orca
+    return config, outdir, orca, verbosity
 
-def setup_logging(workdir):
+def setup_logging(workdir, verbosity="info"):
+    # Map string verbosity to logging levels
+    level_map = {
+        "debug": logging.DEBUG,
+        "info": logging.INFO,
+        "warning": logging.WARNING,
+        "error": logging.ERROR,
+        "critical": logging.CRITICAL,
+    }
+    log_level = level_map.get(verbosity.lower(), logging.INFO)
+    
     # Remove existing handlers
     root_logger = logging.getLogger()
     for handler in list(root_logger.handlers):
@@ -51,8 +62,7 @@ def setup_logging(workdir):
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(message)s",
-        # TODO set level of verbosity in config file
-        level=logging.INFO,
+        level=log_level,
         handlers=handlers,
     )
 
@@ -130,8 +140,8 @@ def setup_ingredients(config):
     return courses, ingredients
 
 def setup(configPath):
-    config, outdir, orca = setup_config(configPath)
-    setup_logging(outdir)
+    config, outdir, orca, verbosity = setup_config(configPath)
+    setup_logging(outdir, verbosity)
     # Prepare ingredients and courses from the configuration    
     courses, ingredients = setup_ingredients(config)
     return outdir, orca, courses, ingredients

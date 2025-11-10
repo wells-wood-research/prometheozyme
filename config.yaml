@@ -3,7 +3,10 @@ misc:
   # set directory for output
   # automatically writes %Y-%m-%d_%H-%M-%S directory under the path specified below
   # and places all output there
-  workdir: "/home/mchrnwsk/prometheozyme/runs"
+  workdir: /home/mchrnwsk/prometheozyme/runs
+  # Set logging verbosity:
+  # available options: debug, info, warning, error, critical
+  verbosity: debug
   
 # SETTINGS FOR ORCA DOCKER: Automated Docking Algorithm
 # Read more here: https://www.faccts.de/docs/orca/6.1/manual/contents/structurereactivity/docker.html?q=docker&n=0#docker-automated-docking-algorithm
