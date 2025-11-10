@@ -497,6 +497,31 @@ def main(args):
             logger.warning(f"Critical failure during docking of course {course_key} - docking produced no usable results.")
             break
 
+    # Report here final theozymes
+    # Sort by einter value (ascending)
+    leftovers_sorted = sorted(leftovers, key=lambda x: x.einter)
+
+    # Create output directory
+    results_dir = os.path.join(outdir, "results")
+    os.makedirs(results_dir, exist_ok=True)
+
+    logger.info("Successfully cooked the following theozymes:")
+
+    # Copy files with renamed names based on order
+    for i, ing in enumerate(leftovers_sorted, start=1):
+        new_name = f"result{i}"
+        new_pathPDB = os.path.join(results_dir, f"{new_name}.pdb")
+        new_pathXYZ = os.path.join(results_dir, f"{new_name}.xyz")
+
+        # Copy and rename files
+        shutil.copy(ing.pathPDB, new_pathPDB)
+        shutil.copy(ing.pathXYZ, new_pathXYZ)
+
+        # Log the results
+        logger.info(
+            f"path: {new_pathPDB}, eopt: {ing.eopt} (Eh), einter: {ing.einter} (kcal/mol)"
+        )
+
     if allOk:
         logging.info("""
             Cooking complete - bon appetit!
