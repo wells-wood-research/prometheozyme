@@ -216,6 +216,7 @@ courses:
         - guestIdx: h_acceptor
           hostIdx: deprot
           val: 1.5
+          tol: 1.0
           force: 100
   - &base2
       name: base2
@@ -226,4 +227,5 @@ courses:
         - guestIdx: h_acceptor
           hostIdx: deprot
           val: 1.5
+          tol: 1.0
           force: 100

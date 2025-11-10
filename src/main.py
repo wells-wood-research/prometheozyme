@@ -104,10 +104,12 @@ def setup_ingredients(config):
             restraints_data = course.get('restraints', [])
             restraints = []
             for restr in restraints_data:
+                # TODO rewrite as "get" with default values
                 restraint = Restraint(
                     guestIdx=restr['guestIdx'],
                     hostIdx=restr['hostIdx'],
                     val=restr['val'],
+                    tol=restr['tol'],
                     force=restr['force']
                 )
                 restraints.append(restraint)
@@ -215,7 +217,7 @@ def process_biases(restraints):
     # For example, to add a bond bias between atom 2 from the GUEST and atom 19 from the HOST, write: BIAS { B 2 19 } END 
     biases = []
     for restraint in restraints:
-        bias = {"atoms": [restraint.guestIdx, restraint.hostIdx], "val": restraint.val, "force": restraint.force}
+        bias = {"atoms": [restraint.guestIdx, restraint.hostIdx], "val": restraint.val, "tol": restraint.tol, "force": restraint.force}
         biases.append(bias)
     return biases
 
@@ -332,7 +334,7 @@ def expand_restraints(guest, host, restraint, course_name):
         # g_item and h_item are tuples like (index, name, activity)
         g_idx = g_item[0]  # numeric index in the PDB/molecule
         h_idx = h_item[0]
-        bias_params.append((g_idx, h_idx, restraint.val, restraint.force))
+        bias_params.append((g_idx, h_idx, restraint.val, restraint.tol, restraint.force))
     return bias_params
 
 def expand_ingredient_and_restraint_combinations(course, host):
@@ -340,7 +342,7 @@ def expand_ingredient_and_restraint_combinations(course, host):
 
     # Loop all candidate host/guest pairs
     for guest in course.guests:
-        # For each restraint compute the list of concrete options (g_idx, h_idx, val, force)
+        # For each restraint compute the list of concrete options (g_idx, h_idx, val, tol, force)
         bias_params_per_restraint = []
         # TODO how would this work for multiple course restraints, e.g. distance and angle?
         # TODO desired behaviour is to make all combinations of one restraint, and all combinations of the other (separately), and then combine them directlyin all possibilities
@@ -378,14 +380,15 @@ def expand_ingredient_and_restraint_combinations(course, host):
             # Build new restraint tuples representing these concrete restraint
             mashed_restraints = []
             for orig_restraint, bias_params in zip(course.restraints, mash):
-                g_idx, h_idx, val, force = bias_params
+                g_idx, h_idx, val, tol, force = bias_params
                 # Create a copy of the original restraint but with resolved atom indices
                 new_restraint = copy.deepcopy(orig_restraint)
                 # Overwrite guestIdx/hostIdx with the concrete atom indices
                 new_restraint.guestIdx = g_idx
                 new_restraint.hostIdx = h_idx
-                # Ensure val/force are set to the chosen option (val likely same as orig)
+                # Ensure val/tol/force are set to the chosen option
                 new_restraint.val = val
+                new_restraint.tol = tol
                 new_restraint.force = force
                 mashed_restraints.append(new_restraint)
 
@@ -454,6 +457,7 @@ def main(args):
                 [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
         leftovers = new_leftovers
 
+    # TODO only print this if nothing failed on the way (need to carry over some check variable)
     logging.info("""
           Cooking complete - bon appetit!
           ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆

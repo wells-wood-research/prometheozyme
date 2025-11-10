@@ -297,7 +297,7 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, biases, logger=None)
         logger.info(f"Split {multi_xyz_path} into {len(results)} results.")
 
     if len(results) < 1:
-        logger.error("No docker result structures passed the constraint test. Consider increasing tolerance on the relevant restraint.")
+        logger.error("No docker result structures passed the restraint test. Consider increasing tolerance or force on the relevant restraint.")
     
     return results
 

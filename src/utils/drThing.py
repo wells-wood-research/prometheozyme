@@ -119,9 +119,11 @@ class Restraint:
         guestIdx: int,
         hostIdx: int,
         val: float,
+        tol: float,
         force: float = 100.0,
     ) -> None:
         self.guestIdx: int = guestIdx
         self.hostIdx: int = hostIdx
         self.val: float = val
+        self.tol: float = tol
         self.force: float = force
