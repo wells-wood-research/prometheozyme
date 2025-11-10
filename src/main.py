@@ -9,8 +9,9 @@ import itertools
 import copy
 import string
 
-from utils import Ingredient, Restraint, Course, col_order, col_types, split_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb
-from drOrca import make_orca_input
+from utils.drThing import Ingredient, Restraint, Course, col_order, col_types
+from utils.drStructure import split_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb
+from utils.drOrca import make_orca_input
 
 ########################
 ## SETUP
