@@ -7,6 +7,8 @@ import pandas as pd
 from pdbUtils import pdbUtils
 from typing import Tuple, Optional, Any
 
+from utils.drEval import evaluate_distance
+
 ########################
 ## LOGGING
 ########################
@@ -238,7 +240,7 @@ def parse_energy_comment(comment):
         if einter_match: einter = float(einter_match.group(1))
     return eopt, einter
 
-def split_docker_results(multi_xyz_path, logger=None):
+def extract_ok_docker_results(multi_xyz_path, n_atoms_host, biases, logger=None):
     """
     - Split a multi-structure XYZ file.
     - Extract Eopt/Einter from the comment line.
@@ -253,8 +255,22 @@ def split_docker_results(multi_xyz_path, logger=None):
 
     results = []
 
-    for i, (atom_count, comment, coords, atom_types) in enumerate(structures, start=1):
+    for i, (atom_count, comment, coords, atom_types) in enumerate(structures):
         # TODO use atom_count to check if it agrees with the total of ingredients atom count?
+        # TODO after optmisation there might be duplicated results - need to remove
+        allOk = True
+        for bias in biases:
+            [guestIdx, hostIdx] = bias.get("atoms", [0, 0])
+            val = bias.get("val", 0)
+            tol = bias.get("tol", 0.5)
+            distance = evaluate_distance(coords, guestIdx, hostIdx, n_atoms_host)
+            logger.debug(f"Distance between restrained atoms: {distance}, expected {val} within {tol} tolerance.")
+            if not val - tol <= distance <= val + tol:
+                allOk = False
+                break
+        if not allOk:
+            continue
+
         # --- Parse energies using regex ---
         eopt = einter = None
         if comment:
@@ -280,6 +296,9 @@ def split_docker_results(multi_xyz_path, logger=None):
     if logger:
         logger.info(f"Split {multi_xyz_path} into {len(results)} results.")
 
+    if len(results) < 1:
+        logger.error("No docker result structures passed the constraint test. Consider increasing tolerance on the relevant restraint.")
+    
     return results
 
 def write_xyz(file, comment, coords, atom_types):
@@ -298,33 +317,6 @@ def write_xyz(file, comment, coords, atom_types):
     elif isinstance(file, str):
         with open(file, 'w') as f:
             write_to_file(f)
-
-
-
-def calculate_distance(coord1, coord2):
-    """Calculate Euclidean distance between two 3D coordinates."""
-    return np.sqrt(np.sum((coord1 - coord2) ** 2))
-
-def calculate_center_of_mass(coordinates, indices, atom_types):
-    """Calculate center of mass for given indices, weighted by atomic masses."""
-    if not indices:
-        return None
-    
-    # Atomic masses in atomic mass units (u) for common elements
-    atomic_masses = {
-        'H': 1.00794, 'He': 4.002602, 'C': 12.0107, 'N': 14.0067, 'O': 15.9994,
-        'F': 18.998403, 'P': 30.973762, 'S': 32.065, 'Cl': 35.453,
-        # Add more elements as needed
-    }
-    
-    selected_coords = np.array([coordinates[i] for i in indices])
-    masses = np.array([atomic_masses.get(atom_types[i], 1.0) for i in indices])  # Default to 1.0 if unknown
-    
-    # Weighted average: sum(mass * coord) / sum(mass)
-    weighted_coords = selected_coords * masses[:, np.newaxis]
-    center_of_mass = np.sum(weighted_coords, axis=0) / np.sum(masses)
-    
-    return center_of_mass
 
 def read_score(filepath, logger=None):
     with open(filepath, 'r') as f:

@@ -10,7 +10,7 @@ import copy
 import string
 
 from utils.drThing import Ingredient, Restraint, Course, col_order, col_types
-from utils.drStructure import split_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb
+from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb
 from utils.drOrca import make_orca_input
 
 ########################
@@ -196,25 +196,20 @@ def dock(outdir, course_key, course_desc, orca):
     workdir = os.path.join(outdir, *course_key[1:])
     os.makedirs(workdir, exist_ok=True)
 
-    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(course_key[0], course_desc.guests, course_desc.host, course_desc.restraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
+    biases = process_biases(course_desc.restraints)
+
+    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(course_key[0], course_desc.guests, course_desc.host, biases, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs)
     logging.debug(f"Docking input written at path: {inp_file_path}.inp\n")
 
     logging.debug(f"Running docking...")
     run_docking(inp_file_path, orcapath)
     logging.debug(f"Docking complete. See details at path: {inp_file_path}.out\n")
 
-    results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, course_desc.guests, course_desc.host, course_key, logging)
-
+    results_map = process_docking_output(inp_file_path, curr_charge, curr_multiplicity, course_desc.guests, course_desc.host, biases, course_key, logging)
 
     return results_map
 
-def write_docking_input(course_name, guest, host, restraints, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs):
-    inp_file_path = os.path.join(workdir, f"dock")
-    title = f"ORCA DOCKER: Automated Docking Algorithm for\n # course: {course_name}\n # host: {host.name}\n # guest: {guest.name}"
-
-    # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
-    moleculeInfo = {"charge": host.charge, "multiplicity": host.multiplicity}
-
+def process_biases(restraints):
     # Define bond bias potential to impose restraints of distance between guest and host atoms
     # Must be defined by atom numbers for GUEST FIRST, then HOST SECOND, absolute indexing for each molecule independently
     # For example, to add a bond bias between atom 2 from the GUEST and atom 19 from the HOST, write: BIAS { B 2 19 } END 
@@ -222,7 +217,15 @@ def write_docking_input(course_name, guest, host, restraints, workdir, qmMethod,
     for restraint in restraints:
         bias = {"atoms": [restraint.guestIdx, restraint.hostIdx], "val": restraint.val, "force": restraint.force}
         biases.append(bias)
-    
+    return biases
+
+def write_docking_input(course_name, guest, host, biases, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs):
+    inp_file_path = os.path.join(workdir, f"dock")
+    title = f"ORCA DOCKER: Automated Docking Algorithm for\n # course: {course_name}\n # host: {host.name}\n # guest: {guest.name}"
+
+    # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
+    moleculeInfo = {"charge": host.charge, "multiplicity": host.multiplicity}
+
     docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": True, "bias": biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
 
     # Use the updated XYZ file for optimization
@@ -243,16 +246,17 @@ def run_docking(input, orcapath):
     with open(output_file, "w") as f:
         subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=f, stderr=subprocess.STDOUT)
 
-def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, course_key, logger):
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, biases, course_key, logger):
     course_name = course_key[0]
-    all_results = split_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", logger)
+    # The following function splits mutli-xyz output of docker,
+    # evaluates each result for satisfaction of constraints,
+    # and writes only the correct outputs to separate single-xyz files
+    ok_results = extract_ok_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", host.n_atoms, biases, logger)
     results_map = {}
 
     c = 0
-    for result in all_results:
+    for result in ok_results:
         (pathXYZ, eopt, einter, df) = result
-        # TODO evaluate output for satisfying restraints
-        # TODO after optmisation there might be duplicated results - need to remove
         new_pathXYZ = os.path.join(os.path.dirname(pathXYZ), f"serving{c}", "host.xyz")
         os.makedirs(os.path.dirname(new_pathXYZ), exist_ok=True)
         shutil.move(pathXYZ, new_pathXYZ)
