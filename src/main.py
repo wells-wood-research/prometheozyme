@@ -448,7 +448,6 @@ def main(args):
     allOk = True
     # Read config file
     outdir, orca, courses, ingredients, allOk = setup(args.config)
-    logger = logging.getLogger(__name__)
     logging.info(f"Cooking begins - recipe from {args.config}")
 
     # Results of previous course, carried over as starting point (HOST) of next docking step
