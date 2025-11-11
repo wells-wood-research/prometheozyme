@@ -41,8 +41,16 @@ def setup_config(configPath):
     return config, outdir, orca, verbosity
 
 def setup_logging(workdir, verbosity="info"):
+    # Define a custom logging level called VERBOSE
+    VERBOSE_LEVEL_NUM = 5
+    logging.addLevelName(VERBOSE_LEVEL_NUM, "VERBOSE")
+    def verbose_root(message, *args, **kwargs):
+        logging.log(VERBOSE_LEVEL_NUM, message, *args, **kwargs)
+    logging.verbose = verbose_root
+
     # Map string verbosity to logging levels
     level_map = {
+        "verbose": VERBOSE_LEVEL_NUM,
         "debug": logging.DEBUG,
         "info": logging.INFO,
         "warning": logging.WARNING,
@@ -218,7 +226,7 @@ def dock(outdir, course_key, course_desc, orca):
 
         biases = process_biases(course_desc.restraints)
         inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
-            course_key[0], course_desc.guests, course_desc.host, biases,
+            course_key[0], course_desc.guests[0], course_desc.host, biases,
             workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs
         )
         logging.info(f"Docking input written at path: {inp_file_path}.inp")
@@ -228,7 +236,7 @@ def dock(outdir, course_key, course_desc, orca):
 
         results_map = process_docking_output(
             inp_file_path, curr_charge, curr_multiplicity,
-            course_desc.guests, course_desc.host, biases, course_key
+            course_desc.guests[0], course_desc.host, biases, course_key
         )
         if not results_map:
             logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
@@ -307,7 +315,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         # Make sure each molecule gets a new CHAIN_ID so that ATOM_IDs can be individually 1-based per each molecule
         df = assign_chain_ids(df)
         df = df[col_order].astype(col_types)
-        logging.debug(f"Result of this docking step:\n{df}")
+        logging.verbose( f"Result of this docking step:\n{df}")
 
         # Save PDB
         df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
@@ -339,8 +347,8 @@ def assign_restraint_idx(guest, host, restraint, course_name):
     if not guest_matches:
         logging.error(f"Guest {guest.name} has no atoms matching flavour of restraint {restraint.guestIdx} for course {course_name}\n")
     else:
-        logging.debug("Expanding restraints for guest:")
-        logging.debug(f"\n{guest.df}")
+        logging.verbose("Expanding restraints for guest:")
+        logging.verbose(f"\n{guest.df}")
         logging.debug(f"Original guestIdx to be restrained: {restraint.guestIdx}")
         logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {guest_matches}\n")
     
@@ -348,8 +356,8 @@ def assign_restraint_idx(guest, host, restraint, course_name):
     if not host_matches:
         logging.error(f"Host {host.name} has no atoms matching flavour of restraint {restraint.hostIdx} for course {course_name}")
     else:
-        logging.debug("Expanding restraints for host:")
-        logging.debug(f"\n{host.df}")
+        logging.verbose("Expanding restraints for host:")
+        logging.verbose(f"\n{host.df}")
         logging.debug(f"Original hostIdx to be restrained: {restraint.hostIdx}")
         logging.debug(f"Host atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {host_matches}\n")
 
@@ -371,13 +379,16 @@ def expand_restraints(guest, host, restraint, course_name):
 def expand_ingredient_and_restraint_combinations(course, host):
     allOk = True
     expanded_course = {}
+    # The desired behaviour is to make all combinations of one restraint, and all combinations of the other (separately), and then combine them directly in all possibilities
+    # The code loops over all candidate guest-host ingredient pairs,
+    # for each restraint, expands to all concrete atom index pairs,
+    # for multiple restraints, takes full Cartesian product,
+    # and produces a new Course object per combination
 
     # Loop all candidate host/guest pairs
     for guest in course.guests:
         # For each restraint compute the list of concrete options (g_idx, h_idx, val, tol, force)
         bias_params_per_restraint = []
-        # TODO how would this work for multiple course restraints, e.g. distance and angle?
-        # TODO desired behaviour is to make all combinations of one restraint, and all combinations of the other (separately), and then combine them directlyin all possibilities
         for restraint in course.restraints or []:
             # from setup_ingredients, course.restraints could be an empty list or a list on Nones
             if restraint is None:
@@ -385,7 +396,8 @@ def expand_ingredient_and_restraint_combinations(course, host):
             bias_params = expand_restraints(guest, host, restraint, course.name)
             # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
             if not bias_params:
-                # skip this host/guest pair entirely
+                logging.error(f"Course {course.name} has restraints defined (e.g. guestIdx {course.restraints[0].guestIdx}, hostIdx {course.restraints[0].hostIdx}, val: {course.restraints[0].val}) but bias potentials could not be defined.")
+                allOk = False
                 bias_params_per_restraint = []
                 break
             bias_params_per_restraint.append(bias_params)
@@ -404,7 +416,7 @@ def expand_ingredient_and_restraint_combinations(course, host):
 
         # Case 2) restraints cannot be satisfied
         if not bias_params_per_restraint:
-            logging.error(f"Course {course.name} has restraints defined (e.g. guestIdx {course.restraints[0].guestIdx}, hostIdx {course.restraints[0].hostIdx}, val: {course.restraints[0].val}) but bias potentials could not be defined.")
+            logging.error(f"No bias params could be defined for restraints of course {course.name}.")
             allOk = False
             break
 
@@ -431,7 +443,7 @@ def expand_ingredient_and_restraint_combinations(course, host):
             # Make new course copy and set host/guest to the concrete candidates and restraints
             new_course = copy.deepcopy(course)
             new_course.host = host
-            new_course.guests = guest  # TODO guests vs guest... typing... should this be a list here?
+            new_course.guests = [guest]
             new_course.restraints = mashed_restraints
 
             # Unique key: include the combination index so expansion products of same host and guest don't overwrite themselves

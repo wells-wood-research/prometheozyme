@@ -256,8 +256,8 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, biases, logger=None)
     results = []
 
     for i, (atom_count, comment, coords, atom_types) in enumerate(structures):
-        # TODO use atom_count to check if it agrees with the total of ingredients atom count?
         # TODO after optmisation there might be duplicated results - need to remove based on RMSD
+        # use AMPAL? https://isambard-uob.github.io/ampal/ampal.html#ampal.base_ampal.BaseAmpal.rmsd
         allOk = True
         for bias in biases:
             [guestIdx, hostIdx] = bias.get("atoms", [0, 0])

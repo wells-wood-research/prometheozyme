@@ -5,7 +5,7 @@ misc:
   # and places all output there
   workdir: /home/mchrnwsk/prometheozyme/runs
   # Set logging verbosity:
-  # available options: debug, info, warning, error, critical
+  # available options: verbose, debug, info, warning, error, critical
   verbosity: debug
   
 # SETTINGS FOR ORCA DOCKER: Automated Docking Algorithm
