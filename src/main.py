@@ -116,7 +116,6 @@ def setup_ingredients(config):
             restraints_data = course.get('restraints', [])
             restraints = []
             for restr in restraints_data:
-                # TODO rewrite as "get" with default values
                 restraint = Restraint(
                     guestIdx=restr.get('guestIdx', None),
                     hostIdx=restr.get('hostIdx', None),
@@ -203,7 +202,7 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 
-def dock(outdir, course_key, course_desc, orca, logger):
+def dock(outdir, course_key, course_desc, orca):
     try:
         # Read orca parameters
         orcapath = orca.get("orcapth", "./orca")
@@ -222,25 +221,25 @@ def dock(outdir, course_key, course_desc, orca, logger):
             course_key[0], course_desc.guests, course_desc.host, biases,
             workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs
         )
-        logger.info(f"Docking input written at path: {inp_file_path}.inp")
-        logger.info(f"Running docking...")
+        logging.info(f"Docking input written at path: {inp_file_path}.inp")
+        logging.info(f"Running docking...")
         run_docking(inp_file_path, orcapath)
-        logger.info(f"Docking complete. See details at path: {inp_file_path}.out")
+        logging.info(f"Docking complete. See details at path: {inp_file_path}.out")
 
         results_map = process_docking_output(
             inp_file_path, curr_charge, curr_multiplicity,
-            course_desc.guests, course_desc.host, biases, course_key, logger
+            course_desc.guests, course_desc.host, biases, course_key
         )
         if not results_map:
-            logger.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
+            logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
 
         return results_map
 
     except subprocess.CalledProcessError as e:
-        logger.exception(f"Critical error during ORCA run: {e}")
+        logging.exception(f"Critical error during ORCA run: {e}")
         return {}
     except Exception as e:
-        logger.exception(f"Unexpected error in docking step: {e}")
+        logging.exception(f"Unexpected error in docking step: {e}")
         return {}
 
 def process_biases(restraints):
@@ -280,12 +279,12 @@ def run_docking(input, orcapath):
     with open(output_file, "w") as f:
         subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=f, stderr=subprocess.STDOUT)
 
-def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, biases, course_key, logger):
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, biases, course_key):
     course_name = course_key[0]
     # The following function splits mutli-xyz output of docker,
     # evaluates each result for satisfaction of constraints,
     # and writes only the correct outputs to separate single-xyz files
-    ok_results = extract_ok_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", host.n_atoms, biases, logger)
+    ok_results = extract_ok_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", host.n_atoms, biases, logger=logging)
     results_map = {}
 
     c = 0
@@ -370,6 +369,7 @@ def expand_restraints(guest, host, restraint, course_name):
     return bias_params
 
 def expand_ingredient_and_restraint_combinations(course, host):
+    allOk = True
     expanded_course = {}
 
     # Loop all candidate host/guest pairs
@@ -404,8 +404,9 @@ def expand_ingredient_and_restraint_combinations(course, host):
 
         # Case 2) restraints cannot be satisfied
         if not bias_params_per_restraint:
-            # TODO add error prints here
-            continue
+            logging.error(f"Course {course.name} has restraints defined (e.g. guestIdx {course.restraints[0].guestIdx}, hostIdx {course.restraints[0].hostIdx}, val: {course.restraints[0].val}) but bias potentials could not be defined.")
+            allOk = False
+            break
 
         # Cartesian product across lists of options (one option per restraint)
         # If one ingredient has multiple atoms of same flavour (e.g. multiple h_donor),
@@ -437,7 +438,7 @@ def expand_ingredient_and_restraint_combinations(course, host):
             course_key = (str(course.name), str(guest.name), str(mash_idx))
             expanded_course[course_key] = new_course
 
-    return expanded_course
+    return expanded_course, allOk
 
 ########################
 ## MAIN LOOP
@@ -448,7 +449,7 @@ def main(args):
     # Read config file
     outdir, orca, courses, ingredients, allOk = setup(args.config)
     logger = logging.getLogger(__name__)
-    logger.info(f"Cooking begins - recipe from {args.config}")
+    logging.info(f"Cooking begins - recipe from {args.config}")
 
     # Results of previous course, carried over as starting point (HOST) of next docking step
     leftovers = []
@@ -466,14 +467,14 @@ def main(args):
         init_host.pathXYZ = init_host_pathXYZ
         leftovers.append(init_host)
     except Exception as e:
-        logger.exception(f"Critical error while preparing base stock (initial host) from substrate: {e}")
+        logging.exception(f"Critical error while preparing base stock (initial host) from substrate: {e}")
         allOk = False
         return
 
     # Run ORCA DOCKER for each course, exhaustive for host/guest mix
     for i, (course_name, course) in enumerate(courses.items()):
         if not allOk:
-            logger.error("Terminating remaining docking steps due to previous critical error.")
+            logging.error("Terminating remaining docking steps due to previous critical error.")
             break
 
         if course_name == "init":
@@ -492,30 +493,30 @@ def main(args):
                 new_host_for_restraints_ing = ingredients[new_host_for_restraints_name]
                 new_host_for_restraints_ing.df = new_host_for_restraints_df
             except Exception as e:
-                logger.exception(f"Critical error preparing host for course {course_name}: {e}")
+                logging.exception(f"Critical error preparing host for course {course_name}: {e}")
                 allOk = False
                 break
 
-            expanded_course = expand_ingredient_and_restraint_combinations(course, new_host_for_restraints_ing)
+            expanded_course, allOk = expand_ingredient_and_restraint_combinations(course, new_host_for_restraints_ing)
             logging.info(f"""Expanded ingredient and restraint combinations for course {course.name} ({len(expanded_course)} combinations),
                             keys: {list(expanded_course.keys())}""")
             
             for course_key, course_desc in expanded_course.items():
                 try:
-                    logger.info(f"""
+                    logging.info(f"""
                                 Processing course: {course_key}""")
                     course_desc.host = new_host_for_docking_ing
                     curr_outdir = os.path.join(outdir, f"course{i}_{course_key[0]}", f"serving{j}")
-                    waste_bucket = dock(curr_outdir, course_key, course_desc, orca, logger)
+                    waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
                     [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
                 except Exception as e:
-                    logger.exception(f"Critical error in course {course_key}: {e}")
+                    logging.exception(f"Critical error in course {course_key}: {e}")
                     allOk = False
                     break
         leftovers = new_leftovers
         if len(leftovers) < 1:
             allOk = False
-            logger.warning(f"Critical failure during docking of course {course_key} - docking produced no usable results.")
+            logging.warning(f"Critical failure during docking of course {course_key} - docking produced no usable results.")
             break
 
     # Report here final theozymes
@@ -526,7 +527,7 @@ def main(args):
     results_dir = os.path.join(outdir, "results")
     os.makedirs(results_dir, exist_ok=True)
 
-    logger.info("Successfully cooked the following theozymes:")
+    logging.info("Successfully cooked the following theozymes:")
 
     # Copy files with renamed names based on order
     for i, ing in enumerate(leftovers_sorted, start=1):
@@ -539,7 +540,7 @@ def main(args):
         shutil.copy(ing.pathXYZ, new_pathXYZ)
 
         # Log the results
-        logger.info(
+        logging.info(
             f"path: {new_pathPDB}, eopt: {ing.eopt} (Eh), einter: {ing.einter} (kcal/mol)"
         )
 
