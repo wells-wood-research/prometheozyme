@@ -67,6 +67,7 @@ def setup_logging(workdir, verbosity="info"):
     )
 
 def setup_ingredients(config):
+    allOk = True
     ingredients_cfg = config.get("ingredients", [])
     courses_cfg = config.get("courses", [])
 
@@ -117,12 +118,16 @@ def setup_ingredients(config):
             for restr in restraints_data:
                 # TODO rewrite as "get" with default values
                 restraint = Restraint(
-                    guestIdx=restr['guestIdx'],
-                    hostIdx=restr['hostIdx'],
-                    val=restr['val'],
-                    tol=restr['tol'],
-                    force=restr['force']
+                    guestIdx=restr.get('guestIdx', None),
+                    hostIdx=restr.get('hostIdx', None),
+                    val=restr.get('val', None),
+                    tol=restr.get('tol', 0.5),
+                    force=restr.get('force', 100)
                 )
+                if restraint.guestIdx is None or restraint.hostIdx is None or restraint.val is None:
+                    logging.warning(f"No guestIdx, hostIdx, val defined for course {course['name']} restraints. Fix or remove the restraints block from config file.")
+                    allOk = False
+                    restraint = None 
                 restraints.append(restraint)
         
         # Create Course object
@@ -137,14 +142,17 @@ def setup_ingredients(config):
     logging.debug(f"""Course map is:
                 {courses}\n""")
 
-    return courses, ingredients
+    return courses, ingredients, allOk
 
 def setup(configPath):
+    allOk = True
     config, outdir, orca, verbosity = setup_config(configPath)
     setup_logging(outdir, verbosity)
     # Prepare ingredients and courses from the configuration    
-    courses, ingredients = setup_ingredients(config)
-    return outdir, orca, courses, ingredients
+    courses, ingredients, is_step_ok = setup_ingredients(config)
+    if not is_step_ok:
+        allOk = False
+    return outdir, orca, courses, ingredients, allOk
 
 ########################
 ## HELPER FUNCTIONS
@@ -371,6 +379,9 @@ def expand_ingredient_and_restraint_combinations(course, host):
         # TODO how would this work for multiple course restraints, e.g. distance and angle?
         # TODO desired behaviour is to make all combinations of one restraint, and all combinations of the other (separately), and then combine them directlyin all possibilities
         for restraint in course.restraints or []:
+            # from setup_ingredients, course.restraints could be an empty list or a list on Nones
+            if restraint is None:
+                continue
             bias_params = expand_restraints(guest, host, restraint, course.name)
             # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
             if not bias_params:
@@ -435,7 +446,7 @@ def expand_ingredient_and_restraint_combinations(course, host):
 def main(args):
     allOk = True
     # Read config file
-    outdir, orca, courses, ingredients = setup(args.config)
+    outdir, orca, courses, ingredients, allOk = setup(args.config)
     logger = logging.getLogger(__name__)
     logger.info(f"Cooking begins - recipe from {args.config}")
 

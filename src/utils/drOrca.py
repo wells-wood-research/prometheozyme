@@ -210,13 +210,13 @@ def write_docker_block(f, docker):
     f.write(f"{' '*4}GRIDEXTENT {docker.get('gridExtent', 15)}\n")
     if "bias" in docker.keys():
         biases = docker.get("bias", [])
-        f.write(f"{' '*4}BIAS\n")
         for bias in biases:
+            f.write(f"{' '*4}BIAS\n")
             atoms = bias.get("atoms", [])
             val = bias.get("val", 0.0)
             force = bias.get("force", 100)
             f.write(f"{' '*8}{{ B {atoms[0]} {atoms[1]} {val} {force} }}\n")
-        f.write(f"{' '*4}END\n")
+            f.write(f"{' '*4}END\n")
     f.write(f"{' '*4}OPTLEVEL {docker.get('optLevel', 'sloppyopt')}\n")
     f.write(f"{' '*4}NOPT {docker.get('nOpt', 5)}\n")
     f.write("END\n")
