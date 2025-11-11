@@ -218,9 +218,9 @@ courses:
       restraints:
         - guestIdx: h_acceptor
           hostIdx: deprot
-          val: 1.5
-          tol: 1.0
-          force: 100
+          val: 1.5 # equilibrium distance between restrained atoms (units: Ang)
+          tol: 1.0 # docker results within val +/- tol are accepted as correct starting points for next docking (units: Ang)
+          force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
   - &base2
       name: base2
       host_candidates: *base1
