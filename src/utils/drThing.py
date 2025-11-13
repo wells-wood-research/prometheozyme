@@ -106,11 +106,13 @@ class Course:
         host: Ingredient,
         guests: List[Ingredient],
         restraints: Optional[List["Restraint"]] = None,
+        orcaSettings: Optional[Dict] = None
     ) -> None:
         self.name: str = name
         self.host: Ingredient = host
         self.guests: List[Ingredient] = guests
         self.restraints: List[Restraint] = restraints
+        self.orcaSettings: Optional[Dict] = orcaSettings
 
 
 class Restraint:

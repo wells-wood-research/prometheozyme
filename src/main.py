@@ -8,9 +8,10 @@ import sys
 import itertools
 import copy
 import string
+import uuid
 
 from utils.drThing import Ingredient, Restraint, Course, col_order, col_types
-from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb
+from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb
 from utils.drOrca import make_orca_input
 
 ########################
@@ -102,6 +103,8 @@ def setup_ingredients(config):
             df=None
         )
         ingredients[ingredient_obj.name] = ingredient_obj
+    # TODO to print this properly, add some "print" function to the classes
+    # (otherwise prints things like: {'sub': <utils.drThing.Ingredient object at 0x77104e150290> ... or ... Restraints are: [<utils.drThing.Restraint object at 0x77104ea16490>])
     logging.debug(f"""Ingredient map is:
                 {ingredients}\n""")
 
@@ -115,6 +118,7 @@ def setup_ingredients(config):
             # There is a list of mutliple potential guests for any course
             guest_candidates = [ingredients["sub"]]
             restraints = None
+            orcaSettings = None
         else:
             # Map candidates to Ingredient objects
             host_candidate = course['host_candidates']['name'] # this will be name of a previous Course - not actual molecular hosts yet
@@ -139,10 +143,11 @@ def setup_ingredients(config):
         
         # Create Course object
         course_obj = Course(
-            name=course['name'],
+            name=course.get("name", str(uuid.uuid4())),
             host=host_candidate,
             guests=guest_candidates,
-            restraints=restraints
+            restraints=restraints,
+            orcaSettings=course.get("orcaSettings", None)
         )
         courses[course_obj.name] = course_obj 
         logging.debug(f"Restraints are: {course_obj.restraints}")
@@ -210,24 +215,54 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 
+def define_orca_params(orca, course_desc):
+    # Define default ORCA settings
+    default_orca_settings = {
+        "orcapth": "./orca",
+        "qmMethod": "XTB2",
+        "strategy": "NORMAL",
+        "optLevel": "sloppyopt",
+        "nOpt": 5,
+        "fixHost": True,
+        "gridExtent": 15,
+        "nprocs": 8
+    }
+
+    # Merge global ORCA config (orca dict from config file)
+    # This overrides defaults with general config-level values
+    merged_orca_settings = {**default_orca_settings, **orca}
+
+    # Check if this course defines specific ORCA overrides
+    course_orca_settings = course_desc.orcaSettings
+    if course_orca_settings:
+        # Only overwrite recognized keys
+        for key in default_orca_settings.keys():
+            if key in course_orca_settings:
+                merged_orca_settings[key] = course_orca_settings[key]
+
+    # Extract final ORCA parameters
+    orcapath   = merged_orca_settings["orcapth"]
+    qmMethod   = merged_orca_settings["qmMethod"]
+    strategy   = merged_orca_settings["strategy"]
+    optLevel   = merged_orca_settings["optLevel"]
+    nOpt       = merged_orca_settings["nOpt"]
+    fixHost    = merged_orca_settings["fixHost"]
+    gridExtent = merged_orca_settings["gridExtent"]
+    nprocs     = merged_orca_settings["nprocs"]
+
+    return orcapath, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
+
 def dock(outdir, course_key, course_desc, orca):
     try:
-        # Read orca parameters
-        orcapath = orca.get("orcapth", "./orca")
-        qmMethod = orca.get("qmMethod", "XTB2")
-        strategy = orca.get("strategy", "normal")
-        optLevel = orca.get("optLevel", "sloppyopt")
-        nOpt = orca.get("nOpt", 5)
-        gridExtent = orca.get("gridExtent", 15)
-        nprocs = orca.get("nprocs", 8) 
-
+        orcapath, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs = define_orca_params(orca, course_desc)
+        
         workdir = os.path.join(outdir, *course_key[1:])
         os.makedirs(workdir, exist_ok=True)
 
         biases = process_biases(course_desc.restraints)
         inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
             course_key[0], course_desc.guests[0], course_desc.host, biases,
-            workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs
+            workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
         )
         logging.info(f"Docking input written at path: {inp_file_path}.inp")
         logging.info(f"Running docking...")
@@ -260,14 +295,14 @@ def process_biases(restraints):
         biases.append(bias)
     return biases
 
-def write_docking_input(course_name, guest, host, biases, workdir, qmMethod, strategy, optLevel, nOpt, gridExtent, nprocs):
+def write_docking_input(course_name, guest, host, biases, workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
     inp_file_path = os.path.join(workdir, f"dock")
     title = f"ORCA DOCKER: Automated Docking Algorithm for\n # course: {course_name}\n # host: {host.name}\n # guest: {guest.name}"
 
     # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
     moleculeInfo = {"charge": host.charge, "multiplicity": host.multiplicity}
 
-    docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": True, "bias": biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
+    docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": fixHost, "bias": biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
 
     # Use the updated XYZ file for optimization
     make_orca_input(orcaInput=inp_file_path,
@@ -350,7 +385,7 @@ def assign_restraint_idx(guest, host, restraint, course_name):
         logging.verbose("Expanding restraints for guest:")
         logging.verbose(f"\n{guest.df}")
         logging.debug(f"Original guestIdx to be restrained: {restraint.guestIdx}")
-        logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {guest_matches}\n")
+        logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {guest_matches}")
     
     host_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in host.df.iterrows() if restraint.hostIdx in row["FLAVOUR"]]
     if not host_matches:
@@ -359,7 +394,7 @@ def assign_restraint_idx(guest, host, restraint, course_name):
         logging.verbose("Expanding restraints for host:")
         logging.verbose(f"\n{host.df}")
         logging.debug(f"Original hostIdx to be restrained: {restraint.hostIdx}")
-        logging.debug(f"Host atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {host_matches}\n")
+        logging.debug(f"Host atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {host_matches}")
 
     return guest_matches, host_matches
 
@@ -544,16 +579,16 @@ def main(args):
     for i, ing in enumerate(leftovers_sorted, start=1):
         new_name = f"result{i}"
         new_pathPDB = os.path.join(results_dir, f"{new_name}.pdb")
-        new_pathXYZ = os.path.join(results_dir, f"{new_name}.xyz")
-
         # Copy and rename files
         shutil.copy(ing.pathPDB, new_pathPDB)
-        shutil.copy(ing.pathXYZ, new_pathXYZ)
-
         # Log the results
         logging.info(
             f"path: {new_pathPDB}, eopt: {ing.eopt} (Eh), einter: {ing.einter} (kcal/mol)"
         )
+    
+    # Merge into one multi-frame PDB file for easier analysis
+    result_paths = [os.path.join(results_dir, x) for x in os.listdir(results_dir) if x.lower().endswith(".pdb")]
+    write_multi_pdb(result_paths, os.path.join(results_dir, "merged.pdb"))
 
     if allOk:
         logging.info("""
