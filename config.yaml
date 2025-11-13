@@ -38,7 +38,7 @@ orca:
   # total number of parallel processes to run docker with
   # default: 8
   nprocs: 16
-  
+
 # DEFINE ALL MOLECULAR OBJECTS TO PARTICIPATE IN THE DOCKING PIPELINE
 # Recommended strategy: create PDB files and assign unique atom names to all atoms,
 # or at least all atoms that will be used in any constraints
@@ -64,18 +64,40 @@ ingredients:
         - NH1
         - NH2
       
-  - &lys
-    name: lys
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_lysine.pdb
+  - &lys_p
+    name: lys_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_lysine_protonated.pdb
     charge: 1
     multiplicity: 1
     flavours:
       h_donor:
         - NZ
 
-  - &his
-    name: his
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_histidine.pdb
+  - &lys_d
+    name: lys_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_lysine_deprotonated.pdb
+    charge: 0
+    multiplicity: 1
+    flavours:
+      h_donor:
+        - NZ
+
+  - &hid
+    name: hid
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_histidine_hid.pdb
+    charge: 0
+    multiplicity: 1
+    flavours:
+      h_acceptor:
+        - NE2
+      h_donor:
+        - ND1
+      deprot:
+        - HD1
+
+  - &hie
+    name: hie
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_histidine_hie.pdb
     charge: 0
     multiplicity: 1
     flavours:
@@ -86,9 +108,32 @@ ingredients:
       deprot:
         - HE2
 
-  - &cys
-    name: cys
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_cysteine.pdb
+  - &hip
+    name: hip
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_histidine_hip.pdb
+    charge: 1
+    multiplicity: 1
+    flavours:
+      h_donor:
+        - ND1
+        - NE2
+      deprot:
+        - HD1
+        - HE2
+
+  - &hia
+    name: hia
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_histidine_hia.pdb
+    charge: -1
+    multiplicity: 1
+    flavours:
+      h_acceptor:
+        - ND1
+        - NE2
+
+  - &cys_p
+    name: cys_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_cysteine_protonated.pdb
     charge: 0
     multiplicity: 1
     flavours:
@@ -97,9 +142,18 @@ ingredients:
       h_donor:
         - SG
 
-  - &ser
-    name: ser
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_serine.pdb
+  - &cys_d
+    name: cys_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_cysteine_deprotonated.pdb
+    charge: -1
+    multiplicity: 1
+    flavours:
+      h_acceptor:
+        - SG
+
+  - &ser_p
+    name: ser_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_serine_protonated.pdb
     charge: 0
     multiplicity: 1
     flavours:
@@ -108,9 +162,18 @@ ingredients:
       h_donor:
         - OG
 
-  - &thr
-    name: thr
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_threonine.pdb
+  - &ser_d
+    name: ser_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_serine_deprotonated.pdb
+    charge: -1
+    multiplicity: 1
+    flavours:
+      h_acceptor:
+        - OG
+
+  - &thr_p
+    name: thr_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_threonine_protonated.pdb
     charge: 0
     multiplicity: 1
     flavours:
@@ -119,9 +182,18 @@ ingredients:
       h_donor:
         - OG1
 
-  - &tyr
-    name: tyr
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_tyrosine.pdb
+  - &thr_d
+    name: thr_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_threonine_deprotonated.pdb
+    charge: -1
+    multiplicity: 1
+    flavours:
+      h_acceptor:
+        - OG1
+
+  - &tyr_p
+    name: tyr_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_tyrosine_protonated.pdb
     charge: 0
     multiplicity: 1
     flavours:
@@ -135,6 +207,22 @@ ingredients:
       h_acceptor:
         - OH
       h_donor:
+        - OH
+
+  - &tyr_d
+    name: tyr_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_tyrosine_deprotonated.pdb
+    charge: -1
+    multiplicity: 1
+    flavours:
+      grease:
+        - CG
+        - CD1
+        - CD2
+        - CE1
+        - CE2
+        - CZ
+      h_acceptor:
         - OH
 
   - &phe
@@ -151,9 +239,21 @@ ingredients:
         - CE2
         - CZ
 
-  - &glu
-    name: glu
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_glutamate.pdb
+  - &glu_p
+    name: glu_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_glutamate_protonated.pdb
+    charge: 0
+    multiplicity: 1
+    flavours:
+      h_acceptor:
+        - OE1
+        - OE2
+      h_donor:
+        - OE2
+
+  - &glu_d
+    name: glu_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_glutamate_deprotonated.pdb
     charge: -1
     multiplicity: 1
     flavours:
@@ -172,15 +272,25 @@ ingredients:
       h_donor:
         - NE2
 
-  - &asp
-    name: asp
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_aspartate.pdb
-    charge: -1
+  - &asp_p
+    name: asp_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_aspartate_protonated.pdb
+    charge: 0
     multiplicity: 1
     flavours:
       h_acceptor:
         - OD1
       h_donor:
+        - OD2
+
+  - &asp_d
+    name: asp_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_aspartate_deprotonated.pdb
+    charge: -1
+    multiplicity: 1
+    flavours:
+      h_acceptor:
+        - OD1
         - OD2
 
   - &asn
@@ -194,6 +304,7 @@ ingredients:
       h_donor:
         - ND2
 
+# (courses must follow ingredient definition to use aliases)
 # DEFINE COURSES AS COMBINATION OF POTENTIAL GUESTS AND THEIR RESTRAINTS
 # First course must be 'init' and specify as guest the substrate object,
 # which will then become the host of the first real docking step in the pipeline.
@@ -214,7 +325,8 @@ courses:
       name: base1
       host_candidates: *init
       guest_candidates:
-        - *his
+        - *hie
+        - *hid
       restraints:
         - guestIdx: h_acceptor
           hostIdx: deprot
@@ -225,7 +337,7 @@ courses:
       name: base2
       host_candidates: *base1
       guest_candidates:
-        - *asp
+        - *asp_d
       restraints:
         - guestIdx: h_acceptor
           hostIdx: deprot
