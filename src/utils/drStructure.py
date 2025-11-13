@@ -534,11 +534,11 @@ def write_multi_pdb(pdb_paths, output_path):
             out_file.write(f"MODEL        {i}\n")
             with open(pdb_path, 'r') as in_file:
                 for line in in_file:
-                    if line.startswith("HETATM") or line.startswith("ATOM"):
-                        out_file.write(line.replace("ATOM  ", "HETATM"))
-                    elif line.startswith("TER"):
-                        break
-            out_file.write("ENDMDL\n")
+                    if line.startswith(("ATOM", "HETATM")):
+                        out_file.write(line)
+                    out_file.write(line)
+            out_file.write("\nENDMDL\n")
+        out_file.write("END\n")
 
 def add_dummy_atom_to_xyz(xyz_coords, atom_types, dummy_atom_coords):
     """
