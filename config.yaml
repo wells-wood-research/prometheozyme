@@ -10,6 +10,7 @@ misc:
   
 # SETTINGS FOR ORCA DOCKER: Automated Docking Algorithm
 # Read more here: https://www.faccts.de/docs/orca/6.1/manual/contents/structurereactivity/docker.html?q=docker&n=0#docker-automated-docking-algorithm
+# Options qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent can be overwritten in each individual course definition for that step
 # TODO not implemented options: SWARMMINITER, SWARMMAXITER, %GEOM block, GRIDCENTER, DOCKLEVEL
 orca:
   # absolute path to orca executable
@@ -29,7 +30,10 @@ orca:
   optLevel: sloppyopt
   # define fixed final number of structures to be optimised at the end of each docking step
   # default: 5
-  nOpt: 3
+  nOpt: 15
+  # determine whether host molecule is optimised (False) or kept static (True)
+  # default: True
+  fixHost: True
   # defines extent of the grid around the center (of host; could be overridden by GRIDCENTER)
   # cube of all dimensions equal
   # units: Ang
@@ -44,10 +48,37 @@ orca:
 # or at least all atoms that will be used in any constraints
 # WARNING: atom name length is limited to 3 symbols!
 ingredients:
-  - &sub
-    name: sub
-    path: /home/mchrnwsk/prometheozyme/ingredients/lmo-mandalate/adduct.pdb
-    charge: 0
+  - &sub_het_p
+    name: sub_het_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/lmo-mandalate/optimised/adduct_het_p/opt.pdb
+    charge: -1
+    multiplicity: 1
+    flavours:
+      deprot:
+        - OH
+
+  - &sub_het_d
+    name: sub_het_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/lmo-mandalate/optimised/adduct_het_d/opt.pdb
+    charge: -2
+    multiplicity: 1
+    flavours:
+      deprot:
+        - OH
+
+  - &sub_grs_p
+    name: sub_grs_p
+    path: /home/mchrnwsk/prometheozyme/ingredients/lmo-mandalate/optimised/adduct_grease_p/opt.pdb
+    charge: -1
+    multiplicity: 1
+    flavours:
+      deprot:
+        - OH
+
+  - &sub_grs_d
+    name: sub_grs_d
+    path: /home/mchrnwsk/prometheozyme/ingredients/lmo-mandalate/optimised/adduct_grease_d/opt.pdb
+    charge: -2
     multiplicity: 1
     flavours:
       deprot:
@@ -330,9 +361,12 @@ courses:
       restraints:
         - guestIdx: h_acceptor
           hostIdx: deprot
-          val: 1.5 # equilibrium distance between restrained atoms (units: Ang)
-          tol: 1.0 # docker results within val +/- tol are accepted as correct starting points for next docking (units: Ang)
+          val: 2.7 # equilibrium distance between restrained atoms (units: Ang)
+          tol: 0.5 # docker results within val +/- tol are accepted as correct starting points for next docking (units: Ang)
           force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
+      orcaSettings:
+        nOpt: 15
+        fixHost: False
   - &base2
       name: base2
       host_candidates: *base1
@@ -344,3 +378,5 @@ courses:
           val: 1.5
           tol: 1.0
           force: 100
+      orcaSettings:
+        nOpt: 5
