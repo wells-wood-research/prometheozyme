@@ -116,7 +116,7 @@ def setup_ingredients(config):
             # Or the one currently considered host, however keep name as plural for underlying idea
             host_candidate = None
             # There is a list of mutliple potential guests for any course
-            guest_candidates = [ingredients["sub"]]
+            guest_candidates = [ingredients[cand['name']] for cand in course['guest_candidates']]
             restraints = None
             orcaSettings = None
         else:
@@ -495,6 +495,10 @@ def main(args):
     allOk = True
     # Read config file
     outdir, orca, courses, ingredients, allOk = setup(args.config)
+
+    # Copy config file to output directory for reproducibility / tracking
+    shutil.copy(args.config, outdir)
+    
     logging.info(f"Cooking begins - recipe from {args.config}")
 
     # Results of previous course, carried over as starting point (HOST) of next docking step
