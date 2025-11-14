@@ -145,6 +145,10 @@ ingredients:
     charge: 1
     multiplicity: 1
     flavours:
+      nucleophile:
+        - NE2
+      electrophile:
+        - ND1
       h_donor:
         - ND1
         - NE2
@@ -320,6 +324,8 @@ ingredients:
     charge: -1
     multiplicity: 1
     flavours:
+      nucleophile:
+        - OD2
       h_acceptor:
         - OD1
         - OD2
@@ -349,17 +355,16 @@ courses:
       name: init
       host_candidates: None
       guest_candidates:
-        - *sub
+        - *sub_het_d
       restraints:
         None
   - &base1
       name: base1
       host_candidates: *init
       guest_candidates:
-        - *hie
-        - *hid
+        - *hip
       restraints:
-        - guestIdx: h_acceptor
+        - guestIdx: nucleophile
           hostIdx: deprot
           val: 2.7 # equilibrium distance between restrained atoms (units: Ang)
           tol: 0.5 # docker results within val +/- tol are accepted as correct starting points for next docking (units: Ang)
@@ -373,10 +378,10 @@ courses:
       guest_candidates:
         - *asp_d
       restraints:
-        - guestIdx: h_acceptor
-          hostIdx: deprot
-          val: 1.5
-          tol: 1.0
+        - guestIdx: nucleophile
+          hostIdx: electrophile
+          val: 2.7
+          tol: 0.5
           force: 100
       orcaSettings:
         nOpt: 5
