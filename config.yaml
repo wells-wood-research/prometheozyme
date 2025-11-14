@@ -385,3 +385,9 @@ courses:
           force: 100
       orcaSettings:
         nOpt: 5
+
+# TODO add molecular orbital diagrams of amino acids' HOMOs and LUMOs to guide decisions on restraint angles (tutorial style)
+# TODO evaluate angle restraints
+# TODO evaluate reasonable backbone arrangement - what testable rules are there for reasonable arrangement?
+# TODO automatically write inputs to evaluate reactivity (e.g. with NEB) 
+# TODO source of each individual final result is unknown because of renaming based on einter - write as REMARKs metadata information?
