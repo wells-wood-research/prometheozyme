@@ -318,9 +318,16 @@ def write_docking_input(course_name, guest, host, biases, workdir, qmMethod, str
     return inp_file_path, calculate_charge([guest.charge, host.charge]), calculate_multiplicity([guest.multiplicity, host.multiplicity])
 
 def run_docking(input, orcapath):
-    output_file = f"{input}.out"
-    with open(output_file, "w") as f:
-        subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=f, stderr=subprocess.STDOUT)
+    stdout_file = f"{input}.out"
+    stderr_file = f"{input}.err"
+    with open(stdout_file, "w") as out, open(stderr_file, "w") as err:
+        result = subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=out, stderr=err)
+    
+    if result.returncode != 0:
+        with stdout_file.open("r", errors="ignore") as f:
+            lines = f.readlines()
+        for l in lines[-13:]:
+            print(l.rstrip())
 
 def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, biases, course_key):
     course_name = course_key[0]
@@ -592,6 +599,7 @@ def main(args):
     
     # Merge into one multi-frame PDB file for easier analysis
     result_paths = [os.path.join(results_dir, x) for x in os.listdir(results_dir) if x.lower().endswith(".pdb")]
+    # TODO merging duplicates atoms
     write_multi_pdb(result_paths, os.path.join(results_dir, "merged.pdb"))
 
     if allOk:
