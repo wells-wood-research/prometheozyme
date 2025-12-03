@@ -347,15 +347,16 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         df[["FLAVOUR", "ING", "DISH"]] = None, None, None
         n_host, n_guest = host.n_atoms, guest.n_atoms
 
-        for col in ["ATOM", "ATOM_ID", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "FLAVOUR", "ING"]:
+        for col in ["ATOM", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "FLAVOUR", "ING"]:
             df.loc[:n_host - 1, col] = host.df[col].values
             df.loc[n_host:n_host + n_guest - 1, col] = guest.df[col].values
+        # reindex residues and atoms in guest to continue the same chain
+        df.loc[0:n_host + n_guest - 1, "ATOM_ID"] = range(1, n_host+n_guest+1)
+        df.loc[n_host:n_host + n_guest - 1, "RES_ID"] = host.df["RES_ID"].max() + 1
         # transfer dish labels
         df.loc[:n_host - 1, "DISH"] = host.df["DISH"].values
         df.loc[n_host:n_host + n_guest - 1, "DISH"] = course_name
-
-        # Make sure each molecule gets a new CHAIN_ID so that ATOM_IDs can be individually 1-based per each molecule
-        df = assign_chain_ids(df)
+        # cast column types and order
         df = df[col_order].astype(col_types)
         logging.verbose( f"Result of this docking step:\n{df}")
 
