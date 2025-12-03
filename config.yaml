@@ -12,10 +12,11 @@ misc:
 # Read more here: https://www.faccts.de/docs/orca/6.1/manual/contents/structurereactivity/docker.html?q=docker&n=0#docker-automated-docking-algorithm
 # Options qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent can be overwritten in each individual course definition for that step
 # TODO not implemented options: SWARMMINITER, SWARMMAXITER, %GEOM block, GRIDCENTER, DOCKLEVEL
+# TODO consideration: %DOCK CHECKGUESTTOPO FALSE END
 orca:
   # absolute path to orca executable
   # default: ./orca
-  orcapth: /home/mchrnwsk/orca_6_1_0/orca
+  orcapth: /home/mchrnwsk/orca_6_1_1_linux_x86-64_shared_openmpi418/orca
   # QM method to use in docking
   # DOCKER as of ORCA 6.1 is only working with the GFN-XTB and GFN-FF methods and the ALPB solvation model
   # default: XTB2
@@ -175,6 +176,10 @@ ingredients:
       h_acceptor:
         - SG
       h_donor:
+        - SG
+      nucleophile:
+        - SG
+      electrophile:
         - SG
 
   - &cys_d
@@ -355,14 +360,14 @@ courses:
       name: init
       host_candidates: None
       guest_candidates:
-        - *sub_het_d
+        - *sub_het_p
       restraints:
         None
   - &base1
       name: base1
       host_candidates: *init
       guest_candidates:
-        - *hip
+        - *cys_p
       restraints:
         - guestIdx: nucleophile
           hostIdx: deprot
@@ -391,3 +396,5 @@ courses:
 # TODO evaluate reasonable backbone arrangement - what testable rules are there for reasonable arrangement?
 # TODO automatically write inputs to evaluate reactivity (e.g. with NEB) 
 # TODO source of each individual final result is unknown because of renaming based on einter - write as REMARKs metadata information?
+# TODO add a slightly greasy polarisable medium (mimics protein environment) so lack of H-bonds isn't penalised so much
+# TODO clearer error messaging - the errors are there, but tend to be hidden by the code that comes next
