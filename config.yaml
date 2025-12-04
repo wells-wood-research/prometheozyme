@@ -57,6 +57,8 @@ ingredients:
     flavours:
       deprot:
         - OH
+      deprot_H:
+        - HH
 
   - &sub_het_d
     name: sub_het_d
@@ -66,6 +68,8 @@ ingredients:
     flavours:
       deprot:
         - OH
+      deprot_H:
+        - HH
 
   - &sub_grs_p
     name: sub_grs_p
@@ -75,6 +79,8 @@ ingredients:
     flavours:
       deprot:
         - OH
+      deprot_H:
+        - HH
 
   - &sub_grs_d
     name: sub_grs_d
@@ -84,6 +90,8 @@ ingredients:
     flavours:
       deprot:
         - OH
+      deprot_H:
+        - HH
 
   - &arg
     name: arg
@@ -369,32 +377,54 @@ courses:
       guest_candidates:
         - *cys_p
       restraints:
-        - guestIdx: nucleophile
-          hostIdx: deprot
-          val: 2.7 # equilibrium distance between restrained atoms (units: Ang)
-          tol: 0.5 # docker results within val +/- tol are accepted as correct starting points for next docking (units: Ang)
-          force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
+        - restraintType: distance
+          selection:
+            - parent: guest
+              idx: nucleophile
+            - parent: host
+              idx: deprot
+          parameters:
+            val: 2.7 # equilibrium distance between restrained atoms (units: Ang)
+            tol: 0.5 # docker results within val +/- tol are accepted as correct starting points for next docking
+            force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
+        - restraintType: angle
+          selection:
+            - parent: guest
+              idx: nucleophile
+            - parent: host
+              idx: deprot_H
+            - parent: host
+              idx: deprot
+          parameters:
+            val: 180 # optimal angle between restrained atoms (units: degrees)
+            tol: 10 # docker results within val +/- tol are accepted as correct starting points for next docking
+            force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
       orcaSettings:
-        nOpt: 15
+        nOpt: 2
         fixHost: False
-  - &base2
-      name: base2
-      host_candidates: *base1
-      guest_candidates:
-        - *asp_d
-      restraints:
-        - guestIdx: nucleophile
-          hostIdx: electrophile
-          val: 2.7
-          tol: 0.5
-          force: 100
-      orcaSettings:
-        nOpt: 5
+#  - &base2
+#      name: base2
+#      host_candidates: *base1
+#      guest_candidates:
+#        - *asp_d
+#      restraints:
+#        - restraintType: distance
+#          selection:
+#            - parent: guest
+#              idx: nucleophile
+#            - parent: host
+#              idx: electrophile
+#          parameters:
+#            r0: 2.7
+#            tol: 0.5
+#            k: 100
+#      orcaSettings:
+#        nOpt: 5
 
 # TODO add molecular orbital diagrams of amino acids' HOMOs and LUMOs to guide decisions on restraint angles (tutorial style)
 # TODO evaluate angle restraints
 # TODO evaluate reasonable backbone arrangement - what testable rules are there for reasonable arrangement?
-# TODO automatically write inputs to evaluate reactivity (e.g. with NEB) 
+# TODO automatically write inputs to evaluate reactivity (e.g. with NEB) and generate protein (RFdiffusion)
 # TODO source of each individual final result is unknown because of renaming based on einter - write as REMARKs metadata information?
 # TODO add a slightly greasy polarisable medium (mimics protein environment) so lack of H-bonds isn't penalised so much
 # TODO clearer error messaging - the errors are there, but tend to be hidden by the code that comes next
