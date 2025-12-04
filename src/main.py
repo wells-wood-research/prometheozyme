@@ -399,30 +399,44 @@ def assign_restraint_idx(guest, host, restraint, course_name):
             logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {match}")
         return match
 
-    matches = []
-    for atom in restraint.sele:
+    matches = {}
+    for i, atom in enumerate(restraint.sele):
         atom_parent = atom.parent # must be guest or host - no other option for iterative docker system
         atom_idx = atom.idx # at this point it is still a string
         parent_object = guest if atom_parent == "guest" else host
         match = _flavour_to_idx(parent_object, atom_idx)
-        matches.append({atom_parent: match})
+        matches[i] = {"parent": atom_parent, "match": match}
 
     return matches
 
-def expand_restraints(guest, host, restraint, course_name):
+def expand_angle_restraints(guest, host, restraint, course_name):
     # Filter tuples whose activity matches the requested flavour name
     matches = assign_restraint_idx(guest, host, restraint, course_name)
-    guest_matches = matches.get["guest"]
-    host_matches = matches.get["host"]
 
     # To define bond bias potential in ORCA DOCKING step
-    bias_params = []
+    angle_params = []
+    for (atom1_parent, atom1_item), (atom2_parent, atom2_item), (atom3_parent, atom3_item) in itertools.product([(atom["parent"], atom["match"]) for atom in matches.values()]):
+        # g_item and h_item are tuples like (index, name, activity)
+        atom1_idx = atom1_item[0]  # numeric index in the PDB/molecule
+        atom2_idx = atom2_item[0]
+        atom3_idx = atom3_item[0]
+        angle_params.append(({"parent": atom1_parent, "idx": atom1_idx}, {"parent": atom2_parent, "idx": atom2_idx}, {"parent": atom3_parent, "idx": atom3_idx}, restraint.params.val, restraint.params.tol, restraint.params.force))
+    return angle_params
+
+def expand_distance_restraints(guest, host, restraint, course_name):
+    # Filter tuples whose activity matches the requested flavour name
+    matches = assign_restraint_idx(guest, host, restraint, course_name)
+    guest_matches = [match["match"] for match in matches.values() if match["parent"] == "guest"]
+    host_matches = [match["match"] for match in matches.values() if match["parent"] == "host"]
+
+    # To define bond bias potential in ORCA DOCKING step
+    distance_params = []
     for g_item, h_item in itertools.product(guest_matches, host_matches):
         # g_item and h_item are tuples like (index, name, activity)
         g_idx = g_item[0]  # numeric index in the PDB/molecule
         h_idx = h_item[0]
-        bias_params.append((g_idx, h_idx, restraint.params.val, restraint.params.tol, restraint.params.force))
-    return bias_params
+        distance_params.append((g_idx, h_idx, restraint.params.val, restraint.params.tol, restraint.params.force))
+    return distance_params
 
 def expand_ingredient_and_restraint_combinations(course, host):
     allOk = True
@@ -436,7 +450,8 @@ def expand_ingredient_and_restraint_combinations(course, host):
     # Loop all candidate host/guest pairs
     for guest in course.guests:
         # For each restraint compute the list of concrete options (g_idx, h_idx, val, tol, force)
-        bias_params_per_restraint = []
+        distance_params_per_restraint = []
+        angle_params_per_restraint = []
         if course.restraints is not None or course.restraints is not []:
             for restraint in course.restraints:
                 # from setup_ingredients, course.restraints could be an empty list or a list on Nones
@@ -444,14 +459,24 @@ def expand_ingredient_and_restraint_combinations(course, host):
                     continue
                 # bias in docker is applied only on distance restraints
                 if restraint.property == "distance":
-                    bias_params = expand_restraints(guest, host, restraint, course.name)
+                    distance_params = expand_distance_restraints(guest, host, restraint, course.name)
                     # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
-                    if not bias_params:
-                        logging.error(f"Course {course.name} has restraints defined (e.g. guestIdx {course.restraints[0].guestIdx}, hostIdx {course.restraints[0].hostIdx}, val: {course.restraints[0].val}) but bias potentials could not be defined.")
+                    if not distance_params:
+                        logging.error(f"Distance potentials for course {course.name} could not be defined.")
                         allOk = False
-                        bias_params_per_restraint = []
+                        distance_params_per_restraint = []
                         break
-                    bias_params_per_restraint.append(bias_params)
+                    distance_params_per_restraint.append(distance_params)
+
+                if restraint.property == "angle":
+                    angle_params = expand_angle_restraints(guest, host, restraint, course.name)
+                    # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
+                    if not angle_params:
+                        logging.error(f"Distance potentials for course {course.name} could not be defined.")
+                        allOk = False
+                        angle_params = []
+                        break
+                    angle_params_per_restraint.append(angle_params)
 
         # Case 1) no restraints were defined for this course:
         else:
@@ -465,16 +490,11 @@ def expand_ingredient_and_restraint_combinations(course, host):
             expanded_course[course_key] = new_course
             continue
 
-        # Case 2) restraints cannot be satisfied
-        if not bias_params_per_restraint:
-            logging.error(f"No bias params could be defined for restraints of course {course.name}.")
-            allOk = False
-            break
-
+        # TODO this doesn't wokr, restraints have a different structure now
         # Cartesian product across lists of options (one option per restraint)
         # If one ingredient has multiple atoms of same flavour (e.g. multiple h_donor),
         # this creates multiple combinations (a "mash-up"), one for each of the atoms
-        for mash_idx, mash in enumerate(itertools.product(*bias_params_per_restraint)):
+        for mash_idx, mash in enumerate(itertools.product(*distance_params_per_restraint)):
             # 'mash' is a tuple of option tuples, one per restraint
             # Build new restraint tuples representing these concrete restraint
             mashed_restraints = []
