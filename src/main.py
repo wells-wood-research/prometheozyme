@@ -400,19 +400,20 @@ def assign_restraint_idx(guest, host, restraint, course_name):
         return match
 
     matches = []
-    # TODO extremely inflexible and relies on the order in config file
     for atom in restraint.sele:
         atom_parent = atom.parent # must be guest or host - no other option for iterative docker system
         atom_idx = atom.idx # at this point it is still a string
         parent_object = guest if atom_parent == "guest" else host
         match = _flavour_to_idx(parent_object, atom_idx)
-        matches.append(match)
+        matches.append({atom_parent: match})
 
     return matches
 
 def expand_restraints(guest, host, restraint, course_name):
     # Filter tuples whose activity matches the requested flavour name
-    guest_matches, host_matches = assign_restraint_idx(guest, host, restraint, course_name)
+    matches = assign_restraint_idx(guest, host, restraint, course_name)
+    guest_matches = matches.get["guest"]
+    host_matches = matches.get["host"]
 
     # To define bond bias potential in ORCA DOCKING step
     bias_params = []
