@@ -363,7 +363,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         # Save PDB
         df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
         new_pathPDB = new_pathXYZ.replace(".xyz", ".pdb")
-        df2pdb(df=df_to_save, outPDB=new_pathPDB, logger=logging)
+        df2pdb(df=df_to_save, outPDB=new_pathPDB, remarks=[f"Eopt= {eopt} (Eh), Einter= {einter} (kcal/mol)"], logger=logging)
         logging.info(f"Saved result to {new_pathPDB}")
         
         new_course_key = course_key + (str(c), )
@@ -600,7 +600,6 @@ def main(args):
     
     # Merge into one multi-frame PDB file for easier analysis
     result_paths = [os.path.join(results_dir, x) for x in os.listdir(results_dir) if x.lower().endswith(".pdb")]
-    # TODO merging duplicates atoms
     write_multi_pdb(result_paths, os.path.join(results_dir, "merged.pdb"))
 
     if allOk:

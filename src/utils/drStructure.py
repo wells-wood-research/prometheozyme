@@ -71,16 +71,35 @@ def pdb2df(pathPDB: str, logger: Optional[logging.Logger] = None) -> Optional[pd
         return None
 
 
-def df2pdb(df: pd.DataFrame, outPDB: str, logger: Optional[logging.Logger] = None) -> Optional[Any]:
+def df2pdb(df: pd.DataFrame, outPDB: str, remarks: list = [], logger: Optional[logging.Logger] = None) -> Optional[Any]:
     """Convert a DataFrame to a PDB file."""
     logger = get_logger(logger)
 
     if not isinstance(df, pd.DataFrame) or df.empty:
         logger.error("Invalid or empty DataFrame provided.")
         return None
-
     try:
         pdbUtils.df2pdb(df=df, outFile=outPDB)
+        if remarks:
+            try:
+                # Read the existing PDB content
+                with open(outPDB, "r") as f:
+                    original = f.read()
+
+                # Build REMARK header text
+                # remark should be a list or iterable of strings
+                remark_header = ""
+                for remark in remarks:
+                    remark_header += f"REMARK   {remark}\n"
+
+                # Write REMARK header + original content back to the file
+                with open(outPDB, "w") as f:
+                    f.write(remark_header)
+                    f.write(original)
+
+            except Exception as e:
+                logger.exception(f"Failed to prepend REMARK lines: {e}")
+                return None
         if not isPDB(outPDB):
             logger.error("pdbUtils.df2pdb did not return a correct PDB file.")
             return None
@@ -534,9 +553,8 @@ def write_multi_pdb(pdb_paths, output_path):
             out_file.write(f"MODEL        {i}\n")
             with open(pdb_path, 'r') as in_file:
                 for line in in_file:
-                    if line.startswith(("ATOM", "HETATM")):
+                    if line.startswith(("REMARK", "ATOM", "HETATM")):
                         out_file.write(line)
-                    out_file.write(line)
             out_file.write("\nENDMDL\n")
         out_file.write("END\n")
 
