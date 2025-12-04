@@ -98,6 +98,44 @@ class Ingredient:
         self.n_atoms: int = len(self.df)
         self.id: str = str(uuid.uuid4())
 
+class Selection:
+    def __init__(
+        self,
+        parent: str,
+        idx: str
+    ) -> None:
+        self.parent: str = parent
+        self.idx: str = idx
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(d["parent"], d["idx"])
+
+class Params:
+    def __init__(
+        self,
+        val: float,
+        tol: float,
+        force: float = 100.0,
+    ) -> None:
+        self.val: float = val
+        self.tol: float = tol
+        self.force: float = force
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(d["val"], d["tol"], d.get("force", 100))
+        
+class Restraint:
+    def __init__(
+        self,
+        property: str,
+        sele: List[Selection],
+        params: Params
+    ) -> None:
+        self.property: str = property
+        self.sele: List[Selection] = [Selection.from_dict(a) for a in sele]
+        self.params: Params = Params.from_dict(params)
 
 class Course:
     def __init__(
@@ -105,7 +143,7 @@ class Course:
         name: str,
         host: Ingredient,
         guests: List[Ingredient],
-        restraints: Optional[List["Restraint"]] = None,
+        restraints: Optional[List[Restraint]] = None,
         orcaSettings: Optional[Dict] = None
     ) -> None:
         self.name: str = name
@@ -113,19 +151,3 @@ class Course:
         self.guests: List[Ingredient] = guests
         self.restraints: List[Restraint] = restraints
         self.orcaSettings: Optional[Dict] = orcaSettings
-
-
-class Restraint:
-    def __init__(
-        self,
-        guestIdx: int,
-        hostIdx: int,
-        val: float,
-        tol: float,
-        force: float = 100.0,
-    ) -> None:
-        self.guestIdx: int = guestIdx
-        self.hostIdx: int = hostIdx
-        self.val: float = val
-        self.tol: float = tol
-        self.force: float = force

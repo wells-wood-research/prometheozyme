@@ -128,15 +128,17 @@ def setup_ingredients(config):
             restraints_data = course.get('restraints', [])
             restraints = []
             for restr in restraints_data:
+                restraint_property = restr.get('property', 'distance')
+                restraint_selection = restr.get('selection', [])
+                restraint_params = restr.get('parameters', {"val": None, "tol": None, "force": None})
+
                 restraint = Restraint(
-                    guestIdx=restr.get('guestIdx', None),
-                    hostIdx=restr.get('hostIdx', None),
-                    val=restr.get('val', None),
-                    tol=restr.get('tol', 0.5),
-                    force=restr.get('force', 100)
+                    property=restraint_property,
+                    sele=restraint_selection,
+                    params=restraint_params
                 )
-                if restraint.guestIdx is None or restraint.hostIdx is None or restraint.val is None:
-                    logging.warning(f"No guestIdx, hostIdx, val defined for course {course['name']} restraints. Fix or remove the restraints block from config file.")
+                if restraint.property is None or restraint.sele is None or restraint.params is None:
+                    logging.warning(f"No property, atom selection or restraint parameters defined for course {course['name']} restraints. Fix or remove the restraints block from config file.")
                     allOk = False
                     restraint = None 
                 restraints.append(restraint)
@@ -386,25 +388,27 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
 ########################
 
 def assign_restraint_idx(guest, host, restraint, course_name):
-    guest_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in guest.df.iterrows() if restraint.guestIdx in row["FLAVOUR"]]
-    if not guest_matches:
-        logging.error(f"Guest {guest.name} has no atoms matching flavour of restraint {restraint.guestIdx} for course {course_name}\n")
-    else:
-        logging.verbose("Expanding restraints for guest:")
-        logging.verbose(f"\n{guest.df}")
-        logging.debug(f"Original guestIdx to be restrained: {restraint.guestIdx}")
-        logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {guest_matches}")
-    
-    host_matches = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in host.df.iterrows() if restraint.hostIdx in row["FLAVOUR"]]
-    if not host_matches:
-        logging.error(f"Host {host.name} has no atoms matching flavour of restraint {restraint.hostIdx} for course {course_name}")
-    else:
-        logging.verbose("Expanding restraints for host:")
-        logging.verbose(f"\n{host.df}")
-        logging.debug(f"Original hostIdx to be restrained: {restraint.hostIdx}")
-        logging.debug(f"Host atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {host_matches}")
+    def _flavour_to_idx(parent, idx_ref):
+        match = [(i, row["ATOM_NAME"], row["FLAVOUR"]) for i, row in parent.df.iterrows() if idx_ref in row["FLAVOUR"]]
+        if not match:
+            logging.error(f"Ingredient {parent.name} has no atoms matching flavour of restraint {idx_ref} for course {course_name}\n")
+        else:
+            logging.verbose(f"Expanding restraints for {parent.name}:")
+            logging.verbose(f"\n{parent.df}")
+            logging.debug(f"Original idx to be restrained: {idx_ref}")
+            logging.debug(f"Guest atoms matching the restraint (idx, ATOM_NAME, FLAVOUR): {match}")
+        return match
 
-    return guest_matches, host_matches
+    matches = []
+    # TODO extremely inflexible and relies on the order in config file
+    for atom in restraint.sele:
+        atom_parent = atom.parent # must be guest or host - no other option for iterative docker system
+        atom_idx = atom.idx # at this point it is still a string
+        parent_object = guest if atom_parent == "guest" else host
+        match = _flavour_to_idx(parent_object, atom_idx)
+        matches.append(match)
+
+    return matches
 
 def expand_restraints(guest, host, restraint, course_name):
     # Filter tuples whose activity matches the requested flavour name
@@ -416,7 +420,7 @@ def expand_restraints(guest, host, restraint, course_name):
         # g_item and h_item are tuples like (index, name, activity)
         g_idx = g_item[0]  # numeric index in the PDB/molecule
         h_idx = h_item[0]
-        bias_params.append((g_idx, h_idx, restraint.val, restraint.tol, restraint.force))
+        bias_params.append((g_idx, h_idx, restraint.params.val, restraint.params.tol, restraint.params.force))
     return bias_params
 
 def expand_ingredient_and_restraint_combinations(course, host):
@@ -432,21 +436,24 @@ def expand_ingredient_and_restraint_combinations(course, host):
     for guest in course.guests:
         # For each restraint compute the list of concrete options (g_idx, h_idx, val, tol, force)
         bias_params_per_restraint = []
-        for restraint in course.restraints or []:
-            # from setup_ingredients, course.restraints could be an empty list or a list on Nones
-            if restraint is None:
-                continue
-            bias_params = expand_restraints(guest, host, restraint, course.name)
-            # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
-            if not bias_params:
-                logging.error(f"Course {course.name} has restraints defined (e.g. guestIdx {course.restraints[0].guestIdx}, hostIdx {course.restraints[0].hostIdx}, val: {course.restraints[0].val}) but bias potentials could not be defined.")
-                allOk = False
-                bias_params_per_restraint = []
-                break
-            bias_params_per_restraint.append(bias_params)
+        if course.restraints is not None or course.restraints is not []:
+            for restraint in course.restraints:
+                # from setup_ingredients, course.restraints could be an empty list or a list on Nones
+                if restraint is None or restraint is []:
+                    continue
+                # bias in docker is applied only on distance restraints
+                if restraint.property == "distance":
+                    bias_params = expand_restraints(guest, host, restraint, course.name)
+                    # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
+                    if not bias_params:
+                        logging.error(f"Course {course.name} has restraints defined (e.g. guestIdx {course.restraints[0].guestIdx}, hostIdx {course.restraints[0].hostIdx}, val: {course.restraints[0].val}) but bias potentials could not be defined.")
+                        allOk = False
+                        bias_params_per_restraint = []
+                        break
+                    bias_params_per_restraint.append(bias_params)
 
         # Case 1) no restraints were defined for this course:
-        if not course.restraints:
+        else:
             # Create single course copy with no concrete restraints
             new_course = copy.deepcopy(course)
             new_course.host = host
