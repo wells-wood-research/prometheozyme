@@ -409,34 +409,35 @@ def assign_restraint_idx(guest, host, restraint, course_name):
 
     return matches
 
-def expand_angle_restraints(guest, host, restraint, course_name):
-    # Filter tuples whose activity matches the requested flavour name
+def expand_restraint(guest, host, restraint, course_name):
+    # get idx matches for each atom flavour in restraint.sele
     matches = assign_restraint_idx(guest, host, restraint, course_name)
 
-    # To define bond bias potential in ORCA DOCKING step
-    angle_params = []
-    for (atom1_parent, atom1_item), (atom2_parent, atom2_item), (atom3_parent, atom3_item) in itertools.product([(atom["parent"], atom["match"]) for atom in matches.values()]):
-        # g_item and h_item are tuples like (index, name, activity)
-        atom1_idx = atom1_item[0]  # numeric index in the PDB/molecule
-        atom2_idx = atom2_item[0]
-        atom3_idx = atom3_item[0]
-        angle_params.append(({"parent": atom1_parent, "idx": atom1_idx}, {"parent": atom2_parent, "idx": atom2_idx}, {"parent": atom3_parent, "idx": atom3_idx}, restraint.params.val, restraint.params.tol, restraint.params.force))
-    return angle_params
+    # extract match-lists and parent names (in order)
+    match_lists = [entry["match"] for entry in matches.values()]
+    parents = [entry["parent"] for entry in matches.values()]
 
-def expand_distance_restraints(guest, host, restraint, course_name):
-    # Filter tuples whose activity matches the requested flavour name
-    matches = assign_restraint_idx(guest, host, restraint, course_name)
-    guest_matches = [match["match"] for match in matches.values() if match["parent"] == "guest"]
-    host_matches = [match["match"] for match in matches.values() if match["parent"] == "host"]
+    # If any atom has zero matches → no possible restraint
+    if any(len(lst) == 0 for lst in match_lists):
+        return []
 
-    # To define bond bias potential in ORCA DOCKING step
-    distance_params = []
-    for g_item, h_item in itertools.product(guest_matches, host_matches):
-        # g_item and h_item are tuples like (index, name, activity)
-        g_idx = g_item[0]  # numeric index in the PDB/molecule
-        h_idx = h_item[0]
-        distance_params.append((g_idx, h_idx, restraint.params.val, restraint.params.tol, restraint.params.force))
-    return distance_params
+    # N-way Cartesian product
+    expanded = []
+    for combo in itertools.product(*match_lists):
+        atoms = []
+        for (idx, name, flav), parent in zip(combo, parents):
+            atoms.append({"parent": parent, "idx": idx})
+
+        expanded.append({
+            "property": restraint.property,
+            "atoms": atoms,  # 2 for distance, 3 for angle
+            "val": restraint.params.val,
+            "tol": restraint.params.tol,
+            "force": restraint.params.force,
+            "orig": restraint
+        })
+
+    return expanded
 
 def expand_ingredient_and_restraint_combinations(course, host):
     allOk = True
@@ -450,65 +451,50 @@ def expand_ingredient_and_restraint_combinations(course, host):
     # Loop all candidate host/guest pairs
     for guest in course.guests:
         # For each restraint compute the list of concrete options (g_idx, h_idx, val, tol, force)
-        distance_params_per_restraint = []
-        angle_params_per_restraint = []
-        if course.restraints is not None or course.restraints is not []:
-            for restraint in course.restraints:
-                # from setup_ingredients, course.restraints could be an empty list or a list on Nones
-                if restraint is None or restraint is []:
-                    continue
-                # bias in docker is applied only on distance restraints
-                if restraint.property == "distance":
-                    distance_params = expand_distance_restraints(guest, host, restraint, course.name)
-                    # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
-                    if not distance_params:
-                        logging.error(f"Distance potentials for course {course.name} could not be defined.")
-                        allOk = False
-                        distance_params_per_restraint = []
-                        break
-                    distance_params_per_restraint.append(distance_params)
+        # Collect expansions for ALL restraints, regardless of property
+        params_per_restraint = []
 
-                if restraint.property == "angle":
-                    angle_params = expand_angle_restraints(guest, host, restraint, course.name)
-                    # If a restraint has no matching atoms, this course/host/guest pair can't satisfy it:
-                    if not angle_params:
-                        logging.error(f"Distance potentials for course {course.name} could not be defined.")
-                        allOk = False
-                        angle_params = []
-                        break
-                    angle_params_per_restraint.append(angle_params)
+        for restraint in course.restraints or []:
+            if restraint is None:
+                continue
 
-        # Case 1) no restraints were defined for this course:
-        else:
-            # Create single course copy with no concrete restraints
+            expanded = expand_restraint(guest, host, restraint, course.name)
+
+            if not expanded:
+                logging.error(
+                    f"Restraint {restraint.property} for course {course.name} "
+                    f"could not be satisfied for guest {guest.name} / host {host.name}"
+                )
+                allOk = False
+                params_per_restraint = []
+                break
+
+            params_per_restraint.append(expanded)
+
+        # If no restraints → single unrestrained Course copy
+        if not params_per_restraint:
             new_course = copy.deepcopy(course)
             new_course.host = host
-            new_course.guests = guest
+            new_course.guests = [guest]
             new_course.restraints = []
-            course_key = f"{course.name}_{host.name}_{guest.name}_constrX"
-            logging.info(f"No restraints defined for course {course_key}\n")
-            expanded_course[course_key] = new_course
+            key = f"{course.name}_{host.name}_{guest.name}_constr0"
+            expanded_course[key] = new_course
             continue
 
-        # TODO this doesn't wokr, restraints have a different structure now
-        # Cartesian product across lists of options (one option per restraint)
+        # Cartesian product across ALL restraints
         # If one ingredient has multiple atoms of same flavour (e.g. multiple h_donor),
         # this creates multiple combinations (a "mash-up"), one for each of the atoms
-        for mash_idx, mash in enumerate(itertools.product(*distance_params_per_restraint)):
+        for mash_idx, mash in enumerate(itertools.product(*params_per_restraint)):
             # 'mash' is a tuple of option tuples, one per restraint
             # Build new restraint tuples representing these concrete restraint
             mashed_restraints = []
-            for orig_restraint, bias_params in zip(course.restraints, mash):
-                g_idx, h_idx, val, tol, force = bias_params
-                # Create a copy of the original restraint but with resolved atom indices
-                new_restraint = copy.deepcopy(orig_restraint)
-                # Overwrite guestIdx/hostIdx with the concrete atom indices
-                new_restraint.guestIdx = g_idx
-                new_restraint.hostIdx = h_idx
-                # Ensure val/tol/force are set to the chosen option
-                new_restraint.val = val
-                new_restraint.tol = tol
-                new_restraint.force = force
+            for expanded_restraint in mash:
+                orig = expanded_restraint["orig"]
+                new_restraint = copy.deepcopy(orig)
+                new_restraint.sele = expanded_restraint["atoms"]
+                new_restraint.params.val = expanded_restraint["val"]
+                new_restraint.params.tol = expanded_restraint["tol"]
+                new_restraint.params.force = expanded_restraint["force"]
                 mashed_restraints.append(new_restraint)
 
             # Make new course copy and set host/guest to the concrete candidates and restraints
@@ -521,6 +507,11 @@ def expand_ingredient_and_restraint_combinations(course, host):
             course_key = (str(course.name), str(guest.name), str(mash_idx))
             expanded_course[course_key] = new_course
 
+    for course_key, course_obj in expanded_course.items():
+        logging.debug(f"========= Course {course_key} restraints:")
+        for i, r in enumerate(course_obj.restraints):
+            logging.debug(f"----- restr {i}")
+            logging.debug(r)
     return expanded_course, allOk
 
 ########################

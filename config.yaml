@@ -100,10 +100,10 @@ ingredients:
     multiplicity: 1
     flavours:
       h_donor:
-        - NE
         - NH1
         - NH2
-      
+        - NE
+        
   - &lys_p
     name: lys_p
     path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_lysine_protonated.pdb
@@ -245,13 +245,6 @@ ingredients:
     charge: 0
     multiplicity: 1
     flavours:
-      grease:
-        - CG
-        - CD1
-        - CD2
-        - CE1
-        - CE2
-        - CZ
       h_acceptor:
         - OH
       h_donor:
@@ -263,29 +256,8 @@ ingredients:
     charge: -1
     multiplicity: 1
     flavours:
-      grease:
-        - CG
-        - CD1
-        - CD2
-        - CE1
-        - CE2
-        - CZ
       h_acceptor:
         - OH
-
-  - &phe
-    name: phe
-    path: /home/mchrnwsk/prometheozyme/ingredients/amino_acids/cb_phenylalanine.pdb
-    charge: 0
-    multiplicity: 1
-    flavours:
-      grease:
-        - CG
-        - CD1
-        - CD2
-        - CE1
-        - CE2
-        - CZ
 
   - &glu_p
     name: glu_p
@@ -375,12 +347,12 @@ courses:
       name: base1
       host_candidates: *init
       guest_candidates:
-        - *cys_p
+        - *arg
       restraints:
         - property: distance
           selection:
             - parent: guest
-              idx: nucleophile
+              idx: h_donor
             - parent: host
               idx: deprot
           parameters:
@@ -390,7 +362,7 @@ courses:
         - property: angle
           selection:
             - parent: guest
-              idx: nucleophile
+              idx: h_donor
             - parent: host
               idx: deprot_H
             - parent: host
