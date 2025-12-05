@@ -335,6 +335,11 @@ ingredients:
 # by pointing to the name of a particular previous course
 # in which molecules that you want to restrain to as HOSTS, were added as guest_candidates;
 # these host_candidates must contain 'flavours' matching hostIdx in the course currently being defined.
+# Be careful: restraint expansion takes place across ALL combinations,
+# so if multiple atoms from one ingredient match a flavour, all combinations will be created!
+# This can lead to combinatorial explosion of number of docking runs and some less-than-sensible combinations
+# such as NH1 of arginine being restrained to in distance but NH2 in angle - to avoid,
+# groups only truly identical and equivalent atoms in flavours, and preferably keep atom atom per flavour.
 courses:
   - &init
       name: init
