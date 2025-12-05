@@ -1,3 +1,4 @@
+import ast
 import os
 import uuid
 import logging
@@ -44,12 +45,11 @@ col_types = {
     "OCCUPANCY": float,
     "BETAFACTOR": float,
     "ELEMENT": str,
-    "FLAVOUR": str,
     "ING": str,
     "DISH": str
 }
 
-class Ingredient:
+class Ingredient:    
     def __init__(
         self,
         pathPDB: str,
@@ -97,8 +97,24 @@ class Ingredient:
         self.df: pd.DataFrame = df
         self.n_atoms: int = len(self.df)
         self.id: str = str(uuid.uuid4())
+    def __str__(self):
+        flavour_summary = {
+            k: len(v) for k, v in (
+                {role: self.df[self.df["FLAVOUR"].apply(lambda lst: role in lst)]["ATOM_NAME"].tolist() 
+                 for role in self.df["FLAVOUR"].explode().dropna().unique()}
+            ).items()
+        } if "FLAVOUR" in self.df.columns else {}
+        return (
+            f"Ingredient: {self.name}\n"
+            f"PDB_path: {self.pathPDB}\n"
+            f"XYZ_path: {self.pathXYZ}\n"
+            f"Charge: {self.charge}, Multiplicity: {self.multiplicity}\n"
+            f"Eopt: {self.eopt:.4f}, Einter: {self.einter:.4f}\n"
+            f"Number of atoms: {self.n_atoms}\n"
+            f"Flavours: {flavour_summary}\n"
+        )
 
-class Selection:
+class Selection:    
     def __init__(
         self,
         parent: str,
@@ -106,6 +122,8 @@ class Selection:
     ) -> None:
         self.parent: str = parent
         self.idx: str = idx
+    def __str__(self):
+        return f"Selection(parent={self.parent}, idx={self.idx})"
 
     @classmethod
     def from_dict(cls, d):
@@ -121,12 +139,14 @@ class Params:
         self.val: float = val
         self.tol: float = tol
         self.force: float = force
+    def __str__(self):
+        return f"Params(val={self.val}, tol={self.tol}, force={self.force})"
 
     @classmethod
     def from_dict(cls, d):
         return cls(d["val"], d["tol"], d.get("force", 100))
         
-class Restraint:
+class Restraint:    
     def __init__(
         self,
         property: str,
@@ -136,7 +156,14 @@ class Restraint:
         self.property: str = property
         self.sele: List[Selection] = [Selection.from_dict(a) for a in sele]
         self.params: Params = Params.from_dict(params)
-
+    def __str__(self):
+        sele_str = ", ".join(str(s) for s in self.sele)
+        return (
+            f"Restraint(property={self.property}, "
+            f"atoms=[{sele_str}], "
+            f"params={self.params})"
+        )
+    
 class Course:
     def __init__(
         self,
@@ -151,3 +178,13 @@ class Course:
         self.guests: List[Ingredient] = guests
         self.restraints: List[Restraint] = restraints
         self.orcaSettings: Optional[Dict] = orcaSettings
+    def __str__(self):
+        guest_names = [g.name for g in self.guests]
+        restraint_summaries = "\n    ".join(str(r) for r in self.restraints) if self.restraints else "None"
+        return (
+            f"Course: {self.name}\n"
+            f"Host: {self.host.name}\n"
+            f"Guests: {guest_names}\n"
+            f"Restraints:\n    {restraint_summaries}\n"
+            f"ORCA Settings: {self.orcaSettings or 'Default'}\n"
+        )
