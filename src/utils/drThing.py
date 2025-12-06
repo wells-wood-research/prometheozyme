@@ -49,71 +49,6 @@ col_types = {
     "DISH": str
 }
 
-class Ingredient:    
-    def __init__(
-        self,
-        pathPDB: str,
-        pathXYZ: str,
-        name: Optional[str],
-        eopt: float = 0.0,
-        einter: float = 0.0,
-        charge: int = 0,
-        multiplicity: int = 1,
-        flavours: Optional[Dict[str, List[str]]] = None,
-        df: Optional[pd.DataFrame] = None,
-    ) -> None:
-        self.pathPDB: str = pathPDB
-        self.pathXYZ: str = pathXYZ
-        self.name: str = name or os.path.splitext(os.path.basename(pathPDB))[0]
-        self.eopt: float = eopt
-        self.einter: float = einter
-        self.charge: int = int(charge)
-        self.multiplicity: int = int(multiplicity)
-
-        # DataFrame setup
-        if df is None:
-            df = pdb2df(self.pathPDB)
-        if df is None:
-            raise ValueError(f"Failed to load PDB data from {self.pathPDB}")
-
-        # Fill in missing columns
-        if "FLAVOUR" not in df.columns:
-            df["FLAVOUR"] = [[] for _ in range(len(df))]
-            if flavours:
-                for role_name, atom_names in flavours.items():
-                    mask = df["ATOM_NAME"].isin(atom_names)
-                    df.loc[mask, "FLAVOUR"] = df.loc[mask, "FLAVOUR"].apply(
-                        lambda lst: lst + [role_name]
-                    )
-
-        if "ING" not in df.columns:
-            df["ING"] = self.name
-        if "DISH" not in df.columns:
-            df["DISH"] = "init"
-
-        # col_order and col_types are assumed global
-        df = df[col_order].astype(col_types)
-
-        self.df: pd.DataFrame = df
-        self.n_atoms: int = len(self.df)
-        self.id: str = str(uuid.uuid4())
-    def __str__(self):
-        flavour_summary = {
-            k: len(v) for k, v in (
-                {role: self.df[self.df["FLAVOUR"].apply(lambda lst: role in lst)]["ATOM_NAME"].tolist() 
-                 for role in self.df["FLAVOUR"].explode().dropna().unique()}
-            ).items()
-        } if "FLAVOUR" in self.df.columns else {}
-        return (
-            f"Ingredient: {self.name}\n"
-            f"PDB_path: {self.pathPDB}\n"
-            f"XYZ_path: {self.pathXYZ}\n"
-            f"Charge: {self.charge}, Multiplicity: {self.multiplicity}\n"
-            f"Eopt: {self.eopt:.4f}, Einter: {self.einter:.4f}\n"
-            f"Number of atoms: {self.n_atoms}\n"
-            f"Flavours: {flavour_summary}\n"
-        )
-    
 class Selection:    
     def __init__(
         self,
@@ -171,6 +106,73 @@ class Restraint:
             f"Restraint(property={self.property}, "
             f"atoms=[{sele_str}], "
             f"params={self.params})"
+        )
+
+class Ingredient:    
+    def __init__(
+        self,
+        pathPDB: str,
+        pathXYZ: str,
+        name: Optional[str],
+        eopt: float = 0.0,
+        einter: float = 0.0,
+        charge: int = 0,
+        multiplicity: int = 1,
+        flavours: Optional[Dict[str, List[str]]] = None,
+        df: Optional[pd.DataFrame] = None,
+        restraints: List[Restraint] = []
+    ) -> None:
+        self.pathPDB: str = pathPDB
+        self.pathXYZ: str = pathXYZ
+        self.name: str = name or os.path.splitext(os.path.basename(pathPDB))[0]
+        self.eopt: float = eopt
+        self.einter: float = einter
+        self.charge: int = int(charge)
+        self.multiplicity: int = int(multiplicity)
+        self.restraints: List[Restraint] = restraints
+
+        # DataFrame setup
+        if df is None:
+            df = pdb2df(self.pathPDB)
+        if df is None:
+            raise ValueError(f"Failed to load PDB data from {self.pathPDB}")
+
+        # Fill in missing columns
+        if "FLAVOUR" not in df.columns:
+            df["FLAVOUR"] = [[] for _ in range(len(df))]
+            if flavours:
+                for role_name, atom_names in flavours.items():
+                    mask = df["ATOM_NAME"].isin(atom_names)
+                    df.loc[mask, "FLAVOUR"] = df.loc[mask, "FLAVOUR"].apply(
+                        lambda lst: lst + [role_name]
+                    )
+
+        if "ING" not in df.columns:
+            df["ING"] = self.name
+        if "DISH" not in df.columns:
+            df["DISH"] = "init"
+
+        # col_order and col_types are assumed global
+        df = df[col_order].astype(col_types)
+
+        self.df: pd.DataFrame = df
+        self.n_atoms: int = len(self.df)
+        self.id: str = str(uuid.uuid4())
+    def __str__(self):
+        flavour_summary = {
+            k: len(v) for k, v in (
+                {role: self.df[self.df["FLAVOUR"].apply(lambda lst: role in lst)]["ATOM_NAME"].tolist() 
+                 for role in self.df["FLAVOUR"].explode().dropna().unique()}
+            ).items()
+        } if "FLAVOUR" in self.df.columns else {}
+        return (
+            f"Ingredient: {self.name}\n"
+            f"PDB_path: {self.pathPDB}\n"
+            f"XYZ_path: {self.pathXYZ}\n"
+            f"Charge: {self.charge}, Multiplicity: {self.multiplicity}\n"
+            f"Eopt: {self.eopt:.4f}, Einter: {self.einter:.4f}\n"
+            f"Number of atoms: {self.n_atoms}\n"
+            f"Flavours: {flavour_summary}\n"
         )
     
 class Course:

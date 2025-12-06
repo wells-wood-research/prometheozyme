@@ -16,11 +16,13 @@ misc:
 orca:
   # absolute path to orca executable
   # default: ./orca
-  orcapth: /home/mchrnwsk/orca_6_1_1_linux_x86-64_shared_openmpi418/orca
+  orcapath: /home/mchrnwsk/orca_6_1_1_linux_x86-64_shared_openmpi418/orca
   # QM method to use in docking
   # DOCKER as of ORCA 6.1 is only working with the GFN-XTB and GFN-FF methods and the ALPB solvation model
   # default: XTB2
-  qmMethod: "XTB2"
+  qmMethod_dock: "XTB2"
+  # QM method to use in optimisation of final results
+  qmMethod_opt: "XTB2"
   # define a general strategy of docking procedure, 
   # from faster but less accurate, to more elaborate
   # alters population density and final number of optimised structures (but nOpt is decisive)
@@ -189,6 +191,8 @@ ingredients:
         - SG
       electrophile:
         - SG
+      electrophile_H:
+        - HG
 
   - &cys_d
     name: cys_d
@@ -379,24 +383,36 @@ courses:
       orcaSettings:
         nOpt: 2
         fixHost: False
-#  - &base2
-#      name: base2
-#      host_candidates: *base1
-#      guest_candidates:
-#        - *asp_d
-#      restraints:
-#        - restraintproperty: distance
-#          selection:
-#            - parent: guest
-#              idx: nucleophile
-#            - parent: host
-#              idx: electrophile
-#          parameters:
-#            r0: 2.7
-#            tol: 0.5
-#            k: 100
-#      orcaSettings:
-#        nOpt: 5
+  - &base2
+      name: base2
+      host_candidates: *base1
+      guest_candidates:
+        - *asp_d
+      restraints:
+        - property: distance
+          selection:
+            - parent: guest
+              idx: nucleophile
+            - parent: host
+              idx: electrophile
+          parameters:
+            val: 2.7
+            tol: 0.5
+            force: 100
+        - property: angle
+          selection:
+            - parent: guest
+              idx: nucleophile
+            - parent: host
+              idx: electrophile_H
+            - parent: host
+              idx: electrophile
+          parameters:
+            val: 180 # optimal angle between restrained atoms (units: degrees)
+            tol: 100 # docker results within val +/- tol are accepted as correct starting points for next docking
+            force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
+      orcaSettings:
+        nOpt: 5
 
 # TODO add molecular orbital diagrams of amino acids' HOMOs and LUMOs to guide decisions on restraint angles (tutorial style)
 # TODO evaluate angle restraints

@@ -11,7 +11,7 @@ import string
 import uuid
 
 from utils.drThing import Ingredient, Restraint, Course, Selection, col_order, col_types, _abs_index
-from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb
+from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb, evaluate_restraints, read_xyz, evaluate_angle
 from utils.drOrca import make_orca_input
 
 ########################
@@ -220,8 +220,8 @@ def calculate_multiplicity(multiplicities):
 def define_orca_params(orca, course_desc):
     # Define default ORCA settings
     default_orca_settings = {
-        "orcapth": "./orca",
-        "qmMethod": "XTB2",
+        "orcapath": "./orca",
+        "qmMethod_dock": "XTB2",
         "strategy": "NORMAL",
         "optLevel": "sloppyopt",
         "nOpt": 5,
@@ -243,8 +243,8 @@ def define_orca_params(orca, course_desc):
                 merged_orca_settings[key] = course_orca_settings[key]
 
     # Extract final ORCA parameters
-    orcapath   = merged_orca_settings["orcapth"]
-    qmMethod   = merged_orca_settings["qmMethod"]
+    orcapath   = merged_orca_settings["orcapath"]
+    qmMethod   = merged_orca_settings["qmMethod_dock"]
     strategy   = merged_orca_settings["strategy"]
     optLevel   = merged_orca_settings["optLevel"]
     nOpt       = merged_orca_settings["nOpt"]
@@ -277,14 +277,16 @@ def dock(outdir, course_key, course_desc, orca):
         os.makedirs(workdir, exist_ok=True)
 
         host_n_atoms = course_desc.host.n_atoms
-        abs_restraints = process_restraints_for_docking(course_desc.restraints, host_n_atoms)
+        current_step_restraints = process_restraints_for_docking(course_desc.restraints, host_n_atoms)
+        abs_restraints = course_desc.host.restraints + current_step_restraints
+
         inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
-            course_key[0], course_desc.guests[0], course_desc.host, abs_restraints,
+            course_key[0], course_desc.guests[0], course_desc.host, current_step_restraints,
             workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
         )
         logging.info(f"Docking input written at path: {inp_file_path}.inp")
         logging.info(f"Running docking...")
-        run_docking(inp_file_path, orcapath)
+        run_orca(inp_file_path, orcapath)
         logging.info(f"Docking complete. See details at path: {inp_file_path}.out")
 
 
@@ -355,7 +357,51 @@ def write_docking_input(course_name, guest, host, restraints_abs, workdir, qmMet
     # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
     return inp_file_path, calculate_charge([guest.charge, host.charge]), calculate_multiplicity([guest.multiplicity, host.multiplicity])
 
-def run_docking(input, orcapath):
+def write_geom_opt_input(name, inp_file_path, ing, qmMethod, nprocs):
+    title = f"ORCA Geometry Optimisation\n # of {name}"
+    moleculeInfo = {"charge": ing.charge, "multiplicity": ing.multiplicity}
+
+    restraints_abs = ing.restraints
+    geom_keep = []
+    geom_scan = []
+    geom = {}
+    for r in restraints_abs:
+        atoms = [s.idx for s in r.sele]
+        if r.property == "distance":
+            geom_keep.append({
+                "atoms": atoms,
+                "val": r.params.val,
+                "tol": r.params.tol,
+            })
+        elif r.property == "angle":
+            # Need to get current angle and scan ("For a linear bend you can only keep the initial value of your structure as constraint!!!")
+            coords = ing.df[["X", "Y", "Z"]].to_numpy()
+            a = int(r.sele[0].idx)
+            b = int(r.sele[1].idx)
+            c = int(r.sele[2].idx)
+            angle = evaluate_angle(coords, a, b, c)
+            geom_scan.append({
+                "atoms": atoms,
+                "start": angle,
+                "end": r.params.val,
+                "iter": round(abs(angle - r.params.val)/10)
+            })
+
+    if geom_keep:
+        geom["keep"] = geom_keep
+    if geom_scan:
+        geom["scan"] = geom_scan
+
+    make_orca_input(orcaInput=inp_file_path,
+                    title=title,
+                    simpleInputLine=[qmMethod, "Opt"],
+                    inputFormat="xyzfile",
+                    inputFile=ing.pathXYZ,
+                    moleculeInfo=moleculeInfo,
+                    parallelize=nprocs,
+                    geom=geom)
+
+def run_orca(input, orcapath):
     stdout_file = f"{input}.out"
     stderr_file = f"{input}.err"
     with open(stdout_file, "w") as out, open(stderr_file, "w") as err:
@@ -366,6 +412,8 @@ def run_docking(input, orcapath):
             lines = f.readlines()
         for l in lines[-13:]:
             logging.error(l.rstrip())
+
+
 
 def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, abs_restraints, course_key):
     course_name = course_key[0]
@@ -413,7 +461,8 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
             einter=einter,
             charge=curr_charge,
             multiplicity=curr_multiplicity,
-            df=df
+            df=df,
+            restraints=abs_restraints
         )
         results_map[new_course_key] = product_obj
         c+=1
@@ -614,6 +663,7 @@ def main(args):
                 try:
                     logging.info(f"""Processing course: {course_key}""")
                     course_desc.host = new_host_for_docking_ing
+                    course_desc.host.restraints = new_host_for_docking_ing.restraints
                     curr_outdir = os.path.join(outdir, f"course{i}_{course_key[0]}", f"serving{j}")
                     waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
                     [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
@@ -627,27 +677,55 @@ def main(args):
             logging.warning(f"Critical failure during docking of course {course_key} - docking produced no usable results.")
             break
 
-    # Report here final theozymes
     # Sort by einter value (ascending)
     leftovers_sorted = sorted(leftovers, key=lambda x: x.einter)
 
-    # Create output directory
+    # Create output directories
+    opt_dir = os.path.join(outdir, "optimisations")
+    os.makedirs(opt_dir, exist_ok=True)
     results_dir = os.path.join(outdir, "results")
     os.makedirs(results_dir, exist_ok=True)
 
-    logging.info("Successfully cooked the following theozymes:")
-
-    # Copy files with renamed names based on order
+    # Geometry optimisations; optimised structures that satisfied all restraints copied to results dir
     for i, ing in enumerate(leftovers_sorted, start=1):
+
         new_name = f"result{i}"
-        new_pathPDB = os.path.join(results_dir, f"{new_name}.pdb")
-        # Copy and rename files
+        curr_opt_dir = os.path.join(opt_dir, new_name)
+        os.makedirs(curr_opt_dir, exist_ok=True)
+
+        # Copy original files for reference/record
+        new_pathXYZ = os.path.join(curr_opt_dir, f"{new_name}.xyz")
+        new_pathPDB = new_pathXYZ.replace(".xyz", ".pdb")
+        shutil.copy(ing.pathXYZ, new_pathXYZ)
         shutil.copy(ing.pathPDB, new_pathPDB)
-        # Log the results
-        logging.info(
-            f"path: {new_pathPDB}, eopt: {ing.eopt} (Eh), einter: {ing.einter} (kcal/mol)"
-        )
-    
+
+        # Prepare ORCA input
+        inp_file_path = os.path.join(curr_opt_dir, "opt")
+        write_geom_opt_input(new_name, inp_file_path, ing,
+                            orca["qmMethod_opt"], orca["nprocs"])
+
+        logging.info(f"Optimisation input written: {inp_file_path}.inp")
+        run_orca(inp_file_path, orca.get("orcapath", "./orca"))
+        logging.info(f"Optimisation complete: {inp_file_path}.out")
+
+        # ORCA output (XYZ)
+        opt_pathXYZ = f"{inp_file_path}.xyz"
+        _, opt_comment, opt_df = xyz2df(opt_pathXYZ, logger=logging)
+        opt_coords = opt_df[["X", "Y", "Z"]].to_numpy()
+
+        allOk = evaluate_restraints(opt_coords, ing.restraints, logger=logging)
+
+        if allOk:
+            org_df = pdb2df(new_pathPDB)
+            org_df[["X", "Y", "Z"]] = opt_coords
+            new_eopt = float(opt_comment.split()[-1])
+            ing.eopt = new_eopt
+            out_pdb = os.path.join(results_dir, f"{new_name}.pdb")
+            df2pdb(df=org_df, outPDB=out_pdb, remarks=[f"Eopt= {ing.eopt} (Eh), Einter= {ing.einter} (kcal/mol)"], logger=logging)
+            logging.info(f"path: {out_pdb}, eopt={ing.eopt}, einter={ing.einter}")
+        else:
+            logging.debug(f"Theozyme at path: {opt_pathXYZ} failed final optimisation.")
+
     # Merge into one multi-frame PDB file for easier analysis
     result_paths = [os.path.join(results_dir, x) for x in os.listdir(results_dir) if x.lower().endswith(".pdb")]
     write_multi_pdb(result_paths, os.path.join(results_dir, "merged.pdb"))

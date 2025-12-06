@@ -155,7 +155,10 @@ def xyz2df(pathXYZ: str, logger: Optional[logging.Logger] = None) -> Optional[Tu
         return None
 
     try:
-        atom_count, comment, coords, atom_types = read_xyz(pathXYZ, logger)
+        structures = read_xyz(pathXYZ, logger)
+        if not structures:
+            return None  # or handle empty file
+        atom_count, comment, coords, atom_types = structures[0]
         df = pd.DataFrame({
             "ELEMENT": atom_types,
             "X": coords[:, 0],
@@ -166,7 +169,6 @@ def xyz2df(pathXYZ: str, logger: Optional[logging.Logger] = None) -> Optional[Tu
     except Exception as e:
         logger.exception(f"Exception during XYZ → DataFrame conversion: {e}")
         return None
-
 
 def xyz2pdb(pathXYZ: str, outPDB: str, logger: Optional[logging.Logger] = None) -> None:
     """Convert an XYZ file to a PDB format."""
@@ -259,9 +261,9 @@ def parse_energy_comment(comment):
         if einter_match: einter = float(einter_match.group(1))
     return eopt, einter
 
-def evaluate_restraints(coords, abs_restraints, logger=None):
+def evaluate_restraints(coords, restraints_abs, logger=None):
     allOk = True
-    for r in abs_restraints:
+    for r in restraints_abs:
         if r.property == "distance":
             a = int(r.sele[0].idx)
             b = int(r.sele[1].idx)
@@ -287,7 +289,7 @@ def evaluate_restraints(coords, abs_restraints, logger=None):
                 break
     return allOk
 
-def extract_ok_docker_results(multi_xyz_path, n_atoms_host, abs_restraints, logger=None):
+def extract_ok_docker_results(multi_xyz_path, n_atoms_host, restraints_abs, logger=None):
     """
     - Split a multi-structure XYZ file.
     - Extract Eopt/Einter from the comment line.
@@ -307,7 +309,7 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, abs_restraints, logg
         # use AMPAL? https://isambard-uob.github.io/ampal/ampal.html#ampal.base_ampal.BaseAmpal.rmsd
 
         # remove angle restraints from docker evaluation -- too many fail since it can't be constrained
-        allOk = evaluate_restraints(coords, [restr for restr in abs_restraints if restr.property == "distance"], logger=logger)
+        allOk = evaluate_restraints(coords, [restr for restr in restraints_abs if restr.property == "distance"], logger=logger)
         if not allOk:
             continue
 
