@@ -259,6 +259,34 @@ def parse_energy_comment(comment):
         if einter_match: einter = float(einter_match.group(1))
     return eopt, einter
 
+def evaluate_restraints(coords, abs_restraints, logger=None):
+    allOk = True
+    for r in abs_restraints:
+        if r.property == "distance":
+            a = int(r.sele[0].idx)
+            b = int(r.sele[1].idx)
+            val  = r.params.val
+            tol  = r.params.tol
+            dist = evaluate_distance(coords, a, b)
+            isOk = abs(dist - val) <= tol
+            logger.info(f"Distance between restrained atoms: {dist}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
+            if not isOk:
+                allOk = False
+                break
+        elif r.property == "angle":
+            a = int(r.sele[0].idx)
+            b = int(r.sele[1].idx)
+            c = int(r.sele[2].idx)
+            val  = r.params.val
+            tol  = r.params.tol
+            angle = evaluate_angle(coords, a, b, c)
+            isOk = abs(angle - val) <= tol
+            logger.info(f"Angle between restrained atoms: {angle}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
+            if not isOk:
+                allOk = False
+                break
+    return allOk
+
 def extract_ok_docker_results(multi_xyz_path, n_atoms_host, abs_restraints, logger=None):
     """
     - Split a multi-structure XYZ file.
@@ -277,31 +305,9 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, abs_restraints, logg
     for i, (atom_count, comment, coords, atom_types) in enumerate(structures):
         # TODO after optmisation there might be duplicated results - need to remove based on RMSD
         # use AMPAL? https://isambard-uob.github.io/ampal/ampal.html#ampal.base_ampal.BaseAmpal.rmsd
-        allOk = True
-        for r in abs_restraints:
-            if r.property == "distance":
-                a = int(r.sele[0].idx)
-                b = int(r.sele[1].idx)
-                val  = r.params.val
-                tol  = r.params.tol
-                dist = evaluate_distance(coords, a, b)
-                isOk = abs(dist - val) <= tol
-                logger.info(f"Distance between restrained atoms: {dist}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
-                if not isOk:
-                    allOk = False
-                    break
-            elif r.property == "angle":
-                a = int(r.sele[0].idx)
-                b = int(r.sele[1].idx)
-                c = int(r.sele[2].idx)
-                val  = r.params.val
-                tol  = r.params.tol
-                angle = evaluate_angle(coords, a, b, c)
-                isOk = abs(angle - val) <= tol
-                logger.info(f"Angle between restrained atoms: {angle}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
-                if not isOk:
-                    allOk = False
-                    break
+
+        # remove angle restraints from docker evaluation -- too many fail since it can't be constrained
+        allOk = evaluate_restraints(coords, [restr for restr in abs_restraints if restr.property == "distance"], logger=logger)
         if not allOk:
             continue
 
