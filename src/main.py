@@ -261,7 +261,7 @@ def dock(outdir, course_key, course_desc, orca):
         workdir = os.path.join(outdir, *course_key[1:])
         os.makedirs(workdir, exist_ok=True)
 
-        biases = process_biases(course_desc.restraints)
+        biases = process_distance_restraints([restr for restr in course_desc.restraints if restr.property == "distance"])
         inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
             course_key[0], course_desc.guests[0], course_desc.host, biases,
             workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
@@ -287,13 +287,21 @@ def dock(outdir, course_key, course_desc, orca):
         logging.exception(f"Unexpected error in docking step: {e}")
         return {}
 
-def process_biases(restraints):
+def process_distance_restraints(restraints):
     # Define bond bias potential to impose restraints of distance between guest and host atoms
     # Must be defined by atom numbers for GUEST FIRST, then HOST SECOND, absolute indexing for each molecule independently
     # For example, to add a bond bias between atom 2 from the GUEST and atom 19 from the HOST, write: BIAS { B 2 19 } END 
     biases = []
     for restraint in restraints:
-        bias = {"atoms": [restraint.guestIdx, restraint.hostIdx], "val": restraint.val, "tol": restraint.tol, "force": restraint.force}
+        atoms = restraint.sele
+        # TODO add check for number of atoms in restraint.sele matching restraint.property
+        # TODO keep track for all restraints and idxs across multiple docking steps to perform final geometry optimisation
+        # TODO bond bias between host and guest are different than bond bias within guest or within host only
+        # TODO DOCKER can take other bias from %GEOM block, but any biases added in %DOCKER will override them
+        # TODO ^ test if this means overriding all biases or just the ones that match atom idxs
+        guest_idxs = [atom['idx'] for atom in atoms if atom['parent'] == 'guest']
+        host_idxs = [atom['idx'] for atom in atoms if atom['parent'] == 'host']
+        bias = {"guest_idx": guest_idxs[0], "host_idx": host_idxs[0], "val": restraint.params.val, "tol": restraint.params.tol, "force": restraint.params.force}
         biases.append(bias)
     return biases
 
