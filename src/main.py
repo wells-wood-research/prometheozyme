@@ -261,9 +261,9 @@ def dock(outdir, course_key, course_desc, orca):
         workdir = os.path.join(outdir, *course_key[1:])
         os.makedirs(workdir, exist_ok=True)
 
-        biases = process_distance_restraints([restr for restr in course_desc.restraints if restr.property == "distance"])
+        docker_biases, host_geom_biases, guest_geom_biases = process_distance_restraints([restr for restr in course_desc.restraints if restr.property == "distance"], course_desc.host.n_atoms)
         inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
-            course_key[0], course_desc.guests[0], course_desc.host, biases,
+            course_key[0], course_desc.guests[0], course_desc.host, docker_biases, host_geom_biases,
             workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
         )
         logging.info(f"Docking input written at path: {inp_file_path}.inp")
@@ -273,7 +273,7 @@ def dock(outdir, course_key, course_desc, orca):
 
         results_map = process_docking_output(
             inp_file_path, curr_charge, curr_multiplicity,
-            course_desc.guests[0], course_desc.host, biases, course_key
+            course_desc.guests[0], course_desc.host, biases, course_key # TODO
         )
         if not results_map:
             logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
@@ -287,33 +287,40 @@ def dock(outdir, course_key, course_desc, orca):
         logging.exception(f"Unexpected error in docking step: {e}")
         return {}
 
-def process_distance_restraints(restraints):
+def process_distance_restraints(restraints, host_n_atoms):
     # Define bond bias potential to impose restraints of distance between guest and host atoms
     # Must be defined by atom numbers for GUEST FIRST, then HOST SECOND, absolute indexing for each molecule independently
     # For example, to add a bond bias between atom 2 from the GUEST and atom 19 from the HOST, write: BIAS { B 2 19 } END 
-    biases = []
+    docker_biases, host_geom_biases, guest_geom_biases = [], [], []
     for restraint in restraints:
         atoms = restraint.sele
         # TODO add check for number of atoms in restraint.sele matching restraint.property
         # TODO keep track for all restraints and idxs across multiple docking steps to perform final geometry optimisation
         # TODO bond bias between host and guest are different than bond bias within guest or within host only
-        # TODO DOCKER can take other bias from %GEOM block, but any biases added in %DOCKER will override them
-        # TODO ^ test if this means overriding all biases or just the ones that match atom idxs
+        # TODO %geom constraints can be defined only for within-host
         guest_idxs = [atom['idx'] for atom in atoms if atom['parent'] == 'guest']
         host_idxs = [atom['idx'] for atom in atoms if atom['parent'] == 'host']
-        bias = {"guest_idx": guest_idxs[0], "host_idx": host_idxs[0], "val": restraint.params.val, "tol": restraint.params.tol, "force": restraint.params.force}
-        biases.append(bias)
-    return biases
+        if len(guest_idxs) == 1 and len(host_idxs) == 1:
+            bias = {"atoms": [guest_idxs[0], host_idxs[0]], "val": restraint.params.val, "tol": restraint.params.tol, "force": restraint.params.force}
+            docker_biases.append(bias)
+        elif len(host_idxs) == 2:
+            geom_bias = {"atoms": host_idxs, "val": restraint.params.val, "tol": restraint.params.tol, "force": restraint.params.force}
+            host_geom_biases.append(geom_bias)
+        elif len(guest_idxs) == 2:
+            guest_idxs = [idx + host_n_atoms for idx in guest_idxs]  # guest atom indices remain the same
+            geom_bias = {"atoms": guest_idxs, "val": restraint.params.val, "tol": restraint.params.tol, "force": restraint.params.force}
+            guest_geom_biases.append(geom_bias)
+    return docker_biases, host_geom_biases, guest_geom_biases
 
-def write_docking_input(course_name, guest, host, biases, workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
+def write_docking_input(course_name, guest, host, docker_biases, geom_biases, workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
     inp_file_path = os.path.join(workdir, f"dock")
     title = f"ORCA DOCKER: Automated Docking Algorithm for\n # course: {course_name}\n # host: {host.name}\n # guest: {guest.name}"
 
     # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
     moleculeInfo = {"charge": host.charge, "multiplicity": host.multiplicity}
 
-    docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": fixHost, "bias": biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
-
+    docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": fixHost, "bias": docker_biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
+    geom = None if not geom_biases else {"keep": geom_biases}
     # Use the updated XYZ file for optimization
     make_orca_input(orcaInput=inp_file_path,
                     title=title,
@@ -322,7 +329,8 @@ def write_docking_input(course_name, guest, host, biases, workdir, qmMethod, str
                     inputFile=host.pathXYZ,
                     moleculeInfo=moleculeInfo,
                     parallelize=nprocs,
-                    docker=docker)
+                    docker=docker,
+                    geom=geom)
     
     # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
     return inp_file_path, calculate_charge([guest.charge, host.charge]), calculate_multiplicity([guest.multiplicity, host.multiplicity])

@@ -45,15 +45,15 @@ def write_geometry_block(f, geom):
     geomScan = geom.get("scan", {})
     geomPots = geom.get("pots", {})
 
-    f.write("%geom\n")
+    f.write("%GEOM\n")
     if geomBreak:
         geomBreakAtoms = geomBreak.get("atoms", None)
         geomBreakAtoms = list(map(str, geomBreakAtoms))
         if len(geomBreakAtoms) == 2:
             geomBreakType = "B"
-        f.write(f"{' '*4}modify_internal\n")
+        f.write(f"{' '*4}MODIFY_INTERNAL\n")
         f.write(f"{' '*8}{{ {geomBreakType} {' '.join(geomBreakAtoms)} R }}\n")
-        f.write(f"{' '*4}end\n")
+        f.write(f"{' '*4}END\n")
     if geomKeep:
         if isinstance(geomKeep, dict):
             geomKeepAtoms = geomKeep.get("atoms", None)
@@ -61,11 +61,11 @@ def write_geometry_block(f, geom):
             if len(geomKeepAtoms) == 2:
                 geomKeepType = "B"
             geomKeepVal = geomKeep.get("val", None)
-            f.write(f"{' '*4}Constraints\n")
+            f.write(f"{' '*4}CONSTRAINTS\n")
             f.write(f"{' '*8}{{ {geomKeepType} {' '.join(geomKeepAtoms)} {geomKeepVal} C }}\n")
-            f.write(f"{' '*4}end\n")
+            f.write(f"{' '*4}END\n")
         elif isinstance(geomKeep, list):
-            f.write(f"{' '*4}Constraints\n")
+            f.write(f"{' '*4}CONSTRAINTS\n")
             for constraint in geomKeep:
                 geomKeepAtoms = constraint.get("atoms", None)
                 geomKeepAtoms = list(map(str, geomKeepAtoms))
@@ -73,16 +73,16 @@ def write_geometry_block(f, geom):
                     geomKeepType = "B"
                 geomKeepVal = constraint.get("val", None)
                 f.write(f"{' '*8}{{ {geomKeepType} {' '.join(geomKeepAtoms)} {geomKeepVal} C }}\n")
-            f.write(f"{' '*4}end\n")
+            f.write(f"{' '*4}END\n")
     if geomScan:
         geomScanAtoms = geomScan.get("atoms", None)
         geomScanAtoms = list(map(str, geomScanAtoms))
         if len(geomScanAtoms) == 2:
             geomScanType = "B"
         scanValues = (geomScan.get("start", None), geomScan.get("end", None), geomScan.get("iter", None))
-        f.write(f"{' '*4}Scan\n")
+        f.write(f"{' '*4}SCAN\n")
         f.write(f"{' '*8}{geomScanType} {' '.join(geomScanAtoms)} = {scanValues[0]}, {scanValues[1]}, {scanValues[2]}\n")
-        f.write(f"{' '*4}end\n")
+        f.write(f"{' '*4}END\n")
     if geomPots:
         if isinstance(geomPots, dict):
             geomPotsAtoms = geomPots.get("atoms", None)
@@ -90,11 +90,11 @@ def write_geometry_block(f, geom):
             if len(geomPotsAtoms) == 2:
                 geomPotsType = "B"
             geomPotsVal = geomPots.get("val", None)
-            f.write(f"{' '*4}Potentials\n")
+            f.write(f"{' '*4}POTENTIALS\n")
             f.write(f"{' '*8}{{ C {' '.join(geomPotsAtoms)} {geomPotsVal} }}\n")
-            f.write(f"{' '*4}end\n")
+            f.write(f"{' '*4}END\n")
         elif isinstance(geomPots, list):
-            f.write(f"{' '*4}Potentials\n")
+            f.write(f"{' '*4}POTENTIALS\n")
             for constraint in geomPots:
                 geomPotsAtoms = constraint.get("atoms", None)
                 geomPotsAtoms = list(map(str, geomPotsAtoms))
@@ -102,8 +102,8 @@ def write_geometry_block(f, geom):
                     geomPotsType = "B"
                 geomPotsVal = constraint.get("val", None)
                 f.write(f"{' '*8}{{ C {' '.join(geomPotsAtoms)} {geomPotsVal} }}\n")
-            f.write(f"{' '*4}end\n")
-    f.write("end\n")
+            f.write(f"{' '*4}END\n")
+    f.write("END\n")
     f.write("\n")
 
 def write_neb_block(f, neb):
@@ -212,8 +212,9 @@ def write_docker_block(f, docker):
         biases = docker.get("bias", [])
         for bias in biases:
             f.write(f"{' '*4}BIAS\n")
-            guest_idx = bias.get("guest_idx", 0)
-            host_idx = bias.get("host_idx", 0)
+            atoms = bias.get("atoms", [])
+            guest_idx = atoms[0]
+            host_idx = atoms[1]
             val = bias.get("val", 0.0)
             force = bias.get("force", 100)
             f.write(f"{' '*8}{{ B {guest_idx} {host_idx} {val} {force} }}\n")

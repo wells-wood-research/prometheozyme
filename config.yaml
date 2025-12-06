@@ -103,6 +103,8 @@ ingredients:
         - NH1
         - NH2
         - NE
+      h_acceptor:
+        - CZ
         
   - &lys_p
     name: lys_p
@@ -360,6 +362,16 @@ courses:
               idx: h_donor
             - parent: host
               idx: deprot
+          parameters:
+            val: 2.7 # equilibrium distance between restrained atoms (units: Ang)
+            tol: 0.5 # docker results within val +/- tol are accepted as correct starting points for next docking
+            force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
+        - property: distance
+          selection:
+            - parent: guest
+              idx: h_donor
+            - parent: guest
+              idx: h_acceptor
           parameters:
             val: 2.7 # equilibrium distance between restrained atoms (units: Ang)
             tol: 0.5 # docker results within val +/- tol are accepted as correct starting points for next docking
