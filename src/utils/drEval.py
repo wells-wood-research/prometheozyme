@@ -26,8 +26,21 @@ def calculate_center_of_mass(coordinates, indices, atom_types):
     
     return center_of_mass
 
-def evaluate_distance(conformation_coords, g_idx, h_idx, n_atoms_host):
-    guest_coord = conformation_coords[g_idx + n_atoms_host]
-    host_coord = conformation_coords[h_idx]
-    distance = calculate_distance(guest_coord, host_coord)
+def evaluate_distance(conformation_coords, atom1_idx, atom2_idx):
+    coord1 = conformation_coords[atom1_idx]
+    coord2 = conformation_coords[atom2_idx]
+    distance = calculate_distance(coord1, coord2)
     return distance
+
+def evaluate_angle(conformation_coords, atom1_idx, atom2_idx, atom3_idx):
+    coord1 = conformation_coords[atom1_idx]
+    coord2 = conformation_coords[atom2_idx]
+    coord3 = conformation_coords[atom3_idx]
+    
+    vec1 = coord1 - coord2
+    vec2 = coord3 - coord2
+    
+    cos_angle = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+    angle_rad = np.arccos(np.clip(cos_angle, -1.0, 1.0))  # Clip to avoid numerical issues
+    angle = np.degrees(angle_rad)
+    return angle

@@ -113,7 +113,7 @@ class Ingredient:
             f"Number of atoms: {self.n_atoms}\n"
             f"Flavours: {flavour_summary}\n"
         )
-
+    
 class Selection:    
     def __init__(
         self,
@@ -128,6 +128,15 @@ class Selection:
     @classmethod
     def from_dict(cls, d):
         return cls(d["parent"], d["idx"])
+    
+def _abs_index(selection: Selection, host_n_atoms: int) -> int:
+    """Return absolute index for a Selection in merged host+guest system."""
+    if selection.parent == "host":
+        return int(selection.idx)
+    elif selection.parent == "guest":
+        return int(selection.idx) + int(host_n_atoms)
+    else:
+        raise ValueError(f"Unknown selection parent: {selection.parent}")
 
 class Params:
     def __init__(

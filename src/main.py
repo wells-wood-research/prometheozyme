@@ -10,7 +10,7 @@ import copy
 import string
 import uuid
 
-from utils.drThing import Ingredient, Restraint, Course, col_order, col_types
+from utils.drThing import Ingredient, Restraint, Course, Selection, col_order, col_types, _abs_index
 from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb
 from utils.drOrca import make_orca_input
 
@@ -254,6 +254,21 @@ def define_orca_params(orca, course_desc):
 
     return orcapath, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
 
+def process_restraints_for_docking(restraints, host_n_atoms):
+    """
+    Input:  list of Restraint objects with parent='host'/'guest', idx still guest-local.
+    Output: list of Restraint objects with absolute indices.
+    """
+    abs_restraints = []
+    for r in restraints:
+        r_new = copy.deepcopy(r)
+        r_new.sele = [
+            Selection(s.parent, _abs_index(s, host_n_atoms))
+            for s in r.sele
+        ]
+        abs_restraints.append(r_new)
+    return abs_restraints
+
 def dock(outdir, course_key, course_desc, orca):
     try:
         orcapath, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs = define_orca_params(orca, course_desc)
@@ -261,9 +276,10 @@ def dock(outdir, course_key, course_desc, orca):
         workdir = os.path.join(outdir, *course_key[1:])
         os.makedirs(workdir, exist_ok=True)
 
-        docker_biases, host_geom_biases, guest_geom_biases = process_distance_restraints([restr for restr in course_desc.restraints if restr.property == "distance"], course_desc.host.n_atoms)
+        host_n_atoms = course_desc.host.n_atoms
+        abs_restraints = process_restraints_for_docking(course_desc.restraints, host_n_atoms)
         inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
-            course_key[0], course_desc.guests[0], course_desc.host, docker_biases, host_geom_biases,
+            course_key[0], course_desc.guests[0], course_desc.host, abs_restraints,
             workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
         )
         logging.info(f"Docking input written at path: {inp_file_path}.inp")
@@ -271,9 +287,10 @@ def dock(outdir, course_key, course_desc, orca):
         run_docking(inp_file_path, orcapath)
         logging.info(f"Docking complete. See details at path: {inp_file_path}.out")
 
+
         results_map = process_docking_output(
             inp_file_path, curr_charge, curr_multiplicity,
-            course_desc.guests[0], course_desc.host, biases, course_key # TODO
+            course_desc.guests[0], course_desc.host, abs_restraints, course_key
         )
         if not results_map:
             logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
@@ -287,40 +304,43 @@ def dock(outdir, course_key, course_desc, orca):
         logging.exception(f"Unexpected error in docking step: {e}")
         return {}
 
-def process_distance_restraints(restraints, host_n_atoms):
-    # Define bond bias potential to impose restraints of distance between guest and host atoms
-    # Must be defined by atom numbers for GUEST FIRST, then HOST SECOND, absolute indexing for each molecule independently
-    # For example, to add a bond bias between atom 2 from the GUEST and atom 19 from the HOST, write: BIAS { B 2 19 } END 
-    docker_biases, host_geom_biases, guest_geom_biases = [], [], []
-    for restraint in restraints:
-        atoms = restraint.sele
-        # TODO add check for number of atoms in restraint.sele matching restraint.property
-        # TODO keep track for all restraints and idxs across multiple docking steps to perform final geometry optimisation
-        # TODO bond bias between host and guest are different than bond bias within guest or within host only
-        # TODO %geom constraints can be defined only for within-host
-        guest_idxs = [atom['idx'] for atom in atoms if atom['parent'] == 'guest']
-        host_idxs = [atom['idx'] for atom in atoms if atom['parent'] == 'host']
-        if len(guest_idxs) == 1 and len(host_idxs) == 1:
-            bias = {"atoms": [guest_idxs[0], host_idxs[0]], "val": restraint.params.val, "tol": restraint.params.tol, "force": restraint.params.force}
-            docker_biases.append(bias)
-        elif len(host_idxs) == 2:
-            geom_bias = {"atoms": host_idxs, "val": restraint.params.val, "tol": restraint.params.tol, "force": restraint.params.force}
-            host_geom_biases.append(geom_bias)
-        elif len(guest_idxs) == 2:
-            guest_idxs = [idx + host_n_atoms for idx in guest_idxs]  # guest atom indices remain the same
-            geom_bias = {"atoms": guest_idxs, "val": restraint.params.val, "tol": restraint.params.tol, "force": restraint.params.force}
-            guest_geom_biases.append(geom_bias)
-    return docker_biases, host_geom_biases, guest_geom_biases
-
-def write_docking_input(course_name, guest, host, docker_biases, geom_biases, workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
+def write_docking_input(course_name, guest, host, restraints_abs, workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
     inp_file_path = os.path.join(workdir, f"dock")
     title = f"ORCA DOCKER: Automated Docking Algorithm for\n # course: {course_name}\n # host: {host.name}\n # guest: {guest.name}"
 
     # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
     moleculeInfo = {"charge": host.charge, "multiplicity": host.multiplicity}
+    
+    docker_biases = []
+    geom_biases = []
+    for r in restraints_abs:
+        if r.property == "distance":
+            a_abs = r.sele[0].idx
+            b_abs = r.sele[1].idx
+            p = [s.parent for s in r.sele]
 
+            if set(p) == {"guest", "host"}:
+                # ensure guest first
+
+                if r.sele[0].parent == "host":
+                    a_abs, b_abs = b_abs, a_abs
+                a_rel = a_abs - host.n_atoms
+                docker_biases.append({
+                    "atoms": [a_rel,b_abs],
+                    "val": r.params.val,
+                    "tol": r.params.tol,
+                    "force": r.params.force
+                })
+            elif set(p) == {"host"}:
+                geom_biases.append({
+                    "atoms": [a_abs,b_abs],
+                    "val": r.params.val,
+                    "tol": r.params.tol,
+                })
+    
     docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": fixHost, "bias": docker_biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
     geom = None if not geom_biases else {"keep": geom_biases}
+
     # Use the updated XYZ file for optimization
     make_orca_input(orcaInput=inp_file_path,
                     title=title,
@@ -345,14 +365,14 @@ def run_docking(input, orcapath):
         with stdout_file.open("r", errors="ignore") as f:
             lines = f.readlines()
         for l in lines[-13:]:
-            print(l.rstrip())
+            logging.error(l.rstrip())
 
-def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, biases, course_key):
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, abs_restraints, course_key):
     course_name = course_key[0]
     # The following function splits mutli-xyz output of docker,
     # evaluates each result for satisfaction of constraints,
     # and writes only the correct outputs to separate single-xyz files
-    ok_results = extract_ok_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", host.n_atoms, biases, logger=logging)
+    ok_results = extract_ok_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", host.n_atoms, abs_restraints, logger=logging)
     results_map = {}
 
     c = 0
@@ -442,7 +462,7 @@ def expand_restraint(guest, host, restraint, course_name):
     for combo in itertools.product(*match_lists):
         atoms = []
         for (idx, name, flav), parent in zip(combo, parents):
-            atoms.append({"parent": parent, "idx": idx})
+            atoms.append(Selection(parent, idx))
 
         expanded.append({
             "property": restraint.property,
@@ -508,9 +528,6 @@ def expand_ingredient_and_restraint_combinations(course, host):
                 orig = expanded_restraint["orig"]
                 new_restraint = copy.deepcopy(orig)
                 new_restraint.sele = expanded_restraint["atoms"]
-                new_restraint.params.val = expanded_restraint["val"]
-                new_restraint.params.tol = expanded_restraint["tol"]
-                new_restraint.params.force = expanded_restraint["force"]
                 mashed_restraints.append(new_restraint)
 
             # Make new course copy and set host/guest to the concrete candidates and restraints
@@ -542,7 +559,7 @@ def main(args):
     # Copy config file to output directory for reproducibility / tracking
     shutil.copy(args.config, outdir)
     
-    logging.info(f"Cooking begins - recipe from {args.config}")
+    logging.info(f"Cooking begins - recipe from {os.path.abspath(args.config)}")
 
     # Results of previous course, carried over as starting point (HOST) of next docking step
     leftovers = []
@@ -591,13 +608,11 @@ def main(args):
                 break
 
             expanded_course, allOk = expand_ingredient_and_restraint_combinations(course, new_host_for_restraints_ing)
-            logging.info(f"""Expanded ingredient and restraint combinations for course {course.name} ({len(expanded_course)} combinations),
-                            keys: {list(expanded_course.keys())}""")
+            logging.info(f"""Expanded ingredient and restraint combinations for course {course.name} ({len(expanded_course)} combinations) have the following keys: {list(expanded_course.keys())}""")
             
             for course_key, course_desc in expanded_course.items():
                 try:
-                    logging.info(f"""
-                                Processing course: {course_key}""")
+                    logging.info(f"""Processing course: {course_key}""")
                     course_desc.host = new_host_for_docking_ing
                     curr_outdir = os.path.join(outdir, f"course{i}_{course_key[0]}", f"serving{j}")
                     waste_bucket = dock(curr_outdir, course_key, course_desc, orca)

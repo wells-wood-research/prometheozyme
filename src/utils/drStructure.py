@@ -7,7 +7,7 @@ import pandas as pd
 from pdbUtils import pdbUtils
 from typing import Tuple, Optional, Any
 
-from utils.drEval import evaluate_distance
+from utils.drEval import evaluate_distance, evaluate_angle
 
 ########################
 ## LOGGING
@@ -259,7 +259,7 @@ def parse_energy_comment(comment):
         if einter_match: einter = float(einter_match.group(1))
     return eopt, einter
 
-def extract_ok_docker_results(multi_xyz_path, n_atoms_host, biases, logger=None):
+def extract_ok_docker_results(multi_xyz_path, n_atoms_host, abs_restraints, logger=None):
     """
     - Split a multi-structure XYZ file.
     - Extract Eopt/Einter from the comment line.
@@ -278,16 +278,30 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, biases, logger=None)
         # TODO after optmisation there might be duplicated results - need to remove based on RMSD
         # use AMPAL? https://isambard-uob.github.io/ampal/ampal.html#ampal.base_ampal.BaseAmpal.rmsd
         allOk = True
-        for bias in biases:
-            [guestIdx, hostIdx] = bias.get("atoms", [0, 0])
-            val = bias.get("val", 0)
-            tol = bias.get("tol", 0.5)
-            distance = evaluate_distance(coords, guestIdx, hostIdx, n_atoms_host)
-            isOk = val - tol <= distance <= val + tol
-            logger.info(f"Distance between restrained atoms: {distance}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
-            if not isOk:
-                allOk = False
-                break
+        for r in abs_restraints:
+            if r.property == "distance":
+                a = int(r.sele[0].idx)
+                b = int(r.sele[1].idx)
+                val  = r.params.val
+                tol  = r.params.tol
+                dist = evaluate_distance(coords, a, b)
+                isOk = abs(dist - val) <= tol
+                logger.info(f"Distance between restrained atoms: {dist}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
+                if not isOk:
+                    allOk = False
+                    break
+            elif r.property == "angle":
+                a = int(r.sele[0].idx)
+                b = int(r.sele[1].idx)
+                c = int(r.sele[2].idx)
+                val  = r.params.val
+                tol  = r.params.tol
+                angle = evaluate_angle(coords, a, b, c)
+                isOk = abs(angle - val) <= tol
+                logger.info(f"Angle between restrained atoms: {angle}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
+                if not isOk:
+                    allOk = False
+                    break
         if not allOk:
             continue
 
