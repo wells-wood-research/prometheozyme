@@ -218,11 +218,12 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 
-def define_orca_params(orca, course_desc):
+def define_orca_params(orca, course_desc=None):
     # Define default ORCA settings
     default_orca_settings = {
         "orcapath": "./orca",
         "qmMethod_dock": "XTB2",
+        "qmMethod_opt": "XTB2",
         "strategy": "NORMAL",
         "optLevel": "sloppyopt",
         "nOpt": 5,
@@ -236,24 +237,67 @@ def define_orca_params(orca, course_desc):
     merged_orca_settings = {**default_orca_settings, **orca}
 
     # Check if this course defines specific ORCA overrides
-    course_orca_settings = course_desc.orcaSettings
-    if course_orca_settings:
-        # Only overwrite recognized keys
-        for key in default_orca_settings.keys():
-            if key in course_orca_settings:
-                merged_orca_settings[key] = course_orca_settings[key]
+    if course_desc:
+        course_orca_settings = course_desc.orcaSettings
+        if course_orca_settings:
+            # Only overwrite recognized keys
+            for key in default_orca_settings.keys():
+                if key in course_orca_settings:
+                    merged_orca_settings[key] = course_orca_settings[key]
 
     # Extract final ORCA parameters
-    orcapath   = merged_orca_settings["orcapath"]
-    qmMethod   = merged_orca_settings["qmMethod_dock"]
-    strategy   = merged_orca_settings["strategy"]
-    optLevel   = merged_orca_settings["optLevel"]
-    nOpt       = merged_orca_settings["nOpt"]
-    fixHost    = merged_orca_settings["fixHost"]
+    orcapath = merged_orca_settings["orcapath"]
+    qmMethod_dock = merged_orca_settings["qmMethod_dock"]
+    qmMethod_opt = merged_orca_settings["qmMethod_opt"]
+    strategy = merged_orca_settings["strategy"]
+    optLevel = merged_orca_settings["optLevel"]
+    nOpt = merged_orca_settings["nOpt"]
+    fixHost = merged_orca_settings["fixHost"]
     gridExtent = merged_orca_settings["gridExtent"]
-    nprocs     = merged_orca_settings["nprocs"]
+    nprocs = merged_orca_settings["nprocs"]
 
-    return orcapath, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
+    return orcapath, qmMethod_dock, qmMethod_opt, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
+
+def dock(outdir, course_key, course_desc, orca):
+    try:
+        orcapath, qmMethod_dock, qmMethod_opt, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs = define_orca_params(orca, course_desc)
+        
+        workdir = os.path.join(outdir, *course_key[1:])
+        os.makedirs(workdir, exist_ok=True)
+
+        host_n_atoms = course_desc.host.n_atoms
+        current_step_restraints = process_restraints_for_docking(course_desc.restraints, host_n_atoms)
+        abs_restraints = course_desc.host.restraints + current_step_restraints
+
+        inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
+            course_key[0], course_desc.guests[0], course_desc.host, current_step_restraints,
+            workdir, qmMethod_dock, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
+        )
+        logging.info(f"Docking input written at path: {inp_file_path}.inp")
+        logging.info(f"Running docking...")
+        result = run_orca(inp_file_path, orcapath, timeout=None)
+        logging.info(f"Docking complete. See details at path: {inp_file_path}.out")
+        if result != 0 :
+            logging.error(f"Docking returned status code {result}. Skip to next theozyme...")
+            return {} # TODO is this the right error handling?
+
+
+        results_map = process_docking_output(
+            inp_file_path, curr_charge, curr_multiplicity,
+            course_desc.guests[0], course_desc.host, abs_restraints, course_key
+        )
+        if not results_map:
+            logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
+            return {}
+        
+        return results_map
+
+    except subprocess.CalledProcessError as e:
+        logging.exception(f"Critical error during ORCA run: {e}")
+        return {}
+    except Exception as e:
+        logging.exception(f"Unexpected error in docking step: {e}")
+        return {}
 
 def process_restraints_for_docking(restraints, host_n_atoms):
     """
@@ -269,43 +313,6 @@ def process_restraints_for_docking(restraints, host_n_atoms):
         ]
         abs_restraints.append(r_new)
     return abs_restraints
-
-def dock(outdir, course_key, course_desc, orca):
-    try:
-        orcapath, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs = define_orca_params(orca, course_desc)
-        
-        workdir = os.path.join(outdir, *course_key[1:])
-        os.makedirs(workdir, exist_ok=True)
-
-        host_n_atoms = course_desc.host.n_atoms
-        current_step_restraints = process_restraints_for_docking(course_desc.restraints, host_n_atoms)
-        abs_restraints = course_desc.host.restraints + current_step_restraints
-
-        inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
-            course_key[0], course_desc.guests[0], course_desc.host, current_step_restraints,
-            workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
-        )
-        logging.info(f"Docking input written at path: {inp_file_path}.inp")
-        logging.info(f"Running docking...")
-        result = run_orca(inp_file_path, orcapath, timeout=None)
-        logging.info(f"Docking complete. See details at path: {inp_file_path}.out")
-
-
-        results_map = process_docking_output(
-            inp_file_path, curr_charge, curr_multiplicity,
-            course_desc.guests[0], course_desc.host, abs_restraints, course_key
-        )
-        if not results_map:
-            logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
-
-        return results_map
-
-    except subprocess.CalledProcessError as e:
-        logging.exception(f"Critical error during ORCA run: {e}")
-        return {}
-    except Exception as e:
-        logging.exception(f"Unexpected error in docking step: {e}")
-        return {}
 
 def write_docking_input(course_name, guest, host, restraints_abs, workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
     inp_file_path = os.path.join(workdir, f"dock")
@@ -358,8 +365,45 @@ def write_docking_input(course_name, guest, host, restraints_abs, workdir, qmMet
     # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
     return inp_file_path, calculate_charge([guest.charge, host.charge]), calculate_multiplicity([guest.multiplicity, host.multiplicity])
 
-def write_geom_opt_input(name, inp_file_path, ing, qmMethod, nprocs):
-    title = f"ORCA Geometry Optimisation\n # of {name}"
+def optimise(ing, orca):
+
+    # TODO separate dock and opt orca settings in config?
+    orcapath, _, qmMethod_opt, _, _, _, _, _, nprocs = define_orca_params(orca)
+
+    workdir = os.path.dirname(ing.pathXYZ)
+
+    # Prepare ORCA input
+    inp_file_path = os.path.join(workdir, "opt")
+    write_geom_opt_input(inp_file_path, ing, qmMethod_opt, nprocs)
+
+    logging.info(f"Optimisation input written: {inp_file_path}.inp")
+    result = run_orca(inp_file_path, orcapath, timeout=180) # TODO Put timeout in config
+    logging.info(f"Optimisation complete: {inp_file_path}.out")
+    if result != 0 :
+        logging.error(f"Optimisation returned status code {result}. Skip to next theozyme...")
+        return ing
+
+    # ORCA output (XYZ)
+    opt_pathXYZ = f"{inp_file_path}.xyz"
+    opt_pathPDB = opt_pathXYZ.replace(".xyz", ".pdb")
+    _, opt_comment, opt_df = xyz2df(opt_pathXYZ, logger=logging)
+    opt_coords = opt_df[["X", "Y", "Z"]].to_numpy()
+
+    allOk = evaluate_restraints(opt_coords, ing.restraints, logger=logging)
+
+    if allOk:
+        ing.pathXYZ = opt_pathXYZ
+        ing.df[["X", "Y", "Z"]] = opt_coords
+        new_eopt = float(opt_comment.split()[-1])
+        ing.eopt = new_eopt
+        df2pdb(df=ing.df, outPDB=opt_pathPDB, remarks=[f"Eopt= {ing.eopt} (Eh), Einter= {ing.einter} (kcal/mol)"], logger=logging)
+        ing.pathPDB = opt_pathPDB
+        return ing
+    else:
+        return None
+
+def write_geom_opt_input(inp_file_path, ing, qmMethod, nprocs):
+    title = f"ORCA Geometry Optimisation\n # of {ing.name}"
     moleculeInfo = {"charge": ing.charge, "multiplicity": ing.multiplicity}
 
     restraints_abs = ing.restraints
@@ -385,7 +429,7 @@ def write_geom_opt_input(name, inp_file_path, ing, qmMethod, nprocs):
                 "atoms": atoms,
                 "start": angle,
                 "end": r.params.val,
-                "iter": round(abs(angle - r.params.val)/10)
+                "iter": max(1, round(abs(angle - r.params.val)/10))
             })
 
     if geom_keep:
@@ -682,7 +726,15 @@ def main(args):
                     course_desc.host.restraints = new_host_for_docking_ing.restraints
                     curr_outdir = os.path.join(outdir, f"course{i}_{course_key[0]}", f"serving{j}")
                     waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
-                    [new_leftovers.append(waste_bucket[key]) for key in waste_bucket.keys() if key[:3] == course_key]
+                    optimised_waste_bucket = {}
+                    for key, ing in waste_bucket.items():
+                        opt_ing = optimise(ing, orca)
+                        if opt_ing:
+                            optimised_waste_bucket[key] = opt_ing
+                    if not optimised_waste_bucket:
+                        logging.warning(f"Failure during optimisation of course {course_key} - optimisation produced no usable results.")
+                    else:
+                        [new_leftovers.append(optimised_waste_bucket[key]) for key in optimised_waste_bucket.keys() if key[:3] == course_key]
                 except Exception as e:
                     logging.exception(f"Critical error in course {course_key}: {e}")
                     allOk = False
@@ -690,65 +742,33 @@ def main(args):
         leftovers = new_leftovers
         if len(leftovers) < 1:
             allOk = False
-            logging.warning(f"Critical failure during docking of course {course_key} - docking produced no usable results.")
+            logging.warning(f"Failure during docking of course {course_key} - docking and optimisation produced no usable results.")
             break
 
     # Sort by einter value (ascending)
     leftovers_sorted = sorted(leftovers, key=lambda x: x.einter)
 
-    # Create output directories
-    opt_dir = os.path.join(outdir, "optimisations")
-    os.makedirs(opt_dir, exist_ok=True)
+    # Create output directory
     results_dir = os.path.join(outdir, "results")
     os.makedirs(results_dir, exist_ok=True)
 
-    # Geometry optimisations; optimised structures that satisfied all restraints copied to results dir
+    logging.info("Successfully cooked the following theozymes:")
+
+    # Copy files with renamed names based on order
     for i, ing in enumerate(leftovers_sorted, start=1):
-
         new_name = f"result{i}"
-        curr_opt_dir = os.path.join(opt_dir, new_name)
-        os.makedirs(curr_opt_dir, exist_ok=True)
-
-        # Copy original files for reference/record
-        new_pathXYZ = os.path.join(curr_opt_dir, f"{new_name}.xyz")
-        new_pathPDB = new_pathXYZ.replace(".xyz", ".pdb")
-        shutil.copy(ing.pathXYZ, new_pathXYZ)
+        new_pathPDB = os.path.join(results_dir, f"{new_name}.pdb")
+        # Copy and rename files
         shutil.copy(ing.pathPDB, new_pathPDB)
-
-        # Prepare ORCA input
-        inp_file_path = os.path.join(curr_opt_dir, "opt")
-        write_geom_opt_input(new_name, inp_file_path, ing,
-                            orca["qmMethod_opt"], orca["nprocs"])
-
-        logging.info(f"Optimisation input written: {inp_file_path}.inp")
-        result = run_orca(inp_file_path, orca.get("orcapath", "./orca"), timeout=180)
-        logging.info(f"Optimisation complete: {inp_file_path}.out")
-
-        if result != 0 :
-            logging.error(f"Optimisation returned status code {result}. Skip to next theozyme...")
-            continue
-
-        # ORCA output (XYZ)
-        opt_pathXYZ = f"{inp_file_path}.xyz"
-        _, opt_comment, opt_df = xyz2df(opt_pathXYZ, logger=logging)
-        opt_coords = opt_df[["X", "Y", "Z"]].to_numpy()
-
-        allOk = evaluate_restraints(opt_coords, ing.restraints, logger=logging)
-
-        if allOk:
-            org_df = pdb2df(new_pathPDB)
-            org_df[["X", "Y", "Z"]] = opt_coords
-            new_eopt = float(opt_comment.split()[-1])
-            ing.eopt = new_eopt
-            out_pdb = os.path.join(results_dir, f"{new_name}.pdb")
-            df2pdb(df=org_df, outPDB=out_pdb, remarks=[f"Eopt= {ing.eopt} (Eh), Einter= {ing.einter} (kcal/mol)"], logger=logging)
-            logging.info(f"path: {out_pdb}, eopt={ing.eopt}, einter={ing.einter}")
-        else:
-            logging.debug(f"Theozyme at path: {opt_pathXYZ} failed final optimisation.")
+        # Log the results
+        logging.info(
+            f"path: {new_pathPDB}, eopt: {ing.eopt} (Eh), einter: {ing.einter} (kcal/mol)"
+        )
 
     # Merge into one multi-frame PDB file for easier analysis
     result_paths = [os.path.join(results_dir, x) for x in os.listdir(results_dir) if x.lower().endswith(".pdb")]
     write_multi_pdb(result_paths, os.path.join(results_dir, "merged.pdb"))
+
 
     if allOk:
         logging.info("""

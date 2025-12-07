@@ -430,3 +430,6 @@ courses:
 #           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # 
 # Making redundant internal coordinates   ... (2022 redundants).... [file orca_tools/Tool-Misc/qcredint.cpp, line 6411]: Error (ORCA_QCREDINT): For a linear bend you can only keep the initial value of your structure as constraint!!!
+# Options: use COPT (or coordsys cartesian in %geom)
+# Optimise per step
+# Maximum number of scan parameters is 3, cannot do 2 angles and 2 bonds
