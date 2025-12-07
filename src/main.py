@@ -287,7 +287,7 @@ def dock(outdir, course_key, course_desc, orca):
         )
         logging.info(f"Docking input written at path: {inp_file_path}.inp")
         logging.info(f"Running docking...")
-        result = run_orca(inp_file_path, orcapath)
+        result = run_orca(inp_file_path, orcapath, timeout=None)
         logging.info(f"Docking complete. See details at path: {inp_file_path}.out")
 
 
@@ -402,7 +402,7 @@ def write_geom_opt_input(name, inp_file_path, ing, qmMethod, nprocs):
                     parallelize=nprocs,
                     geom=geom)
 
-def run_orca(input, orcapath):
+def run_orca(input, orcapath, timeout):
     stdout_file = Path(f"{input}.out")
     stderr_file = Path(f"{input}.err")
 
@@ -411,27 +411,23 @@ def run_orca(input, orcapath):
             # IMPORTANT: remove check=True
             result = subprocess.run(
                 [orcapath, f"{input}.inp"],
-                check=False,   # <-- Fix
+                check=False,
+                timeout=timeout,
                 stdout=out,
                 stderr=err
             )
+    except subprocess.TimeoutExpired:
+        logging.error(f"Process exceeded {timeout} seconds and was terminated.")
+        return 1
 
     except Exception as e:
         # This handles only unexpected exceptions (file IO issues, etc.)
         logging.error(f"Unexpected exception during ORCA run: {e}")
+        with stdout_file.open("r", errors="ignore") as f:
+            lines = f.readlines()
+        for line in lines[-13:]:
+            logging.error(line.rstrip())
         return 1
-
-    # ORCA failed → print last 13 lines
-    if result.returncode != 0:
-        logging.error(f"ORCA returned non-zero exit code {result.returncode}")
-
-        if stdout_file.exists():
-            with stdout_file.open("r", errors="ignore") as f:
-                lines = f.readlines()
-            for line in lines[-13:]:
-                logging.error(line.rstrip())
-        else:
-            logging.error("stdout file missing; nothing to print.")
 
     return result.returncode
 
@@ -725,7 +721,7 @@ def main(args):
                             orca["qmMethod_opt"], orca["nprocs"])
 
         logging.info(f"Optimisation input written: {inp_file_path}.inp")
-        result = run_orca(inp_file_path, orca.get("orcapath", "./orca"))
+        result = run_orca(inp_file_path, orca.get("orcapath", "./orca"), timeout=180)
         logging.info(f"Optimisation complete: {inp_file_path}.out")
 
         if result != 0 :
