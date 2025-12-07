@@ -377,8 +377,8 @@ courses:
             - parent: host
               idx: deprot
           parameters:
-            val: 180 # optimal angle between restrained atoms (units: degrees)
-            tol: 100 # docker results within val +/- tol are accepted as correct starting points for next docking
+            val: 179.9 # optimal angle between restrained atoms (units: degrees)
+            tol: 10 # docker results within val +/- tol are accepted as correct starting points for next docking
             force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
       orcaSettings:
         nOpt: 2
@@ -408,8 +408,8 @@ courses:
             - parent: host
               idx: electrophile
           parameters:
-            val: 180 # optimal angle between restrained atoms (units: degrees)
-            tol: 100 # docker results within val +/- tol are accepted as correct starting points for next docking
+            val: 179.9 # optimal angle between restrained atoms (units: degrees)
+            tol: 10 # docker results within val +/- tol are accepted as correct starting points for next docking
             force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
       orcaSettings:
         nOpt: 5
@@ -421,3 +421,12 @@ courses:
 # TODO source of each individual final result is unknown because of renaming based on einter - write as REMARKs metadata information?
 # TODO add a slightly greasy polarisable medium (mimics protein environment) so lack of H-bonds isn't penalised so much
 # TODO clearer error messaging - the errors are there, but tend to be hidden by the code that comes next
+
+# TODO deal with this geom opt issue:
+# 
+#           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#           !   SERIOUS PROBLEM WITH INTERNALS - ANGLE IS APPROACHING 180 OR 0 DEGREES   !
+#           !                       REBUILDING A NEW SET OF INTERNALS                    !
+#           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# 
+# Making redundant internal coordinates   ... (2022 redundants).... [file orca_tools/Tool-Misc/qcredint.cpp, line 6411]: Error (ORCA_QCREDINT): For a linear bend you can only keep the initial value of your structure as constraint!!!

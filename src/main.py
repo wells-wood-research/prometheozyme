@@ -9,6 +9,7 @@ import itertools
 import copy
 import string
 import uuid
+from pathlib import Path
 
 from utils.drThing import Ingredient, Restraint, Course, Selection, col_order, col_types, _abs_index
 from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb, evaluate_restraints, read_xyz, evaluate_angle
@@ -286,7 +287,7 @@ def dock(outdir, course_key, course_desc, orca):
         )
         logging.info(f"Docking input written at path: {inp_file_path}.inp")
         logging.info(f"Running docking...")
-        run_orca(inp_file_path, orcapath)
+        result = run_orca(inp_file_path, orcapath)
         logging.info(f"Docking complete. See details at path: {inp_file_path}.out")
 
 
@@ -402,18 +403,37 @@ def write_geom_opt_input(name, inp_file_path, ing, qmMethod, nprocs):
                     geom=geom)
 
 def run_orca(input, orcapath):
-    stdout_file = f"{input}.out"
-    stderr_file = f"{input}.err"
-    with open(stdout_file, "w") as out, open(stderr_file, "w") as err:
-        result = subprocess.run([orcapath, f"{input}.inp"], check=True, stdout=out, stderr=err)
-    
+    stdout_file = Path(f"{input}.out")
+    stderr_file = Path(f"{input}.err")
+
+    try:
+        with stdout_file.open("w") as out, stderr_file.open("w") as err:
+            # IMPORTANT: remove check=True
+            result = subprocess.run(
+                [orcapath, f"{input}.inp"],
+                check=False,   # <-- Fix
+                stdout=out,
+                stderr=err
+            )
+
+    except Exception as e:
+        # This handles only unexpected exceptions (file IO issues, etc.)
+        logging.error(f"Unexpected exception during ORCA run: {e}")
+        return 1
+
+    # ORCA failed → print last 13 lines
     if result.returncode != 0:
-        with stdout_file.open("r", errors="ignore") as f:
-            lines = f.readlines()
-        for l in lines[-13:]:
-            logging.error(l.rstrip())
+        logging.error(f"ORCA returned non-zero exit code {result.returncode}")
 
+        if stdout_file.exists():
+            with stdout_file.open("r", errors="ignore") as f:
+                lines = f.readlines()
+            for line in lines[-13:]:
+                logging.error(line.rstrip())
+        else:
+            logging.error("stdout file missing; nothing to print.")
 
+    return result.returncode
 
 def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, abs_restraints, course_key):
     course_name = course_key[0]
@@ -705,8 +725,12 @@ def main(args):
                             orca["qmMethod_opt"], orca["nprocs"])
 
         logging.info(f"Optimisation input written: {inp_file_path}.inp")
-        run_orca(inp_file_path, orca.get("orcapath", "./orca"))
+        result = run_orca(inp_file_path, orca.get("orcapath", "./orca"))
         logging.info(f"Optimisation complete: {inp_file_path}.out")
+
+        if result != 0 :
+            logging.error(f"Optimisation returned status code {result}. Skip to next theozyme...")
+            continue
 
         # ORCA output (XYZ)
         opt_pathXYZ = f"{inp_file_path}.xyz"
