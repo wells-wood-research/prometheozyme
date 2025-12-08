@@ -267,7 +267,7 @@ def dock(outdir, course_key, course_desc, orca):
 
         host_n_atoms = course_desc.host.n_atoms
         current_step_restraints = process_restraints_for_docking(course_desc.restraints, host_n_atoms)
-        abs_restraints = course_desc.host.restraints + current_step_restraints
+        restraints_abs = course_desc.host.restraints + current_step_restraints
 
         inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
             course_key[0], course_desc.guests[0], course_desc.host, current_step_restraints,
@@ -284,7 +284,7 @@ def dock(outdir, course_key, course_desc, orca):
 
         results_map = process_docking_output(
             inp_file_path, curr_charge, curr_multiplicity,
-            course_desc.guests[0], course_desc.host, abs_restraints, course_key
+            course_desc.guests[0], course_desc.host, restraints_abs, course_key
         )
         if not results_map:
             logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
@@ -304,15 +304,15 @@ def process_restraints_for_docking(restraints, host_n_atoms):
     Input:  list of Restraint objects with parent='host'/'guest', idx still guest-local.
     Output: list of Restraint objects with absolute indices.
     """
-    abs_restraints = []
+    restraints_abs = []
     for r in restraints:
         r_new = copy.deepcopy(r)
         r_new.sele = [
             Selection(s.parent, _abs_index(s, host_n_atoms))
             for s in r.sele
         ]
-        abs_restraints.append(r_new)
-    return abs_restraints
+        restraints_abs.append(r_new)
+    return restraints_abs
 
 def write_docking_input(course_name, guest, host, restraints_abs, workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
     inp_file_path = os.path.join(workdir, f"dock")
@@ -364,6 +364,59 @@ def write_docking_input(course_name, guest, host, restraints_abs, workdir, qmMet
     
     # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
     return inp_file_path, calculate_charge([guest.charge, host.charge]), calculate_multiplicity([guest.multiplicity, host.multiplicity])
+
+def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, restraints_abs, course_key):
+    course_name = course_key[0]
+    # The following function splits mutli-xyz output of docker,
+    # evaluates each result for satisfaction of constraints,
+    # and writes only the correct outputs to separate single-xyz files
+    ok_results = extract_ok_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", host.n_atoms, restraints_abs, logger=logging)
+    results_map = {}
+
+    c = 0
+    for result in ok_results:
+        (pathXYZ, eopt, einter, df) = result
+        new_pathXYZ = os.path.join(os.path.dirname(pathXYZ), f"serving{c}", "host.xyz")
+        os.makedirs(os.path.dirname(new_pathXYZ), exist_ok=True)
+        shutil.move(pathXYZ, new_pathXYZ)
+        # Edit df to assign ingredient names to atoms
+        df[["FLAVOUR", "ING", "DISH"]] = None, None, None
+        n_host, n_guest = host.n_atoms, guest.n_atoms
+
+        for col in ["ATOM", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "FLAVOUR", "ING"]:
+            df.loc[:n_host - 1, col] = host.df[col].values
+            df.loc[n_host:n_host + n_guest - 1, col] = guest.df[col].values
+        # reindex residues and atoms in guest to continue the same chain
+        df.loc[0:n_host + n_guest - 1, "ATOM_ID"] = range(1, n_host+n_guest+1)
+        df.loc[n_host:n_host + n_guest - 1, "RES_ID"] = host.df["RES_ID"].max() + 1
+        # transfer dish labels
+        df.loc[:n_host - 1, "DISH"] = host.df["DISH"].values
+        df.loc[n_host:n_host + n_guest - 1, "DISH"] = course_name
+        # cast column types and order
+        df = df[col_order].astype(col_types)
+        logging.verbose( f"Result of this docking step:\n{df}")
+
+        # Save PDB
+        df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
+        new_pathPDB = new_pathXYZ.replace(".xyz", ".pdb")
+        df2pdb(df=df_to_save, outPDB=new_pathPDB, remarks=[f"Eopt= {eopt} (Eh), Einter= {einter} (kcal/mol)"], logger=logging)
+        logging.info(f"Saved result to {new_pathPDB}")
+        
+        new_course_key = course_key + (str(c), )
+        product_obj = Ingredient(
+            pathPDB=new_pathPDB,
+            pathXYZ=new_pathXYZ,
+            name=f"result of {new_course_key}",
+            eopt=eopt,
+            einter=einter,
+            charge=curr_charge,
+            multiplicity=curr_multiplicity,
+            df=df,
+            restraints=restraints_abs
+        )
+        results_map[new_course_key] = product_obj
+        c+=1
+    return results_map
 
 def optimise(ing, orca):
 
@@ -474,59 +527,6 @@ def run_orca(input, orcapath, timeout):
         return 1
 
     return result.returncode
-
-def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, abs_restraints, course_key):
-    course_name = course_key[0]
-    # The following function splits mutli-xyz output of docker,
-    # evaluates each result for satisfaction of constraints,
-    # and writes only the correct outputs to separate single-xyz files
-    ok_results = extract_ok_docker_results(f"{inp_file_path}.docker.struc1.all.optimized.xyz", host.n_atoms, abs_restraints, logger=logging)
-    results_map = {}
-
-    c = 0
-    for result in ok_results:
-        (pathXYZ, eopt, einter, df) = result
-        new_pathXYZ = os.path.join(os.path.dirname(pathXYZ), f"serving{c}", "host.xyz")
-        os.makedirs(os.path.dirname(new_pathXYZ), exist_ok=True)
-        shutil.move(pathXYZ, new_pathXYZ)
-        # Edit df to assign ingredient names to atoms
-        df[["FLAVOUR", "ING", "DISH"]] = None, None, None
-        n_host, n_guest = host.n_atoms, guest.n_atoms
-
-        for col in ["ATOM", "ATOM_NAME", "RES_NAME", "CHAIN_ID", "RES_ID", "OCCUPANCY", "BETAFACTOR", "ELEMENT", "FLAVOUR", "ING"]:
-            df.loc[:n_host - 1, col] = host.df[col].values
-            df.loc[n_host:n_host + n_guest - 1, col] = guest.df[col].values
-        # reindex residues and atoms in guest to continue the same chain
-        df.loc[0:n_host + n_guest - 1, "ATOM_ID"] = range(1, n_host+n_guest+1)
-        df.loc[n_host:n_host + n_guest - 1, "RES_ID"] = host.df["RES_ID"].max() + 1
-        # transfer dish labels
-        df.loc[:n_host - 1, "DISH"] = host.df["DISH"].values
-        df.loc[n_host:n_host + n_guest - 1, "DISH"] = course_name
-        # cast column types and order
-        df = df[col_order].astype(col_types)
-        logging.verbose( f"Result of this docking step:\n{df}")
-
-        # Save PDB
-        df_to_save = df.loc[:, ~df.columns.isin(["FLAVOUR", "ING", "DISH"])]
-        new_pathPDB = new_pathXYZ.replace(".xyz", ".pdb")
-        df2pdb(df=df_to_save, outPDB=new_pathPDB, remarks=[f"Eopt= {eopt} (Eh), Einter= {einter} (kcal/mol)"], logger=logging)
-        logging.info(f"Saved result to {new_pathPDB}")
-        
-        new_course_key = course_key + (str(c), )
-        product_obj = Ingredient(
-            pathPDB=new_pathPDB,
-            pathXYZ=new_pathXYZ,
-            name=f"result of {new_course_key}",
-            eopt=eopt,
-            einter=einter,
-            charge=curr_charge,
-            multiplicity=curr_multiplicity,
-            df=df,
-            restraints=abs_restraints
-        )
-        results_map[new_course_key] = product_obj
-        c+=1
-    return results_map
 
 ########################
 ## RESTRAINTS
