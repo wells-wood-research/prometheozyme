@@ -308,11 +308,6 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, restraints_abs, logg
         # TODO after optmisation there might be duplicated results - need to remove based on RMSD
         # use AMPAL? https://isambard-uob.github.io/ampal/ampal.html#ampal.base_ampal.BaseAmpal.rmsd
 
-        # remove angle restraints from docker evaluation -- too many fail since it can't be constrained
-        allOk = evaluate_restraints(coords, [restr for restr in restraints_abs if restr.property == "distance"], logger=logger)
-        if not allOk:
-            continue
-
         # --- Parse energies using regex ---
         eopt = einter = None
         if comment:

@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 
 from utils.drThing import Ingredient, Restraint, Course, Selection, col_order, col_types, _abs_index
-from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb, evaluate_restraints, read_xyz, evaluate_angle
+from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb, evaluate_restraints, read_xyz, evaluate_angle, evaluate_distance
 from utils.drOrca import make_orca_input
 
 ########################
@@ -112,7 +112,8 @@ def setup_ingredients(config):
     # Create 'Course' objects
     courses = {}
     for course in courses_cfg:
-        if course['name'] == 'init':
+        course_name = course.get("name", str(uuid.uuid4()))
+        if course_name == 'init':
             # At any given time course.host is a single value describing name of a course to take guests from for docking restraints
             # Or the one currently considered host, however keep name as plural for underlying idea
             host_candidate = None
@@ -136,7 +137,8 @@ def setup_ingredients(config):
                 restraint = Restraint(
                     property=restraint_property,
                     sele=restraint_selection,
-                    params=restraint_params
+                    params=restraint_params,
+                    step=course_name
                 )
                 if restraint.property is None or restraint.sele is None or restraint.params is None:
                     logging.warning(f"No property, atom selection or restraint parameters defined for course {course['name']} restraints. Fix or remove the restraints block from config file.")
@@ -146,7 +148,7 @@ def setup_ingredients(config):
         
         # Create Course object
         course_obj = Course(
-            name=course.get("name", str(uuid.uuid4())),
+            name=course_name,
             host=host_candidate,
             guests=guest_candidates,
             restraints=restraints,
@@ -418,7 +420,7 @@ def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest,
         c+=1
     return results_map
 
-def optimise(ing, orca):
+def optimise(ing, orca, course_name):
 
     # TODO separate dock and opt orca settings in config?
     orcapath, _, qmMethod_opt, _, _, _, _, _, nprocs = define_orca_params(orca)
@@ -427,63 +429,90 @@ def optimise(ing, orca):
 
     # Prepare ORCA input
     inp_file_path = os.path.join(workdir, "opt")
-    write_geom_opt_input(inp_file_path, ing, qmMethod_opt, nprocs)
+    opt_pathXYZ = f"{inp_file_path}.xyz"
+    write_geom_opt_input(inp_file_path, ing, qmMethod_opt, nprocs, course_name)
 
     logging.info(f"Optimisation input written: {inp_file_path}.inp")
     result = run_orca(inp_file_path, orcapath, timeout=180) # TODO Put timeout in config
     logging.info(f"Optimisation complete: {inp_file_path}.out")
-    if result != 0 :
+    if result == 25: # issue with internal coordinates breaking when angle approaches linear
+        # check if opt.xyz exists - if yes, use, and maybe even proceed
+        logging.info("Optimisation failed due to issues with ORCA internal coordinates as the angle approaches linearity. Evaluating outputs for usability.")
+        if os.path.exists(opt_pathXYZ):
+            opt_ing = process_optimisation_output(opt_pathXYZ, ing)
+            if opt_ing:
+                return opt_ing
+        
+        # Rerun with COPT (in cartesian coordinates) - but then can't restrain anything
+        logging.info(f"Retrying optimisation in Cartesian coordinates")
+        inp_file_path = os.path.join(workdir, "copt")
+        title = f"ORCA Geometry Optimisation\n # of {ing.name}"
+        moleculeInfo = {"charge": ing.charge, "multiplicity": ing.multiplicity}
+        make_orca_input(orcaInput=inp_file_path,
+            title=title,
+            simpleInputLine=[qmMethod_opt, "COPT"],
+            inputFormat="xyzfile",
+            inputFile=ing.pathXYZ,
+            moleculeInfo=moleculeInfo,
+            parallelize=nprocs,
+            geom=None)
+        logging.info(f"Cartesian optimisation input written: {inp_file_path}.inp")
+        result = run_orca(inp_file_path, orcapath, timeout=300) # TODO Put timeout in config
+        logging.info(f"Cartesian optimisation complete: {inp_file_path}.out")
+        if result == 0:
+            opt_pathXYZ = f"{inp_file_path}.xyz"
+            if os.path.exists(opt_pathXYZ):
+                opt_ing = process_optimisation_output(opt_pathXYZ, ing)
+                if opt_ing:
+                    return opt_ing
+        else:
+            logging.error(f"Optimisation returned status code {result}. Skip to next theozyme...")
+            return None
+
+    elif result != 0 :
         logging.error(f"Optimisation returned status code {result}. Skip to next theozyme...")
         return None
-
-    # ORCA output (XYZ)
-    opt_pathXYZ = f"{inp_file_path}.xyz"
-    opt_pathPDB = opt_pathXYZ.replace(".xyz", ".pdb")
-    _, opt_comment, opt_df = xyz2df(opt_pathXYZ, logger=logging)
-    opt_coords = opt_df[["X", "Y", "Z"]].to_numpy()
-
-    allOk = evaluate_restraints(opt_coords, ing.restraints, logger=logging)
-
-    if allOk:
-        ing.pathXYZ = opt_pathXYZ
-        ing.df[["X", "Y", "Z"]] = opt_coords
-        new_eopt = float(opt_comment.split()[-1])
-        ing.eopt = new_eopt
-        df2pdb(df=ing.df, outPDB=opt_pathPDB, remarks=[f"Eopt= {ing.eopt} (Eh), Einter= {ing.einter} (kcal/mol)"], logger=logging)
-        ing.pathPDB = opt_pathPDB
-        return ing
     else:
-        return None
+        return process_optimisation_output(opt_pathXYZ, ing)
 
-def write_geom_opt_input(inp_file_path, ing, qmMethod, nprocs):
+def write_geom_opt_input(inp_file_path, ing, qmMethod, nprocs, course_name):
     title = f"ORCA Geometry Optimisation\n # of {ing.name}"
     moleculeInfo = {"charge": ing.charge, "multiplicity": ing.multiplicity}
 
-    restraints_abs = ing.restraints
+    restraints_abs = ing.restraints # TODO what happens if there's no restraints?
+    curr_restraints = [r for r in restraints_abs if r.step == course_name]
+    prev_restraints = [r for r in restraints_abs if r.step != course_name]
+
     geom_keep = []
     geom_scan = []
     geom = {}
-    for r in restraints_abs:
-        atoms = [s.idx for s in r.sele]
-        if r.property == "distance":
-            geom_keep.append({
-                "atoms": atoms,
-                "val": r.params.val,
-                "tol": r.params.tol,
-            })
-        elif r.property == "angle":
-            # Need to get current angle and scan ("For a linear bend you can only keep the initial value of your structure as constraint!!!")
-            coords = ing.df[["X", "Y", "Z"]].to_numpy()
-            a = int(r.sele[0].idx)
-            b = int(r.sele[1].idx)
-            c = int(r.sele[2].idx)
-            angle = evaluate_angle(coords, a, b, c)
-            geom_scan.append({
-                "atoms": atoms,
-                "start": angle,
-                "end": r.params.val,
-                "iter": max(1, round(abs(angle - r.params.val)/10))
-            })
+
+    coords = ing.df[["X", "Y", "Z"]].to_numpy()
+
+    # Previous restraints: simple KEEP
+    for rp in prev_restraints:
+        geom_keep.append({
+            "atoms": [s.idx for s in rp.sele],
+            "val": rp.params.val
+        })
+
+    # Current restraints: SCAN
+    for rc in curr_restraints:
+        atoms = [int(s.idx) for s in rc.sele]
+
+        if rc.property == "distance":
+            start_val = evaluate_distance(coords, atoms[0], atoms[1])
+        elif rc.property == "angle":
+            start_val = evaluate_angle(coords, atoms[0], atoms[1], atoms[2])
+        else:
+            raise ValueError(f"Unknown restraint property: {rc.property}")
+
+        geom_scan.append({
+            "atoms": atoms,
+            "start": start_val,
+            "end": rc.params.val,
+            "iter": max(1, round(abs(start_val - rc.params.val) / 10))
+        })
 
     if geom_keep:
         geom["keep"] = geom_keep
@@ -498,6 +527,32 @@ def write_geom_opt_input(inp_file_path, ing, qmMethod, nprocs):
                     moleculeInfo=moleculeInfo,
                     parallelize=nprocs,
                     geom=geom)
+    
+def process_optimisation_output(pathXYZ, ing):
+    # Load XYZ → validate restraints → update ing → write PDB → return ing
+    pathPDB = pathXYZ.replace(".xyz", ".pdb")
+
+    if not os.path.exists(pathXYZ):
+        return None
+
+    _, opt_comment, opt_df = xyz2df(pathXYZ, logger=logging)
+    coords = opt_df[["X", "Y", "Z"]].to_numpy()
+
+    if not evaluate_restraints(coords, ing.restraints, logger=logging):
+        return None
+
+    ing.pathXYZ = pathXYZ
+    ing.df[["X", "Y", "Z"]] = coords
+    ing.eopt = float(opt_comment.split()[-1])
+    update_restraint_values(ing.restraints, coords)
+    df2pdb(
+        df=ing.df,
+        outPDB=pathPDB,
+        remarks=[f"Eopt= {ing.eopt} (Eh), Einter= {ing.einter} (kcal/mol)"],
+        logger=logging
+    )
+    ing.pathPDB = pathPDB
+    return ing
 
 def run_orca(input, orcapath, timeout):
     stdout_file = Path(f"{input}.out")
@@ -531,6 +586,19 @@ def run_orca(input, orcapath, timeout):
 ########################
 ## RESTRAINTS
 ########################
+
+def update_restraint_values(restraints, coords):
+    """Update restraint target values using the optimised coordinates."""
+    for r in restraints:
+        atoms = [s.idx for s in r.sele]
+        if r.property == "distance":
+            new_val = evaluate_distance(coords, atoms[0], atoms[1])
+        elif r.property == "angle":
+            new_val = evaluate_angle(coords, atoms[0], atoms[1], atoms[2])
+        else:
+            logging.warning(f"Unknown restraint type: {r.property}")
+            continue
+        r.params.val = new_val
 
 def assign_restraint_idx(guest, host, restraint, course_name):
     def _flavour_to_idx(parent, idx_ref):
@@ -728,7 +796,8 @@ def main(args):
                     waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
                     optimised_waste_bucket = {}
                     for key, ing in waste_bucket.items():
-                        opt_ing = optimise(ing, orca)
+                        ing_copy = copy.deepcopy(ing)
+                        opt_ing = optimise(ing_copy, orca, course_desc.name)
                         if opt_ing:
                             optimised_waste_bucket[key] = opt_ing
                     if not optimised_waste_bucket:

@@ -377,8 +377,8 @@ courses:
             - parent: host
               idx: deprot
           parameters:
-            val: 179.9 # optimal angle between restrained atoms (units: degrees)
-            tol: 10 # docker results within val +/- tol are accepted as correct starting points for next docking
+            val: 180.0 # optimal angle between restrained atoms (units: degrees)
+            tol: 15 # docker results within val +/- tol are accepted as correct starting points for next docking
             force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
       orcaSettings:
         nOpt: 2
@@ -408,8 +408,8 @@ courses:
             - parent: host
               idx: electrophile
           parameters:
-            val: 179.9 # optimal angle between restrained atoms (units: degrees)
-            tol: 10 # docker results within val +/- tol are accepted as correct starting points for next docking
+            val: 180.5 # optimal angle between restrained atoms (units: degrees)
+            tol: 15 # docker results within val +/- tol are accepted as correct starting points for next docking
             force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
       orcaSettings:
         nOpt: 5

@@ -95,11 +95,13 @@ class Restraint:
         self,
         property: str,
         sele: List[Selection],
-        params: Params
+        params: Params,
+        step: str
     ) -> None:
         self.property: str = property
         self.sele: List[Selection] = [Selection.from_dict(a) for a in sele]
         self.params: Params = Params.from_dict(params)
+        self.step: str = step
     def __str__(self):
         sele_str = ", ".join(str(s) for s in self.sele)
         return (
