@@ -381,7 +381,7 @@ def optimise(ing, orca):
     logging.info(f"Optimisation complete: {inp_file_path}.out")
     if result != 0 :
         logging.error(f"Optimisation returned status code {result}. Skip to next theozyme...")
-        return ing
+        return None
 
     # ORCA output (XYZ)
     opt_pathXYZ = f"{inp_file_path}.xyz"
