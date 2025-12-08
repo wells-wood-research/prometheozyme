@@ -874,7 +874,7 @@ def main(args):
 
     # Merge into one multi-frame PDB file for easier analysis
     specials_paths = [os.path.join(specials_dir, x) for x in os.listdir(specials_dir) if x.lower().endswith(".pdb")]
-    write_multi_pdb(specials_paths, os.path.join(results_dir, "merged.pdb"))
+    write_multi_pdb(specials_paths, os.path.join(specials_dir, "merged.pdb"))
 
     if allOk:
         logging.info("""
