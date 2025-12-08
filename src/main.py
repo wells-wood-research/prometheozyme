@@ -379,6 +379,12 @@ def optimise(ing, orca):
     logging.info(f"Optimisation input written: {inp_file_path}.inp")
     result = run_orca(inp_file_path, orcapath, timeout=180) # TODO Put timeout in config
     logging.info(f"Optimisation complete: {inp_file_path}.out")
+    if result == 25: # TODO not 100% sure if this is the correct code for SERIOUS PROBLEM WITH INTERNALS - ANGLE IS APPROACHING 180 OR 0 DEGREES
+        with open(inp_file_path, 'r') as f:
+            lines = f.readlines()
+        copt_lines = ["!COPT\n" if line.strip().upper() == "!OPT" else line for line in lines]
+        with open(inp_file_path, 'w') as out_file:
+            out_file.writelines(copt_lines)
     if result != 0 :
         logging.error(f"Optimisation returned status code {result}. Skip to next theozyme...")
         return None
