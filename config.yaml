@@ -433,3 +433,5 @@ courses:
 # Options: use COPT (or coordsys cartesian in %geom)
 # Optimise per step
 # Maximum number of scan parameters is 3, cannot do 2 angles and 2 bonds
+# TODO ^ only optimise the restraints per this course, since host is frozen; keep previous geoms in keep but scan all new restrains; this way only the new restraints per host are limited to 3
+# TODO unfinished opts get copied - see last example, results should be 4 but there's 6
