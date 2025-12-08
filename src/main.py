@@ -491,9 +491,14 @@ def write_geom_opt_input(inp_file_path, ing, qmMethod, nprocs, course_name):
 
     # Previous restraints: simple KEEP
     for rp in prev_restraints:
+        atoms = [int(s.idx) for s in rp.sele]
+        if rp.property == "angle":
+            val = evaluate_angle(coords, atoms[0], atoms[1], atoms[2])
+        else:
+            val = rp.params.val
         geom_keep.append({
-            "atoms": [s.idx for s in rp.sele],
-            "val": rp.params.val
+            "atoms": atoms,
+            "val": val
         })
 
     # Current restraints: SCAN
@@ -544,7 +549,6 @@ def process_optimisation_output(pathXYZ, ing):
     ing.pathXYZ = pathXYZ
     ing.df[["X", "Y", "Z"]] = coords
     ing.eopt = float(opt_comment.split()[-1])
-    update_restraint_values(ing.restraints, coords)
     df2pdb(
         df=ing.df,
         outPDB=pathPDB,
