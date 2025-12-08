@@ -10,6 +10,7 @@ import copy
 import string
 import uuid
 from pathlib import Path
+import rmsd
 
 from utils.drThing import Ingredient, Restraint, Course, Selection, col_order, col_types, _abs_index
 from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb, evaluate_restraints, read_xyz, evaluate_angle, evaluate_distance
@@ -31,6 +32,7 @@ def setup_config(configPath):
     misc = config.get("misc", {})
     workdir = misc.get("workdir", ".")
     verbosity = misc.get("verbosity", ".")
+    rmsd_threshold = misc.get("rmsd", 2.0)
 
     # Get orca docker parameters
     orca = config.get("orca", {})
@@ -40,7 +42,7 @@ def setup_config(configPath):
     outdir = os.path.join(workdir, f"output_{timestamp}")
     os.makedirs(outdir, exist_ok=True)
 
-    return config, outdir, orca, verbosity
+    return config, outdir, orca, verbosity, rmsd_threshold
 
 def setup_logging(workdir, verbosity="info"):
     # Define a custom logging level called VERBOSE
@@ -163,13 +165,13 @@ def setup_ingredients(config):
 
 def setup(configPath):
     allOk = True
-    config, outdir, orca, verbosity = setup_config(configPath)
+    config, outdir, orca, verbosity, rmsd_threshold = setup_config(configPath)
     setup_logging(outdir, verbosity)
     # Prepare ingredients and courses from the configuration    
     courses, ingredients, is_step_ok = setup_ingredients(config)
     if not is_step_ok:
         allOk = False
-    return outdir, orca, courses, ingredients, allOk
+    return outdir, rmsd_threshold, orca, courses, ingredients, allOk
 
 ########################
 ## HELPER FUNCTIONS
@@ -735,7 +737,7 @@ def expand_ingredient_and_restraint_combinations(course, host):
 def main(args):
     allOk = True
     # Read config file
-    outdir, orca, courses, ingredients, allOk = setup(args.config)
+    outdir, rmsd_threshold, orca, courses, ingredients, allOk = setup(args.config)
 
     # Copy config file to output directory for reproducibility / tracking
     shutil.copy(args.config, outdir)
@@ -823,10 +825,11 @@ def main(args):
 
     # Create output directory
     results_dir = os.path.join(outdir, "results")
+    specials_dir = os.path.join(outdir, "specials")
     os.makedirs(results_dir, exist_ok=True)
+    os.makedirs(specials_dir, exist_ok=True)
 
-    logging.info("Successfully cooked the following theozymes:")
-
+    logging.info(f"Saving all successfully cooked theozymes to {results_dir}...")
     # Copy files with renamed names based on order
     for i, ing in enumerate(leftovers_sorted, start=1):
         new_name = f"result{i}"
@@ -837,11 +840,41 @@ def main(args):
         logging.info(
             f"path: {new_pathPDB}, eopt: {ing.eopt} (Eh), einter: {ing.einter} (kcal/mol)"
         )
-
     # Merge into one multi-frame PDB file for easier analysis
     result_paths = [os.path.join(results_dir, x) for x in os.listdir(results_dir) if x.lower().endswith(".pdb")]
     write_multi_pdb(result_paths, os.path.join(results_dir, "merged.pdb"))
 
+    # Reduce on RMSD
+    diverse = []
+    logging.info(f"Saving diverse theozymes with RMSD >= {rmsd_threshold} to {specials_dir}...")
+    for i, ing in enumerate(leftovers_sorted, start=1):
+        # Compare only to already accepted structures
+        isUnique = True
+        min_rmsd = float('inf')
+        for ref_ing in diverse:
+            rmsd_val = float(rmsd.calculate_rmsd.main([ing.pathXYZ, ref_ing.pathXYZ]))
+            if rmsd_val < min_rmsd:
+                min_rmsd = rmsd_val
+            if rmsd_val < rmsd_threshold:
+                logging.info(
+                    f"Not saving {ing.name}: too similar to {ref_ing.name} (RMSD={rmsd_val:.3f})"
+                )
+                isUnique = False
+                break
+
+        # If unique relative to ALL saved structures → keep it
+        if isUnique:
+            diverse.append(ing)
+            new_name = f"result{i}"
+            new_pathPDB = os.path.join(specials_dir, f"{new_name}.pdb")
+            shutil.copy(ing.pathPDB, new_pathPDB)
+            logging.info(
+                f"Unique theozyme found: saved {ing.name} as {new_name}.pdb (Eopt={ing.eopt}, Einter={ing.einter}, min rmsd {min_rmsd})"
+            )
+
+    # Merge into one multi-frame PDB file for easier analysis
+    specials_paths = [os.path.join(specials_dir, x) for x in os.listdir(specials_dir) if x.lower().endswith(".pdb")]
+    write_multi_pdb(specials_paths, os.path.join(results_dir, "merged.pdb"))
 
     if allOk:
         logging.info("""

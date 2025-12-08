@@ -7,6 +7,8 @@ misc:
   # Set logging verbosity:
   # available options: verbose, debug, info, warning, error, critical
   verbosity: debug
+  # RMSD threshold of restrained atms to reduce final theozymes by
+  rmsd: 1.0
   
 # SETTINGS FOR ORCA DOCKER: Automated Docking Algorithm
 # Read more here: https://www.faccts.de/docs/orca/6.1/manual/contents/structurereactivity/docker.html?q=docker&n=0#docker-automated-docking-algorithm
@@ -408,7 +410,7 @@ courses:
             - parent: host
               idx: electrophile
           parameters:
-            val: 180.5 # optimal angle between restrained atoms (units: degrees)
+            val: 180.0 # optimal angle between restrained atoms (units: degrees)
             tol: 15 # docker results within val +/- tol are accepted as correct starting points for next docking
             force: 100 # energy difference from the bottom to the top of the Morse potential (units: kcal/mol)
       orcaSettings:

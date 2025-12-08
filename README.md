@@ -6,13 +6,9 @@ using gnina docking and orca optimisation
 ```pip install pyyaml```
 
 ### pdbUtils
+https://github.com/ESPhoenix/pdbUtils
 ```pip install pdbUtils```
 
-### rdkit
-```pip install rdkit```
-
-### pymol
-```conda install -c conda-forge -c schrodinger pymol-bundle```
-
-### obabel
-```conda install conda-forge::openbabel```
+### rmsd
+https://github.com/charnley/rmsd
+```pip install rmsd```

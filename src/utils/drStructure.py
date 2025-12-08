@@ -572,7 +572,7 @@ def write_multi_pdb(pdb_paths, output_path):
                 for line in in_file:
                     if line.startswith(("REMARK", "ATOM", "HETATM")):
                         out_file.write(line)
-            out_file.write("\nENDMDL\n")
+            out_file.write("ENDMDL\n")
         out_file.write("END\n")
 
 def add_dummy_atom_to_xyz(xyz_coords, atom_types, dummy_atom_coords):
@@ -605,3 +605,35 @@ def add_dummy_atom_to_xyz(xyz_coords, atom_types, dummy_atom_coords):
     dummy_atom_index = len(updated_atom_types) - 1
     
     return updated_xyz_coords, updated_atom_types, dummy_atom_index
+
+def align(P, Q):
+    """
+    Compute the optimal rotation matrix using Kabsch algorithm.
+    P and Q should be Nx3 matrices (NumPy arrays)
+    """
+    # Center the points
+    P_cent = P - P.mean(axis=0)
+    Q_cent = Q - Q.mean(axis=0)
+
+    # Covariance matrix
+    C = np.dot(P_cent.T, Q_cent)
+
+    # SVD
+    V, S, Wt = np.linalg.svd(C)
+    d = np.linalg.det(V) * np.linalg.det(Wt)
+    if d < 0:
+        V[:, -1] *= -1
+
+    # Rotation
+    U = np.dot(V, Wt)
+    P_rot = np.dot(P_cent, U)
+    return P_rot
+
+def get_rmsd(df1, df2, idxs):
+    """
+    Compute RMSD between two DataFrames using only the given row indices (idxs)
+    """
+    coords1 = df1.loc[idxs, ["X","Y","Z"]].to_numpy()
+    coords2 = df2.loc[idxs, ["X","Y","Z"]].to_numpy()
+    diff = coords1 - coords2
+    return np.sqrt(np.mean(np.sum(diff**2, axis=1)))
