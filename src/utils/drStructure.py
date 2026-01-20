@@ -268,10 +268,13 @@ def evaluate_restraints(coords, restraints_abs, logger=None):
             a = int(r.sele[0].idx)
             b = int(r.sele[1].idx)
             val  = r.params.val
-            tol  = r.params.tol
+            uptol  = r.params.uptol
+            downtol = r.params.downtol
             dist = evaluate_distance(coords, a, b)
-            isOk = abs(dist - val) <= tol
-            logger.info(f"Distance between restrained atoms: {dist}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
+            lower = val - downtol if downtol is not None else float("-inf")
+            upper = val + uptol   if uptol   is not None else float("inf")
+            isOk = lower <= dist <= upper
+            logger.info(f"Distance between restrained atoms: {dist}, expected {val} within {lower} and {upper} tolerance ({'failed' if not isOk else 'passed'}).")
             if not isOk:
                 allOk = False
                 break
@@ -280,10 +283,13 @@ def evaluate_restraints(coords, restraints_abs, logger=None):
             b = int(r.sele[1].idx)
             c = int(r.sele[2].idx)
             val  = r.params.val
-            tol  = r.params.tol
+            uptol  = r.params.uptol
+            downtol = r.params.downtol
             angle = evaluate_angle(coords, a, b, c)
-            isOk = abs(angle - val) <= tol
-            logger.info(f"Angle between restrained atoms: {angle}, expected {val} within {tol} tolerance ({'failed' if not isOk else 'passed'}).")
+            lower = val - downtol if downtol is not None else float("-inf")
+            upper = val + uptol   if uptol   is not None else float("inf")
+            isOk = lower <= angle <= upper
+            logger.info(f"Angle between restrained atoms: {angle}, expected {val} within {lower} and {upper} tolerance ({'failed' if not isOk else 'passed'}).")
             if not isOk:
                 allOk = False
                 break

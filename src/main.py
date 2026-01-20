@@ -134,7 +134,7 @@ def setup_ingredients(config):
             for restr in restraints_data:
                 restraint_property = restr.get('property', 'distance')
                 restraint_selection = restr.get('selection', [])
-                restraint_params = restr.get('parameters', {"val": None, "tol": None, "force": None})
+                restraint_params = restr.get('parameters', {"val": None, "uptol": None, "downtol": None, "force": None})
 
                 restraint = Restraint(
                     property=restraint_property,
@@ -342,14 +342,16 @@ def write_docking_input(course_name, guest, host, restraints_abs, workdir, qmMet
                 docker_biases.append({
                     "atoms": [a_rel,b_abs],
                     "val": r.params.val,
-                    "tol": r.params.tol,
+                    "uptol": r.params.uptol,
+                    "downtol": r.params.downtol,
                     "force": r.params.force
                 })
             elif set(p) == {"host"}:
                 geom_biases.append({
                     "atoms": [a_abs,b_abs],
                     "val": r.params.val,
-                    "tol": r.params.tol,
+                    "uptol": r.params.uptol,
+                    "downtol": r.params.downtol,
                 })
     
     docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": fixHost, "bias": docker_biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
@@ -651,7 +653,8 @@ def expand_restraint(guest, host, restraint, course_name):
             "property": restraint.property,
             "atoms": atoms,  # 2 for distance, 3 for angle
             "val": restraint.params.val,
-            "tol": restraint.params.tol,
+            "uptol": restraint.params.uptol,
+            "downtol": restraint.params.downtol,
             "force": restraint.params.force,
             "orig": restraint
         })
@@ -696,8 +699,8 @@ def expand_ingredient_and_restraint_combinations(course, host):
             new_course.host = host
             new_course.guests = [guest]
             new_course.restraints = []
-            key = f"{course.name}_{host.name}_{guest.name}_constr0"
-            expanded_course[key] = new_course
+            course_key = (str(course.name), str(guest.name), "0")
+            expanded_course[course_key] = new_course
             continue
 
         # Cartesian product across ALL restraints
