@@ -77,19 +77,20 @@ class Params:
     def __init__(
         self,
         val: float,
-        tol: float,
+        uptol: Optional[float] = None,
+        downtol: Optional[float] = None,
         force: float = 100.0,
     ) -> None:
         self.val: float = val
-        self.tol: float = tol
+        self.uptol: Optional[float] = uptol
+        self.downtol: Optional[float] = downtol
         self.force: float = force
     def __str__(self):
-        return f"Params(val={self.val}, tol={self.tol}, force={self.force})"
-
+        return f"Params(val={self.val}, uptol={self.uptol}, downtol={self.downtol}, force={self.force})"
     @classmethod
     def from_dict(cls, d):
-        return cls(d["val"], d["tol"], d.get("force", 100))
-        
+        return cls(d["val"], d.get("uptol", None), d.get("downtol", None), d.get("force", 100))
+
 class Restraint:    
     def __init__(
         self,
