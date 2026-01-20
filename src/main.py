@@ -11,6 +11,8 @@ import string
 import uuid
 from pathlib import Path
 import rmsd
+from collections import defaultdict
+leftovers_dict = defaultdict(list)
 
 from utils.drThing import Ingredient, Restraint, Course, Selection, col_order, col_types, _abs_index
 from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb, evaluate_restraints, read_xyz, evaluate_angle, evaluate_distance
@@ -824,7 +826,9 @@ def main(args):
             break
 
     # Sort by einter value (ascending)
-    leftovers_sorted = sorted(leftovers, key=lambda x: x.einter)
+    leftovers_list = sorted(leftovers, key=lambda x: x.einter)
+    for ing in leftovers_list:
+        leftovers_dict[len(ing.df)].append(ing)
 
     # Create output directory
     results_dir = os.path.join(outdir, "results")
@@ -834,7 +838,7 @@ def main(args):
 
     logging.info(f"Saving all successfully cooked theozymes to {results_dir}...")
     # Copy files with renamed names based on order
-    for i, ing in enumerate(leftovers_sorted, start=1):
+    for i, ing in enumerate(leftovers_list, start=1):
         new_name = f"result{i}"
         new_pathPDB = os.path.join(results_dir, f"{new_name}.pdb")
         # Copy and rename files
@@ -848,32 +852,35 @@ def main(args):
     write_multi_pdb(result_paths, os.path.join(results_dir, "merged.pdb"))
 
     # Reduce on RMSD
-    diverse = []
     logging.info(f"Saving diverse theozymes with RMSD >= {rmsd_threshold} to {specials_dir}...")
-    for i, ing in enumerate(leftovers_sorted, start=1):
-        # Compare only to already accepted structures
-        isUnique = True
-        min_rmsd = float('inf')
-        for ref_ing in diverse:
-            rmsd_val = float(rmsd.calculate_rmsd.main([ing.pathXYZ, ref_ing.pathXYZ]))
-            if rmsd_val < min_rmsd:
-                min_rmsd = rmsd_val
-            if rmsd_val < rmsd_threshold:
-                logging.info(
-                    f"Not saving {ing.name}: too similar to {ref_ing.name} (RMSD={rmsd_val:.3f})"
-                )
-                isUnique = False
-                break
+    diverse = []
+    prod_count = 1
+    for ingredients in leftovers_dict.values():
+        for ing in ingredients:
+            # Compare only to already accepted structures
+            isUnique = True
+            min_rmsd = float('inf')
+            for ref_ing in diverse:
+                rmsd_val = float(rmsd.calculate_rmsd.main([ing.pathXYZ, ref_ing.pathXYZ]))
+                if rmsd_val < min_rmsd:
+                    min_rmsd = rmsd_val
+                if rmsd_val < rmsd_threshold:
+                    logging.info(
+                        f"Not saving {ing.name}: too similar to {ref_ing.name} (RMSD={rmsd_val:.3f})"
+                    )
+                    isUnique = False
+                    break
 
-        # If unique relative to ALL saved structures → keep it
-        if isUnique:
-            diverse.append(ing)
-            new_name = f"result{i}"
-            new_pathPDB = os.path.join(specials_dir, f"{new_name}.pdb")
-            shutil.copy(ing.pathPDB, new_pathPDB)
-            logging.info(
-                f"Unique theozyme found: saved {ing.name} as {new_name}.pdb (Eopt={ing.eopt}, Einter={ing.einter}, min rmsd {min_rmsd})"
-            )
+                # If unique relative to ALL saved structures → keep it
+                if isUnique:
+                    diverse.append(ing)
+                    new_name = f"result{prod_count}"
+                    new_pathPDB = os.path.join(specials_dir, f"{new_name}.pdb")
+                    shutil.copy(ing.pathPDB, new_pathPDB)
+                    logging.info(
+                        f"Unique theozyme found: saved {ing.name} as {new_name}.pdb (Eopt={ing.eopt}, Einter={ing.einter}, min rmsd {min_rmsd})"
+                    )
+                    prod_count += 1
 
     # Merge into one multi-frame PDB file for easier analysis
     specials_paths = [os.path.join(specials_dir, x) for x in os.listdir(specials_dir) if x.lower().endswith(".pdb")]
