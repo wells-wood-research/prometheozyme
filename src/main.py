@@ -44,7 +44,7 @@ def setup_config(configPath):
     # Setup output dir
     if addTimestamp:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        project_name = f"{project_name}_{timestamp}"
+        project_name = f"{timestamp}_{project_name}"
     outdir = os.path.join(workdir, project_name)
     os.makedirs(outdir, exist_ok=True)
 
