@@ -14,7 +14,7 @@ import rmsd
 from collections import defaultdict
 leftovers_dict = defaultdict(list)
 
-from utils.drThing import Ingredient, Restraint, Course, Selection, col_order, col_types, _abs_index
+from utils.drThing import Ingredient, Restraint, Course, Selection, col_order, col_types, _abs_index, ing_dish_signature
 from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb, evaluate_restraints, read_xyz, evaluate_angle, evaluate_distance
 from utils.drOrca import make_orca_input
 
@@ -828,7 +828,7 @@ def main(args):
     # Sort by einter value (ascending)
     leftovers_list = sorted(leftovers, key=lambda x: x.einter)
     for ing in leftovers_list:
-        leftovers_dict[len(ing.df)].append(ing)
+        leftovers_dict[ing_dish_signature(ing.df)].append(ing)
 
     # Create output directory
     results_dir = os.path.join(outdir, "results")
@@ -853,10 +853,14 @@ def main(args):
 
     # Reduce on RMSD
     logging.info(f"Saving diverse theozymes with RMSD >= {rmsd_threshold} to {specials_dir}...")
-    diverse = []
     prod_count = 1
-    for ingredients in leftovers_dict.values():
-        for ing in ingredients:
+    dish_count = 1
+    for meal in leftovers_dict.values():
+        logging.debug(f"DEBUG processing dish {dish_count}")
+        dish_count += 1
+        diverse = []
+        for ing in meal:
+            logging.debug(f"DEBUG processing ingredient {ing_dish_signature(ing.df)}")
             # Compare only to already accepted structures
             isUnique = True
             min_rmsd = float('inf')
@@ -865,22 +869,22 @@ def main(args):
                 if rmsd_val < min_rmsd:
                     min_rmsd = rmsd_val
                 if rmsd_val < rmsd_threshold:
-                    logging.info(
+                    logging.debug(
                         f"Not saving {ing.name}: too similar to {ref_ing.name} (RMSD={rmsd_val:.3f})"
                     )
                     isUnique = False
                     break
 
-                # If unique relative to ALL saved structures → keep it
-                if isUnique:
-                    diverse.append(ing)
-                    new_name = f"result{prod_count}"
-                    new_pathPDB = os.path.join(specials_dir, f"{new_name}.pdb")
-                    shutil.copy(ing.pathPDB, new_pathPDB)
-                    logging.info(
-                        f"Unique theozyme found: saved {ing.name} as {new_name}.pdb (Eopt={ing.eopt}, Einter={ing.einter}, min rmsd {min_rmsd})"
-                    )
-                    prod_count += 1
+            # If unique relative to ALL saved structures → keep it
+            if isUnique:
+                diverse.append(ing)
+                new_name = f"result{prod_count}"
+                new_pathPDB = os.path.join(specials_dir, f"{new_name}.pdb")
+                shutil.copy(ing.pathPDB, new_pathPDB)
+                logging.info(
+                    f"Unique theozyme found: saved {ing.name} as {new_name}.pdb (Eopt={ing.eopt}, Einter={ing.einter}, min rmsd {min_rmsd})"
+                )
+                prod_count += 1
 
     # Merge into one multi-frame PDB file for easier analysis
     specials_paths = [os.path.join(specials_dir, x) for x in os.listdir(specials_dir) if x.lower().endswith(".pdb")]
@@ -905,5 +909,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if not args.config:
         # TODO del static assignemnt when finished testing
-        args.config = "/home/mchrnwsk/prometheozyme/config.yaml"
+        args.config = "/home/mchrnwsk/prometheozyme/config_test.yaml"
     main(args)

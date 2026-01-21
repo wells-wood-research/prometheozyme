@@ -111,6 +111,18 @@ class Restraint:
             f"params={self.params})"
         )
 
+def ing_dish_signature(df):
+    pairs = []
+    last = None
+
+    for ing, dish in zip(df["ING"], df["DISH"]):
+        curr = (ing, dish)
+        if curr != last:
+            pairs.append(curr)
+            last = curr
+
+    return tuple(pairs)
+
 class Ingredient:    
     def __init__(
         self,
