@@ -1,8 +1,10 @@
 # MISCELLANEOUS INFORMATION
 misc:
+  # name of this project
+  project_name: test
+  # if True, writes %Y-%m-%d_%H-%M-%S after project name to build output directory found at workdir path specified below
+  timestamp: True
   # set directory for output
-  # automatically writes %Y-%m-%d_%H-%M-%S directory under the path specified below
-  # and places all output there
   workdir: /home/mchrnwsk/prometheozyme/runs
   # Set logging verbosity:
   # available options: verbose, debug, info, warning, error, critical

@@ -32,16 +32,20 @@ def setup_config(configPath):
 
     # Get miscellaneous parameters
     misc = config.get("misc", {})
-    workdir = misc.get("workdir", ".")
     verbosity = misc.get("verbosity", ".")
     rmsd_threshold = misc.get("rmsd", 2.0)
+    addTimestamp = misc.get("timestamp", True)
+    project_name = misc.get("project_name", "test")
+    workdir = misc.get("workdir", ".")
 
     # Get orca docker parameters
     orca = config.get("orca", {})
 
     # Setup output dir
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    outdir = os.path.join(workdir, f"output_{timestamp}")
+    if addTimestamp:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        project_name = f"{project_name}_{timestamp}"
+    outdir = os.path.join(workdir, project_name)
     os.makedirs(outdir, exist_ok=True)
 
     return config, outdir, orca, verbosity, rmsd_threshold

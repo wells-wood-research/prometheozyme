@@ -20,10 +20,12 @@
 [] TODO ^ only optimise the restraints per this course, since host is frozen; keep previous geoms in keep but scan all new restrains; this way only the new restraints per host are limited to 3
 [] TODO unfinished opts get copied - see last example, results should be 4 but there's 6
 [] TODO implement multi-substrate docking (e.g. different conformers) properly
-[] TODO implement sampling conformations of substrate
-[] TODO implement custom output folder names
+[x] TODO implement sampling conformations of substrate
+[x] TODO implement custom output folder names
 [x] TODO fix RMSD breaking at comparison between products from different ingredients (different number of atoms)
 [] TODO add comment about fixHost being bad for any further than first course after init
 [] TODO add warnings in logs (e.g. when fixHost is False past the first step)
-[] Don't fail on too small distances (unless specified)
+[x] Don't fail on too small distances (unless specified)
 [x] TODO is result of copt.xyz used in next steps?
+[] Save at least ine example structure (per ingredient combination) in 'specials'
+[] Grouping products by number of atoms is not enough for RMSD - different amino acids can have same number of atoms
