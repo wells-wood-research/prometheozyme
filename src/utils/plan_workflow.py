@@ -1,9 +1,17 @@
 from itertools import combinations
-from collections import defaultdict
+from collections import defaultdict, deque
 
+
+# ----------------------------
+# STEP 1 — Normalize rows
+# ----------------------------
 def row_to_tuple(row):
     return tuple(entry.molecule_id for entry in row.values())
 
+
+# ----------------------------
+# STEP 2 — Generate motifs
+# ----------------------------
 def generate_motifs(rows, min_support=2):
     n_cols = len(rows[0])
     motifs = {}
@@ -18,191 +26,178 @@ def generate_motifs(rows, min_support=2):
 
             for key, row_ids in groups.items():
                 if len(row_ids) >= min_support:
-                    motif = dict(key)
-                    motifs[frozenset(motif.items())] = set(row_ids)
+                    motifs[frozenset(key)] = set(row_ids)
 
     return motifs
 
-def motif_cost(motif):
-    # number of unique molecules (excluding "0" if desired)
-    mols = {v for (_, v) in motif}
-    return len(mols)
 
-
-def motif_value(motif, covered_rows):
-    support = len(covered_rows)
-    specificity = len(motif)
-
-    cost = motif_cost(motif)
-    if cost == 0:
-        return 0
-
-    return support * specificity / cost
-
-def is_submotif(a, b):
-    # a ⊆ b
-    return all(item in b for item in a)
-
-
-def build_dag(motifs):
-    dag = {m: set() for m in motifs}
-
-    motif_list = list(motifs.keys())
-
-    for i, a in enumerate(motif_list):
-        for j, b in enumerate(motif_list):
-            if i == j:
-                continue
-
-            if is_submotif(a, b):
-                dag[a].add(b)
-
-    return dag
-
+# ----------------------------
+# STEP 3 — Add full rows
+# ----------------------------
 def add_full_rows(rows, motifs):
     for i, row in enumerate(rows):
         motif = frozenset((idx, val) for idx, val in enumerate(row))
         motifs[motif] = {i}
 
-def prune_motifs(motifs):
-    motif_items = list(motifs.items())
-    pruned = {}
 
-    for i, (m1, r1) in enumerate(motif_items):
-        dominated = False
+# ----------------------------
+# STEP 4 — VALID edge rule
+# One molecule per step (possibly multiple columns)
+# ----------------------------
+def is_valid_molecule_step(parent, child):
+    parent_dict = dict(parent)
+    child_dict = dict(child)
 
-        for j, (m2, r2) in enumerate(motif_items):
-            if i == j:
+    # must be strict expansion
+    if not parent_dict.items() < child_dict.items():
+        return False
+
+    # what was added
+    added = {
+        c: v for c, v in child_dict.items()
+        if c not in parent_dict
+    }
+
+    if not added:
+        return False
+
+    # must involve only ONE molecule
+    mols = set(added.values())
+    if len(mols) != 1:
+        return False
+
+    mol = next(iter(mols))
+
+    # find all columns where this molecule appears in the CHILD
+    child_cols_for_mol = {
+        c for c, v in child_dict.items() if v == mol
+    }
+
+    # ensure we added ALL of them at once
+    return set(added.keys()) == child_cols_for_mol - set(parent_dict.keys())
+
+
+# ----------------------------
+# STEP 5 — Build DAG
+# ----------------------------
+def build_dag(motifs):
+    dag = {m: set() for m in motifs}
+    motif_list = list(motifs.keys())
+
+    for a in motif_list:
+        for b in motif_list:
+            if a == b:
                 continue
 
-            if set(m1).issubset(m2) and r1 == r2:
-                dominated = True
-                break
+            if is_valid_molecule_step(a, b):
+                dag[a].add(b)
 
-        if not dominated:
-            pruned[m1] = r1
+    return dag
 
-    return pruned
-    
-# Select motifs that cover all rows with maximum reuse -
-# weighted set cover problem, but small enough for branch & bound
-def plan_branch_and_bound(motifs):
-    motif_items = list(motifs.items())
 
-    # Precompute base values (max possible gain per motif)
-    base_values = [
-        motif_value(m, rows) for m, rows in motif_items
-    ]
+# ----------------------------
+# STEP 6 — Find best root motif
+# (max reuse, minimal size)
+# ----------------------------
+def find_root(motifs):
+    best = None
+    best_score = -1
 
-    # Sort motifs by descending value (important!)
-    order = sorted(
-        range(len(motif_items)),
-        key=lambda i: base_values[i],
-        reverse=True
-    )
+    for m, rows in motifs.items():
+        score = len(rows) / (len(m) + 1)
 
-    motif_items = [motif_items[i] for i in order]
-    base_values = [base_values[i] for i in order]
+        if score > best_score:
+            best_score = score
+            best = m
 
-    # Precompute optimistic suffix sums for pruning
-    suffix_max = [0] * (len(base_values) + 1)
-    for i in range(len(base_values) - 1, -1, -1):
-        suffix_max[i] = suffix_max[i + 1] + base_values[i]
+    return best
 
-    TOTAL_ROWS = len(set().union(*motifs.values()))
 
-    best_score = float("-inf")
-    best_plan = None
-
-    # Memo: (index, frozenset(covered)) → best score seen
-    memo = {}
-
-    def backtrack(i, covered, plan, score):
-        nonlocal best_score, best_plan
-
-        covered_fs = frozenset(covered)
-
-        # Memo pruning
-        key = (i, covered_fs)
-        if key in memo and memo[key] >= score:
-            return
-        memo[key] = score
-
-        # All rows covered → valid solution
-        if len(covered) == TOTAL_ROWS:
-            if score > best_score:
-                best_score = score
-                best_plan = plan[:]
-            return
-
-        # No more motifs
-        if i >= len(motif_items):
-            return
-
-        # Upper bound pruning
-        optimistic = score + suffix_max[i]
-        if optimistic <= best_score:
-            return
-
-        motif, rows = motif_items[i]
-
-        # --- OPTION 1: TAKE ---
-        new_rows = covered | rows
-        gain = motif_value(motif, rows - covered)
-
-        if gain > 0:  # skip useless additions
-            backtrack(
-                i + 1,
-                new_rows,
-                plan + [motif],
-                score + gain
-            )
-
-        # --- OPTION 2: SKIP ---
-        backtrack(i + 1, covered, plan, score)
-
-    backtrack(0, set(), [], 0)
-
-    return best_plan
-
-def topo_sort(plan):
-    plan_set = set(plan)
-
-    edges = {m: set() for m in plan}
-
-    for a in plan:
-        for b in plan:
-            if a != b and is_submotif(a, b):
-                edges[a].add(b)
-
+# ----------------------------
+# STEP 7 — BFS workflow
+# ----------------------------
+def bfs_workflow(dag, root):
     visited = set()
-    result = []
+    queue = deque([root])
 
-    def dfs(node):
-        if node in visited:
-            return
-        visited.add(node)
+    workflow = []
 
-        for nxt in edges[node]:
-            dfs(nxt)
+    while queue:
+        current = queue.popleft()
 
-        result.append(node)
+        if current in visited:
+            continue
 
-    for m in plan:
-        dfs(m)
+        visited.add(current)
+        workflow.append(current)
 
-    return result[::-1]
+        for child in dag[current]:
+            queue.append(child)
 
+    return workflow
+
+
+# ----------------------------
+# STEP 8 — Pretty printing
+# ----------------------------
+def motif_to_row(motif, n_cols):
+    row = ["*"] * n_cols
+    for c, v in motif:
+        row[c] = v
+    return row
+
+
+def describe_step(parent, child):
+    parent_dict = dict(parent)
+    child_dict = dict(child)
+
+    added = {
+        c: v for c, v in child_dict.items()
+        if c not in parent_dict
+    }
+
+    mol = next(iter(set(added.values())))
+    cols = sorted(added.keys())
+
+    return f"Add molecule {mol} at columns {cols}"
+
+
+# ----------------------------
+# STEP 9 — Build full plan
+# ----------------------------
 def build_execution_plan(recipes):
     rows = [row_to_tuple(r) for r in recipes]
 
     motifs = generate_motifs(rows)
     add_full_rows(rows, motifs)
 
-    motifs = prune_motifs(motifs)   # 🔥 critical
+    dag = build_dag(motifs)
 
-    plan = plan_branch_and_bound(motifs)
+    root = find_root(motifs)
 
-    execution_order = topo_sort(plan)
+    workflow = bfs_workflow(dag, root)
 
-    return execution_order
+    return workflow, dag, root, rows
+
+
+# ----------------------------
+# STEP 10 — Print workflow nicely
+# ----------------------------
+def print_workflow(workflow, dag, root, rows):
+    n_cols = len(rows[0])
+
+    print("ROOT (start here):")
+    print(motif_to_row(root, n_cols))
+    print()
+
+    step_num = 1
+
+    for parent in workflow:
+        for child in dag[parent]:
+            if child in workflow:
+                print(f"Step {step_num}:")
+                print(" From:", motif_to_row(parent, n_cols))
+                print(" To:  ", motif_to_row(child, n_cols))
+                print(" Action:", describe_step(parent, child))
+                print()
+                step_num += 1
