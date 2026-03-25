@@ -64,44 +64,103 @@ def add_full_rows(rows, motifs):
         motif = frozenset((idx, val) for idx, val in enumerate(row))
         motifs[motif] = {i}
 
+def prune_motifs(motifs):
+    motif_items = list(motifs.items())
+    pruned = {}
+
+    for i, (m1, r1) in enumerate(motif_items):
+        dominated = False
+
+        for j, (m2, r2) in enumerate(motif_items):
+            if i == j:
+                continue
+
+            if set(m1).issubset(m2) and r1 == r2:
+                dominated = True
+                break
+
+        if not dominated:
+            pruned[m1] = r1
+
+    return pruned
+    
 # Select motifs that cover all rows with maximum reuse -
 # weighted set cover problem, but small enough for branch & bound
-def solve_optimal_plan(motifs):
+def plan_branch_and_bound(motifs):
     motif_items = list(motifs.items())
 
-    best_plan = None
+    # Precompute base values (max possible gain per motif)
+    base_values = [
+        motif_value(m, rows) for m, rows in motif_items
+    ]
+
+    # Sort motifs by descending value (important!)
+    order = sorted(
+        range(len(motif_items)),
+        key=lambda i: base_values[i],
+        reverse=True
+    )
+
+    motif_items = [motif_items[i] for i in order]
+    base_values = [base_values[i] for i in order]
+
+    # Precompute optimistic suffix sums for pruning
+    suffix_max = [0] * (len(base_values) + 1)
+    for i in range(len(base_values) - 1, -1, -1):
+        suffix_max[i] = suffix_max[i + 1] + base_values[i]
+
+    TOTAL_ROWS = len(set().union(*motifs.values()))
+
     best_score = float("-inf")
+    best_plan = None
+
+    # Memo: (index, frozenset(covered)) → best score seen
+    memo = {}
 
     def backtrack(i, covered, plan, score):
-        nonlocal best_plan, best_score
+        nonlocal best_score, best_plan
 
-        # all rows covered
+        covered_fs = frozenset(covered)
+
+        # Memo pruning
+        key = (i, covered_fs)
+        if key in memo and memo[key] >= score:
+            return
+        memo[key] = score
+
+        # All rows covered → valid solution
         if len(covered) == TOTAL_ROWS:
             if score > best_score:
                 best_score = score
                 best_plan = plan[:]
             return
 
+        # No more motifs
         if i >= len(motif_items):
+            return
+
+        # Upper bound pruning
+        optimistic = score + suffix_max[i]
+        if optimistic <= best_score:
             return
 
         motif, rows = motif_items[i]
 
-        # Option 1: take motif
+        # --- OPTION 1: TAKE ---
         new_rows = covered | rows
         gain = motif_value(motif, rows - covered)
 
-        backtrack(
-            i + 1,
-            new_rows,
-            plan + [motif],
-            score + gain
-        )
+        if gain > 0:  # skip useless additions
+            backtrack(
+                i + 1,
+                new_rows,
+                plan + [motif],
+                score + gain
+            )
 
-        # Option 2: skip
+        # --- OPTION 2: SKIP ---
         backtrack(i + 1, covered, plan, score)
 
-    TOTAL_ROWS = len(set().union(*motifs.values()))
     backtrack(0, set(), [], 0)
 
     return best_plan
@@ -140,10 +199,10 @@ def build_execution_plan(recipes):
     motifs = generate_motifs(rows)
     add_full_rows(rows, motifs)
 
-    dag = build_dag(motifs)
+    motifs = prune_motifs(motifs)   # 🔥 critical
 
-    optimal_plan = solve_optimal_plan(motifs)
+    plan = plan_branch_and_bound(motifs)
 
-    execution_order = topo_sort(optimal_plan)
+    execution_order = topo_sort(plan)
 
     return execution_order
