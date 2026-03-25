@@ -2,18 +2,36 @@ from itertools import combinations
 from collections import defaultdict, deque
 
 # ----------------------------
-# STEP 1 — Normalize rows
+# Helpers
 # ----------------------------
 def row_to_tuple(row):
     return tuple(entry.molecule_id for entry in row.values())
 
-# ----------------------------
-# STEP 2 — Motif generation
-# ----------------------------
-def motif_signature(motif):
-    """Return a canonical motif signature (frozenset)"""
-    return frozenset(motif)
+def map_indices_to_column_ids(steps, recipes):
+    """
+    Map execution plan steps from numerical column indices to column IDs.
 
+    steps: list of (parent, child) frozensets like {(0, '2'), (1, '5')}
+    recipes: list of dicts (your config.recipes)
+    """
+    if not recipes:
+        return steps
+
+    # Assume all recipes have the same columns, take the first one
+    col_ids = list(recipes[0].keys())  # preserves order
+    index_to_colid = {i: cid for i, cid in enumerate(col_ids)}
+
+    mapped_steps = []
+    for parent, child in steps:
+        parent_mapped = frozenset((index_to_colid[i], m) for i, m in parent)
+        child_mapped  = frozenset((index_to_colid[i], m) for i, m in child)
+        mapped_steps.append((parent_mapped, child_mapped))
+
+    return mapped_steps
+
+# ----------------------------
+# Motif generation
+# ----------------------------
 def get_row_molecule_columns(row):
     mol_to_cols = {}
     for c, mol in enumerate(row):
@@ -68,7 +86,7 @@ def add_full_rows(rows, motifs):
         motifs[motif] = {i}
 
 # ----------------------------
-# STEP 3 — DAG construction
+# DAG construction
 # ----------------------------
 def is_valid_molecule_step(parent, child, motifs, rows):
     parent_dict = dict(parent)
@@ -129,7 +147,7 @@ def add_missing_solution_layer(dag, motifs, rows):
         dag[fm] = set()
 
 # ----------------------------
-# STEP 4 — Root selection
+# Root selection
 # ----------------------------
 def find_best_root(motifs, rows):
     full_row_ids = set(range(len(rows)))
@@ -144,7 +162,7 @@ def find_best_root(motifs, rows):
     return [best]
 
 # ----------------------------
-# STEP 5 — BFS execution plan
+# BFS execution plan
 # ----------------------------
 def traverse_dag_unique(dag, roots):
     """
@@ -174,7 +192,7 @@ def traverse_dag_unique(dag, roots):
     return steps
 
 # ----------------------------
-# STEP 6 — Utilities
+# Utilities
 # ----------------------------
 def motif_to_row(motif, n_cols):
     row = ["*"] * n_cols
@@ -193,7 +211,7 @@ def describe_step(parent, child):
     return f"Add molecule {mol} at columns {cols}"
 
 # ----------------------------
-# STEP 7 — Visualization
+# Visualization
 # ----------------------------
 def dag_levels(dag, roots):
     levels = defaultdict(list)
@@ -246,7 +264,7 @@ def verify_all_reached(dag, roots, rows):
         print("\nAll solutions covered")
 
 # ----------------------------
-# STEP 9 — Main pipeline
+# Main pipeline
 # ----------------------------
 def build_execution_plan(recipes):
     rows = [row_to_tuple(r) for r in recipes]
@@ -259,11 +277,12 @@ def build_execution_plan(recipes):
     add_missing_solution_layer(dag, motifs, rows)
     roots = find_best_root(motifs, rows)
     steps = traverse_dag_unique(dag, roots)
+    steps = map_indices_to_column_ids(steps, recipes)
     verify_all_reached(dag, roots, rows)
     return steps, dag, roots, rows
 
 # ----------------------------
-# STEP 10 — Pretty printing
+# Pretty printing
 # ----------------------------
 def print_execution_steps(steps, rows):
     n_cols = len(rows[0])
