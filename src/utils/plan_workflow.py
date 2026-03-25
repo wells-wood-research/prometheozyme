@@ -1,60 +1,149 @@
-from typing import Dict, List
+from itertools import combinations
 from collections import defaultdict
-from utils.types import Recipes, RecipeEntry
 
-def similarity(row_a: Dict[str, RecipeEntry], row_b: Dict[str, RecipeEntry]) -> int:
-    return sum(1 for k in row_a if row_a[k] == row_b[k])
+def row_to_tuple(row):
+    return tuple(entry.molecule_id for entry in row.values())
 
+def generate_motifs(rows, min_support=2):
+    n_cols = len(rows[0])
+    motifs = {}
 
-def unique_molecule_count(row: Dict[str, RecipeEntry]) -> int:
-    return len({entry.molecule_id for entry in row.values()})
+    for r in range(1, n_cols + 1):
+        for cols in combinations(range(n_cols), r):
+            groups = defaultdict(list)
 
+            for i, row in enumerate(rows):
+                key = tuple((c, row[c]) for c in cols)
+                groups[key].append(i)
 
-def order_group_by_similarity(group: List[Dict[str, RecipeEntry]]) -> List[Dict[str, RecipeEntry]]:
-    """Greedy similarity ordering inside a group."""
-    if not group:
-        return []
+            for key, row_ids in groups.items():
+                if len(row_ids) >= min_support:
+                    motif = dict(key)
+                    motifs[frozenset(motif.items())] = set(row_ids)
 
-    n = len(group)
+    return motifs
 
-    # Precompute similarity matrix
-    sim = [[0] * n for _ in range(n)]
-    for i in range(n):
-        for j in range(i + 1, n):
-            s = similarity(group[i], group[j])
-            sim[i][j] = s
-            sim[j][i] = s
-
-    remaining = set(range(n))
-
-    # Start with most "central" row
-    start = max(range(n), key=lambda i: sum(sim[i]))
-    order = [start]
-    remaining.remove(start)
-
-    while remaining:
-        last = order[-1]
-        next_idx = max(remaining, key=lambda j: sim[last][j])
-        order.append(next_idx)
-        remaining.remove(next_idx)
-
-    return [group[i] for i in order]
+def motif_cost(motif):
+    # number of unique molecules (excluding "0" if desired)
+    mols = {v for (_, v) in motif}
+    return len(mols)
 
 
-def sort_recipes(recipes: Recipes) -> Recipes:
-    # Step 1: group by unique molecule count
-    groups = defaultdict(list)
-    for row in recipes:
-        groups[unique_molecule_count(row)].append(row)
+def motif_value(motif, covered_rows):
+    support = len(covered_rows)
+    specificity = len(motif)
 
-    # Step 2: process groups in ascending order
+    cost = motif_cost(motif)
+    if cost == 0:
+        return 0
+
+    return support * specificity / cost
+
+def is_submotif(a, b):
+    # a ⊆ b
+    return all(item in b for item in a)
+
+
+def build_dag(motifs):
+    dag = {m: set() for m in motifs}
+
+    motif_list = list(motifs.keys())
+
+    for i, a in enumerate(motif_list):
+        for j, b in enumerate(motif_list):
+            if i == j:
+                continue
+
+            if is_submotif(a, b):
+                dag[a].add(b)
+
+    return dag
+
+def add_full_rows(rows, motifs):
+    for i, row in enumerate(rows):
+        motif = frozenset((idx, val) for idx, val in enumerate(row))
+        motifs[motif] = {i}
+
+# Select motifs that cover all rows with maximum reuse -
+# weighted set cover problem, but small enough for branch & bound
+def solve_optimal_plan(motifs):
+    motif_items = list(motifs.items())
+
+    best_plan = None
+    best_score = float("-inf")
+
+    def backtrack(i, covered, plan, score):
+        nonlocal best_plan, best_score
+
+        # all rows covered
+        if len(covered) == TOTAL_ROWS:
+            if score > best_score:
+                best_score = score
+                best_plan = plan[:]
+            return
+
+        if i >= len(motif_items):
+            return
+
+        motif, rows = motif_items[i]
+
+        # Option 1: take motif
+        new_rows = covered | rows
+        gain = motif_value(motif, rows - covered)
+
+        backtrack(
+            i + 1,
+            new_rows,
+            plan + [motif],
+            score + gain
+        )
+
+        # Option 2: skip
+        backtrack(i + 1, covered, plan, score)
+
+    TOTAL_ROWS = len(set().union(*motifs.values()))
+    backtrack(0, set(), [], 0)
+
+    return best_plan
+
+def topo_sort(plan):
+    plan_set = set(plan)
+
+    edges = {m: set() for m in plan}
+
+    for a in plan:
+        for b in plan:
+            if a != b and is_submotif(a, b):
+                edges[a].add(b)
+
+    visited = set()
     result = []
-    for uniq_count in sorted(groups.keys()):
-        group = groups[uniq_count]
 
-        # Step 3: order within group by similarity
-        ordered_group = order_group_by_similarity(group)
+    def dfs(node):
+        if node in visited:
+            return
+        visited.add(node)
 
-        result.extend(ordered_group)
+        for nxt in edges[node]:
+            dfs(nxt)
 
-    return result
+        result.append(node)
+
+    for m in plan:
+        dfs(m)
+
+    return result[::-1]
+
+def build_execution_plan(recipes):
+    rows = [row_to_tuple(r) for r in recipes]
+
+    motifs = generate_motifs(rows)
+    add_full_rows(rows, motifs)
+
+    dag = build_dag(motifs)
+
+    optimal_plan = solve_optimal_plan(motifs)
+
+    execution_order = topo_sort(optimal_plan)
+
+    return execution_order
