@@ -14,9 +14,10 @@ import rmsd
 from collections import defaultdict
 leftovers_dict = defaultdict(list)
 
-from utils.drStructure import extract_ok_docker_results, isPDB, isXYZ, pdb2df, df2pdb, df2xyz, pdb2xyz, xyz2df, xyz2pdb, write_multi_pdb, evaluate_restraints, read_xyz, evaluate_angle, evaluate_distance
-from utils.drOrca import make_orca_input
-from utils import parse, workflow
+from pathlib import Path
+cwd = Path(__file__).resolve().parent
+
+from utils import types, parse, workflow, structure, orca, validate, lookup
 
 def setup_logging(workdir, verbosity="info"):
     # Define a custom logging level called VERBOSE
@@ -234,7 +235,10 @@ def define_orca_params(orca, course_desc=None):
 
     return orcapath, qmMethod_dock, qmMethod_opt, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
 
-def dock(outdir, course_key, course_desc, orca):
+def dock(host_input_file, guest_input_file, new_restraints, old_restraints, output_dir, orca):
+    return None
+
+def dock_old(outdir, course_key, course_desc, orca):
     try:
         orcapath, qmMethod_dock, qmMethod_opt, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs = define_orca_params(orca, course_desc)
         
@@ -708,6 +712,40 @@ def expand_ingredient_and_restraint_combinations(course, host):
 # ----------------------------
 # MAIN LOOP
 # ----------------------------
+def get_molecule_value(inner_set):
+    # Find all elements of length 1 (the "value" candidates)
+    values = [x for x in inner_set if len(x) == 1]
+    if not values:
+        # No single-character value found
+        return None
+    elif len(values) > 1:
+        # Unexpected: more than one value-like element
+        raise ValueError(f"Multiple value candidates found in {inner_set}")
+    return values[0]
+
+def is_first_step(step):
+    unique_molecules = {get_molecule_value(item) for item in step}
+    unique_molecules.discard(None)
+    if len(unique_molecules) == 1:
+        return True
+    return False
+
+def row_to_signature(row, lookup):
+    return "|".join(
+        "x" if site is None else lookup.get_site_token(site)
+        for site in row
+    )
+
+def motif_to_signature(motif, n_cols, lookup):
+    row = [None] * n_cols
+    for c, v in motif:
+        row[c] = v
+    lookup_row = [
+        lookup.get(x) if x != "x" else "x"
+        for x in row
+    ]
+    signature = "".join(lookup_row)
+    return signature
 
 def main(configPath):
     allOk = True
@@ -716,96 +754,91 @@ def main(configPath):
     outdir, verbosity, rmsd_threshold, orca = parse.get_default_parameters() # TODO write parameters on export from frontend
     
     config = parse.load_config(configPath)
-    # TODO remove
-    # usage
-    # ingredients = config.ingredients
-    # flavours = config.flavours
-# 
-    # print(config.outdir)
-    # print(config.ingredients["1"].charge)
-    print(type(config.recipes))
-    print(config.recipes)
-    steps, dag, roots, rows = workflow.build_execution_plan(config.recipes)
-    print(type(steps))
-    print(steps)
-    sys.exit(1)
-
-    # Results of previous course, carried over as starting point (HOST) of next docking step
-    leftovers = []
     
-    # Prepare the substrate as a fake result of first docking for processing consistency
-    try:
-        init_host = courses["init"].guests[0]
-        init_host_dir = os.path.join(outdir, f"base_stock")
-        init_host_pathPDB = os.path.join(init_host_dir, "host.pdb")
-        init_host_pathXYZ = init_host_pathPDB.replace(".pdb", ".xyz")
-        os.makedirs(init_host_dir)
-        shutil.copy(init_host.pathPDB, init_host_pathPDB)
-        shutil.copy(init_host.pathXYZ, init_host_pathXYZ)
-        init_host.pathPDB = init_host_pathPDB
-        init_host.pathXYZ = init_host_pathXYZ
-        leftovers.append(init_host)
-    except Exception as e:
-        logging.exception(f"Critical error while preparing base stock (initial host) from substrate: {e}")
-        allOk = False
-        return
-
-    # Run ORCA DOCKER for each course, exhaustive for host/guest mix
-    for i, (course_name, course) in enumerate(courses.items()):
-        if not allOk:
-            logging.error("Terminating remaining docking steps due to previous critical error.")
-            break
-
-        if course_name == "init":
-            continue
-
-        new_leftovers = []
-        for j, serving in enumerate(leftovers):
-            try:
-                # There's two kinds of "HOSTS" in every docking step:
-                # 1) host file which is the complete product of previous course
-                # 2) host molecule to restrain guest towards (for seleciton of atom indices in BIAS block of ORCA input file)
-                new_host_for_docking_ing = serving
-                new_host_for_docking_df = new_host_for_docking_ing.df
-                new_host_for_restraints_df = new_host_for_docking_df[new_host_for_docking_df["DISH"] == course.host]
-                new_host_for_restraints_name = new_host_for_restraints_df["ING"].unique()[0]
-                new_host_for_restraints_ing = ingredients[new_host_for_restraints_name]
-                new_host_for_restraints_ing.df = new_host_for_restraints_df
-            except Exception as e:
-                logging.exception(f"Critical error preparing host for course {course_name}: {e}")
-                allOk = False
-                break
-
-            expanded_course, allOk = expand_ingredient_and_restraint_combinations(course, new_host_for_restraints_ing)
-            logging.info(f"""Expanded ingredient and restraint combinations for course {course.name} ({len(expanded_course)} combinations) have the following keys: {list(expanded_course.keys())}""")
+    # ID lookups
+    lookUp = lookup.IDLookup()
+    flavour_ids = list(config.recipes[0].keys())
+    idx_to_flavour = dict(enumerate(flavour_ids))
+    flavour_to_idx = {v: k for k, v in idx_to_flavour.items()}
+    n_cols = len(config.flavours)
+    def get_flav_ids(flavour_columns):
+        return [idx_to_flavour[flav] for flav in flavour_columns]
+    
+    
+    steps, dag, roots, rows = workflow.build_execution_plan(config.recipes)
+    workflow.print_execution_steps(steps, rows)
+    if len(roots) > 1:
+        # TODO what to do then?
+        print(f"Warning: {len(roots)} roots determined.")
+    first = True
+    for host, guest in steps:
+        # Find host file
+        if first:
+            host_id, host_flav_cols = workflow.determine_host(host, guest) # TODO must check that there is only one unique
+            host_files = [structure.get_molec_xyz_path(cwd, config.ingredients[host_id.molecule_id].filepath)]
+            first = False
+        else:
+            host_row = workflow.motif_to_row(host, n_cols)
+            host_signature = row_to_signature(host_row, lookUp)
+            host_dir = structure.prep_assembly_dir(outdir, host_signature)
+            host_files = [host_dir / "best.xyz"] # TODO in the future do list(host_dir.glob("passed_*.xyz"))
+            host_flav_cols = [i for i, col in enumerate(host_row) if col != 'x']
             
-            for course_key, course_desc in expanded_course.items():
-                try:
-                    logging.info(f"""Processing course: {course_key}""")
-                    course_desc.host = new_host_for_docking_ing
-                    course_desc.host.restraints = new_host_for_docking_ing.restraints
-                    curr_outdir = os.path.join(outdir, f"course{i}_{course_key[0]}", f"serving{j}")
-                    waste_bucket = dock(curr_outdir, course_key, course_desc, orca)
-                    optimised_waste_bucket = {}
-                    for key, ing in waste_bucket.items():
-                        ing_copy = copy.deepcopy(ing)
-                        opt_ing = optimise(ing_copy, orca, course_desc.name)
-                        if opt_ing:
-                            optimised_waste_bucket[key] = opt_ing
-                    if not optimised_waste_bucket:
-                        logging.warning(f"Failure during optimisation of course {course_key} - optimisation produced no usable results.")
-                    else:
-                        [new_leftovers.append(optimised_waste_bucket[key]) for key in optimised_waste_bucket.keys() if key[:3] == course_key]
-                except Exception as e:
-                    logging.exception(f"Critical error in course {course_key}: {e}")
-                    allOk = False
-                    break
-        leftovers = new_leftovers
-        if len(leftovers) < 1:
-            allOk = False
-            logging.warning(f"Failure during docking of course {course_key} - docking and optimisation produced no usable results.")
-            break
+        # Find guest file
+        guest_id, guest_flav_cols = workflow.determine_guest(host, guest)
+        guest_file = structure.get_molec_xyz_path(cwd, config.ingredients[guest_id.molecule_id].filepath)
+        
+        # Dock dir (for output of this assembly)
+        guest_row = workflow.motif_to_row(guest, n_cols)
+        print(guest_row)
+        guest_signature = row_to_signature(guest_row, lookUp)
+        
+        assembly_output_dir = structure.prep_assembly_dir(outdir, guest_signature)
 
+        # Find restraints to apply in this step
+        host_flavours = get_flav_ids(host_flav_cols)
+        guest_flavours = get_flav_ids(guest_flav_cols)
+        flavours = host_flavours + guest_flavours
+        relevant_restraints = [
+            restr for restr in config.restraints.values()
+            if all(connection in flavours for connection in restr.connections)
+        ]
+        # New restraints are introduced as inter-host/guest bias in orca's %docker block 
+        new_restraints = [
+            restr for restr in relevant_restraints
+            if any(connection in host_flavours for connection in restr.connections)
+            and any(connection in guest_flavours for connection in restr.connections)
+        ]
+        # Other restraints are written in orca's %geom block
+        # guest-guest restraints need to be considered in subsequent docker steps where guest has become host
+        old_restraints = [
+            restr for restr in relevant_restraints
+            if restr in host_flavours
+        ]
+
+        flavour_map = lookup.build_flavour_map(guest_row, idx_to_flavour)
+        for restr in old_restraints:
+            old_atom_pairs = [
+                flavour_map[fid] for fid in restr.connections
+            ]
+        for restr in new_restraints:
+            new_atom_pairs = [
+                flavour_map[fid] for fid in restr.connections
+            ]
+        print(new_atom_pairs)
+        
+        # dock
+        for host_file in host_files:
+            dock(host_file, guest_file, new_restraints, old_restraints, assembly_output_dir, orca)
+        sys.exit(1)
+
+        # check against restraints
+        
+        # optimise
+        opt_ing = optimise(ing_copy, orca, course_desc.name)
+
+        
+ 
     # Sort by einter value (ascending)
     leftovers_list = sorted(leftovers, key=lambda x: x.einter)
     for ing in leftovers_list:
