@@ -1,12 +1,6 @@
-import ast
-import os
-import uuid
 import logging
-import pandas as pd
 from dataclasses import dataclass
 from typing import Dict, List, Optional
-
-from utils.drStructure import pdb2df
 
 ########################
 ## LOGGING
@@ -70,3 +64,8 @@ class Config:
     verbosity: str
     rmsd_threshold: float
     orca: dict
+
+@dataclass(frozen=True)
+class Site:
+    molecule_id: str
+    atom_id: str
