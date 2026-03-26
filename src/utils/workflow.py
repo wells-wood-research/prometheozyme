@@ -1,11 +1,50 @@
 from itertools import combinations
 from collections import defaultdict, deque
+from utils.types import Site
 
 # ----------------------------
-# Helpers
+# Utilities
 # ----------------------------
+def motif_to_row(motif, n_cols):
+    row = [None] * n_cols
+    for c, v in motif:
+        row[c] = v
+    return row
+
+def describe_step(parent, child):
+    parent_dict = dict(parent)
+    child_dict = dict(child)
+    added = {c: v for c, v in child_dict.items() if c not in parent_dict}
+    if not added:
+        return "No new molecules added"
+    mol = next(iter(set(added.values())))
+    cols = sorted(added.keys())
+    return f"Add molecule {mol} at columns {cols}"
+
+def determine_host(parent, child):
+    parent_dict = dict(parent)
+    added = {c: v for c, v in parent_dict.items()}
+    if not added:
+        return None, []
+    mol = next(iter(set(added.values())))
+    cols = sorted(added.keys())
+    return mol, cols
+
+def determine_guest(parent, child):
+    parent_dict = dict(parent)
+    child_dict = dict(child)
+    added = {c: v for c, v in child_dict.items() if c not in parent_dict}
+    if not added:
+        return None, []
+    mol = next(iter(set(added.values())))
+    cols = sorted(added.keys())
+    return mol, cols
+
 def row_to_tuple(row):
-    return tuple(entry.molecule_id for entry in row.values())
+    return tuple(
+        Site(entry.molecule_id, entry.atom_id)
+        for entry in row.values()
+    )
 
 def map_indices_to_column_ids(steps, recipes):
     """
@@ -192,25 +231,6 @@ def traverse_dag_unique(dag, roots):
     return steps
 
 # ----------------------------
-# Utilities
-# ----------------------------
-def motif_to_row(motif, n_cols):
-    row = ["*"] * n_cols
-    for c, v in motif:
-        row[c] = v
-    return row
-
-def describe_step(parent, child):
-    parent_dict = dict(parent)
-    child_dict = dict(child)
-    added = {c: v for c, v in child_dict.items() if c not in parent_dict}
-    if not added:
-        return "No new molecules added"
-    mol = next(iter(set(added.values())))
-    cols = sorted(added.keys())
-    return f"Add molecule {mol} at columns {cols}"
-
-# ----------------------------
 # Visualization
 # ----------------------------
 def dag_levels(dag, roots):
@@ -257,11 +277,9 @@ def verify_all_reached(dag, roots, rows):
             queue.append(child)
     missing = final_motifs - visited
     if missing:
-        print("\nMissing solutions:")
+        print("\nMissing solutions:") # TODO log instead
         for m in missing:
             print(motif_to_row(m, len(rows[0])))
-    else:
-        print("\nAll solutions covered")
 
 # ----------------------------
 # Main pipeline
@@ -277,7 +295,6 @@ def build_execution_plan(recipes):
     add_missing_solution_layer(dag, motifs, rows)
     roots = find_best_root(motifs, rows)
     steps = traverse_dag_unique(dag, roots)
-    steps = map_indices_to_column_ids(steps, recipes)
     verify_all_reached(dag, roots, rows)
     return steps, dag, roots, rows
 
