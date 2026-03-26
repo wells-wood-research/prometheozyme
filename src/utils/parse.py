@@ -1,9 +1,10 @@
-from typing import Dict, List
+from typing import Dict
 from utils.types import Atom, Config, Ingredient, Restraint, RecipeEntry, Recipes
 import yaml
 import os
 import sys
 import datetime
+from pathlib import Path
 
 def get_config(configPath):
     if not os.path.isfile(configPath):
@@ -17,7 +18,7 @@ def get_default_parameters():
     verbosity = "debug" # misc.get("verbosity", ".")
     rmsd_threshold = 1.0 # misc.get("rmsd", 2.0)
     project_name = "Kemp_eliminase" # misc.get("project_name", "test")
-    workdir = "/home/mchrnwsk/prometheozyme/runs" # misc.get("workdir", ".")
+    workdir = Path("/home/mchrnwsk/prometheozyme/runs") # misc.get("workdir", ".")
 
     # orca
     orca = {
@@ -35,34 +36,10 @@ def get_default_parameters():
     # Setup output dir
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     project_name = f"{timestamp}_{project_name}"
-    outdir = os.path.join(workdir, project_name)
-    os.makedirs(outdir, exist_ok=True)
+    outdir = workdir / project_name
+    outdir.mkdir(parents=True, exist_ok=True)
 
     return outdir, verbosity, rmsd_threshold, orca
-
-def get_parameters(config):
-        # Get miscellaneous parameters
-    misc = config.get("misc", {})
-    verbosity = misc.get("verbosity", ".")
-    rmsd_threshold = misc.get("rmsd", 2.0)
-    addTimestamp = misc.get("timestamp", True)
-    project_name = misc.get("project_name", "test")
-    workdir = misc.get("workdir", ".")
-
-    # Get orca docker parameters
-    orca = config.get("orca", {})
-
-    # Setup output dir
-    if addTimestamp:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        project_name = f"{timestamp}_{project_name}"
-    outdir = os.path.join(workdir, project_name)
-    os.makedirs(outdir, exist_ok=True)
-
-    # Get ingredients metadata
-    ingredients = config.get("ingredients", [])
-
-    return outdir, verbosity, rmsd_threshold, orca, ingredients
 
 def get_cookbook(config):
     ingredients = config.get("ingredients", {})
