@@ -1,29 +1,10 @@
 import io
 import os
-import re
 import logging
 import numpy as np
 import pandas as pd
 from pdbUtils import pdbUtils
 from typing import Tuple, Optional, Any
-
-from utils.drEval import evaluate_distance, evaluate_angle
-
-########################
-## LOGGING
-########################
-
-def get_logger(logger: Optional[logging.Logger] = None) -> logging.Logger:
-    """Return a valid logger, creating one if not provided."""
-    if logger is None:
-        logger = logging.getLogger(__name__)
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-    return logger
 
 ########################
 ## FILE TYPE CONVERSION
@@ -55,8 +36,6 @@ def isXYZ(pathXYZ: str) -> bool:
 
 def pdb2df(pathPDB: str, logger: Optional[logging.Logger] = None) -> Optional[pd.DataFrame]:
     """Convert a PDB file to a DataFrame."""
-    logger = get_logger()
-
     if not isPDB(pathPDB):
         return None
 
@@ -73,8 +52,6 @@ def pdb2df(pathPDB: str, logger: Optional[logging.Logger] = None) -> Optional[pd
 
 def df2pdb(df: pd.DataFrame, outPDB: str, remarks: list = [], logger: Optional[logging.Logger] = None) -> Optional[Any]:
     """Convert a DataFrame to a PDB file."""
-    logger = get_logger(logger)
-
     if not isinstance(df, pd.DataFrame) or df.empty:
         logger.error("Invalid or empty DataFrame provided.")
         return None
@@ -110,8 +87,6 @@ def df2pdb(df: pd.DataFrame, outPDB: str, remarks: list = [], logger: Optional[l
 
 def df2xyz(df: pd.DataFrame, comment: str, outXYZ: str, logger: Optional[logging.Logger] = None) -> None:
     """Write DataFrame to XYZ file format."""
-    logger = get_logger(logger)
-
     if not isinstance(df, pd.DataFrame) or df.empty:
         raise ValueError("Invalid or empty DataFrame provided.")
 
@@ -130,8 +105,6 @@ def df2xyz(df: pd.DataFrame, comment: str, outXYZ: str, logger: Optional[logging
 
 def pdb2xyz(pathPDB: str, outXYZ: str, logger: Optional[logging.Logger] = None) -> None:
     """Convert a PDB file to XYZ format."""
-    logger = get_logger(logger)
-
     df = pdb2df(pathPDB, logger)
     if df is None:
         logger.error("Failed to load PDB file; aborting conversion.")
@@ -149,8 +122,6 @@ def pdb2xyz(pathPDB: str, outXYZ: str, logger: Optional[logging.Logger] = None) 
 
 def xyz2df(pathXYZ: str, logger: Optional[logging.Logger] = None) -> Optional[Tuple[int, str, pd.DataFrame]]:
     """Convert an XYZ file to a DataFrame."""
-    logger = get_logger(logger)
-
     if not isXYZ(pathXYZ):
         return None
 
@@ -172,8 +143,6 @@ def xyz2df(pathXYZ: str, logger: Optional[logging.Logger] = None) -> Optional[Tu
 
 def xyz2pdb(pathXYZ: str, outPDB: str, logger: Optional[logging.Logger] = None) -> None:
     """Convert an XYZ file to a PDB format."""
-    logger = get_logger(logger)
-
     xyz_data = xyz2df(pathXYZ, logger)
     if xyz_data is None:
         logger.error("Failed to read XYZ file; aborting conversion.")
@@ -252,98 +221,6 @@ def read_xyz(file_path, logger=None):
     
     return structures
 
-def parse_energy_comment(comment):
-    eopt = einter = None
-    if comment:
-        eopt_match = re.search(r"Eopt=(-?\d+\.\d+)", comment)
-        einter_match = re.search(r"Einter=(-?\d+\.\d+)", comment)
-        if eopt_match: eopt = float(eopt_match.group(1))
-        if einter_match: einter = float(einter_match.group(1))
-    return eopt, einter
-
-def evaluate_restraints(coords, restraints_abs, logger=None):
-    allOk = True
-    for r in restraints_abs:
-        if r.property == "distance":
-            a = int(r.sele[0].idx)
-            b = int(r.sele[1].idx)
-            val  = r.params.val
-            uptol  = r.params.uptol
-            downtol = r.params.downtol
-            dist = evaluate_distance(coords, a, b)
-            lower = val - downtol if downtol is not None else float("-inf")
-            upper = val + uptol   if uptol   is not None else float("inf")
-            isOk = lower <= dist <= upper
-            logger.info(f"Distance between restrained atoms: {dist}, expected {val} within {lower} and {upper} tolerance ({'failed' if not isOk else 'passed'}).")
-            if not isOk:
-                allOk = False
-                break
-        elif r.property == "angle":
-            a = int(r.sele[0].idx)
-            b = int(r.sele[1].idx)
-            c = int(r.sele[2].idx)
-            val  = r.params.val
-            uptol  = r.params.uptol
-            downtol = r.params.downtol
-            angle = evaluate_angle(coords, a, b, c)
-            lower = val - downtol if downtol is not None else float("-inf")
-            upper = val + uptol   if uptol   is not None else float("inf")
-            isOk = lower <= angle <= upper
-            logger.info(f"Angle between restrained atoms: {angle}, expected {val} within {lower} and {upper} tolerance ({'failed' if not isOk else 'passed'}).")
-            if not isOk:
-                allOk = False
-                break
-    return allOk
-
-def extract_ok_docker_results(multi_xyz_path, n_atoms_host, restraints_abs, logger=None):
-    """
-    - Split a multi-structure XYZ file.
-    - Extract Eopt/Einter from the comment line.
-    - Save each as a single XYZ file.
-    - Return list of (Result, DataFrame).
-    """
-    base_dir = os.path.dirname(multi_xyz_path)
-    base_name = os.path.basename(multi_xyz_path)
-
-    # Reuse universal parser
-    structures = read_xyz(multi_xyz_path, logger=logger)
-
-    results = []
-
-    for i, (atom_count, comment, coords, atom_types) in enumerate(structures):
-        # TODO after optmisation there might be duplicated results - need to remove based on RMSD
-        # use AMPAL? https://isambard-uob.github.io/ampal/ampal.html#ampal.base_ampal.BaseAmpal.rmsd
-
-        # --- Parse energies using regex ---
-        eopt = einter = None
-        if comment:
-            eopt, einter = parse_energy_comment(comment)
-
-        # --- Create dataframe ---
-        df = pd.DataFrame({
-            "ELEMENT": atom_types,
-            "X": coords[:, 0],
-            "Y": coords[:, 1],
-            "Z": coords[:, 2],
-        })
-
-        # --- Construct new output filename ---
-        new_name = re.sub(r"\.all\.optimized\.xyz$", "", base_name)
-        new_path = os.path.join(base_dir, f"{new_name}.result.{i}.xyz")
-
-        # --- Reuse write_xyz() ---
-        write_xyz(new_path, comment, coords, atom_types)
-
-        results.append((new_path, eopt, einter, df))
-
-    if logger:
-        logger.info(f"Split {multi_xyz_path} into {len(results)} results.")
-
-    if len(results) < 1:
-        logger.warning("No docker result structures passed the restraint test for this host seed. This is not critical unless no subsequent results exist. To increase success rate, consider increasing tolerance or force on the relevant restraint.")
-    
-    return results
-
 def write_xyz(file, comment, coords, atom_types):
     """Write coordinates to an XYZ file."""
     def write_to_file(f):
@@ -360,57 +237,6 @@ def write_xyz(file, comment, coords, atom_types):
     elif isinstance(file, str):
         with open(file, 'w') as f:
             write_to_file(f)
-
-def read_score(filepath, logger=None):
-    with open(filepath, 'r') as f:
-        lines = f.readlines()
-
-    # Find the start of the results table
-    start_index = None
-    for i, line in enumerate(lines):
-        if line.strip().startswith("mode |  affinity"):
-            start_index = i + 3  # data starts 3 lines after the header line
-            break
-
-    # Parse the affinity column
-    affinities = []
-    if start_index is not None:
-        for line in lines[start_index:]:
-            parts = line.split()
-            if len(parts) >= 2:
-                try:
-                    affinity = float(parts[1])  # Second column is "affinity"
-                    affinities.append(affinity)
-                except ValueError:
-                    continue  # Skip lines that don't contain floats in expected place
-    else:
-        logger.error(f"No scores found in {filepath}!")
-
-    # Convert to NumPy array or DataFrame
-    affinity_array = np.array(affinities)
-
-    return affinity_array
-
-def append_scores(xyz_file, scores_file, logger=None):
-    structures = read_xyz(xyz_file, logger=logger)
-    scores = read_score(scores_file, logger=logger)
-
-    if len(structures) != len(scores):
-        if logger:
-            logger.error(f"Mismatch: {len(structures)} structures vs {len(scores)} scores in {xyz_file}")
-        else:
-            raise ValueError(f"Mismatch: {len(structures)} structures vs {len(scores)} scores")
-
-    temp_output = xyz_file + ".tmp"
-
-    with open(temp_output, 'w') as f:
-        for i, (atom_count, comment, coordinates, atom_types) in enumerate(structures):
-            score = scores[i]
-            new_comment = f"{score:.7f}"
-            write_xyz(f, new_comment, coordinates, atom_types)
-
-    # Replace original file only after successful write
-    os.replace(temp_output, xyz_file)
 
 def split_multi_xyz(multi_xyz_path, output_dir, logger=None):
     """
@@ -643,3 +469,11 @@ def get_rmsd(df1, df2, idxs):
     coords2 = df2.loc[idxs, ["X","Y","Z"]].to_numpy()
     diff = coords1 - coords2
     return np.sqrt(np.mean(np.sum(diff**2, axis=1)))
+
+def get_molec_xyz_path(cwd, path):
+        return cwd / path.lstrip('/').replace(".mol2", ".xyz")
+    
+def prep_assembly_dir(outdir, signature):
+    assembly_dir = outdir / "tmp" / signature
+    assembly_dir.mkdir(parents=True, exist_ok=True)
+    return assembly_dir
