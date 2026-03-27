@@ -2,6 +2,7 @@ import os
 import numpy as np
 import re
 from utils.structure import read_xyz, write_xyz
+import pandas as pd
 
 def calculate_distance(coord1, coord2):
     """Calculate Euclidean distance between two 3D coordinates."""
