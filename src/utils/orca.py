@@ -3,8 +3,10 @@ class FilePath:
     pass
 class DirectoryPath:
     pass
+from pathlib import Path
 
 # from https://github.com/wells-wood-research/qmmm/blob/559b8ddf88eaab55f138e4ad2bdc04c3016f1f2d/scripts/drOrca.py
+
 
 def write_input(f, inputFormat, moleculeInfo, inputFile):
     qmCharge = moleculeInfo["charge"]
@@ -357,8 +359,8 @@ def make_orca_input(orcaInput: FilePath,
     if qmmm:
         simpleInputLine.append("QMMM")
 
-    if not orcaInput.endswith(".inp"):
-        orcaInput += ".inp"
+    if orcaInput.suffix != ".inp":
+        orcaInput = Path(orcaInput).with_suffix(".inp")
     with open(orcaInput, "w") as f:
         write_title(f, title)
         write_simple_input(f, simpleInputLine, parallelize)
