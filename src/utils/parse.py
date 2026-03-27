@@ -13,7 +13,7 @@ def get_config(configPath):
         config = yaml.safe_load(file)
     return config
 
-def get_default_parameters():
+def get_parameters():
     # misc = config.get("misc", {})
     verbosity = "debug" # misc.get("verbosity", ".")
     rmsd_threshold = 1.0 # misc.get("rmsd", 2.0)
@@ -153,7 +153,7 @@ def load_config(config_path: str) -> Config:
     raw_config = get_config(config_path)
 
     # parameters
-    outdir, verbosity, rmsd_threshold, orca = get_default_parameters()
+    outdir, verbosity, rmsd_threshold, orca = get_parameters()
     # or: use get_parameters(raw_config) if switching later
 
     # cookbook
