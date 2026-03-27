@@ -7,6 +7,49 @@ from pathlib import Path
 
 # from https://github.com/wells-wood-research/qmmm/blob/559b8ddf88eaab55f138e4ad2bdc04c3016f1f2d/scripts/drOrca.py
 
+def calculate_charge(charges):
+    return int(sum(charges))
+    
+def calculate_multiplicity(multiplicities):
+    # Assume molecules are weakly or non-interacting
+    spin = int(sum(m - 1 for m in multiplicities) / 2)
+    multiplicity = 2*spin + 1
+    return multiplicity
+def write_docking_input(workdir, host_file, host_charge, host_multiplicity, guest_file, guest_charge, guest_multiplicity, restraints, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
+    inp_file_path = Path(workdir / "dock").with_suffix(".inp")
+    title = f"ORCA DOCKER: Automated Docking Algorithm"
+    # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
+    moleculeInfo = {"charge": host_charge, "multiplicity": host_multiplicity}
+    
+    docker_biases = []
+    for restr in restraints:
+        if restr.type == "distance":
+            membs = {t for t, _ in restr.connectionsTranslated}
+            if membs == {"host", "guest"}:
+                host_atom_idx = [idx for memb, idx in restr.connectionsTranslated if memb == "host"][0]
+                guest_atom_idx = [idx for memb, idx in restr.connectionsTranslated if memb == "guest"][0]
+                docker_biases.append({
+                    "guest_atom_idx": guest_atom_idx,
+                    "host_atom_idx": host_atom_idx,
+                    "val": restr.value,
+                    "uptol": 1.1 * restr.value, # TODO later define tolerance in some settings - for now hardcoded 10%
+                    "downtol": 0.9 * restr.value, # TODO later define tolerance in some settings - for now hardcoded 10%
+                    "force": 100 # TODO later define force in some settings - for now hardcoded 100
+                })    
+    docker = {"guestPath": guest_file, "guestCharge": guest_charge, "guestMultiplicity": guest_multiplicity, "fixHost": fixHost, "bias": docker_biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
+    # Use the updated XYZ file for optimization
+    make_orca_input(orcaInput=inp_file_path,
+                    title=title,
+                    simpleInputLine=[qmMethod],
+                    inputFormat="xyzfile",
+                    inputFile=host_file,
+                    moleculeInfo=moleculeInfo,
+                    parallelize=nprocs,
+                    docker=docker,
+                    geom=None)
+    
+    # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
+    return inp_file_path
 
 def write_input(f, inputFormat, moleculeInfo, inputFile):
     qmCharge = moleculeInfo["charge"]
