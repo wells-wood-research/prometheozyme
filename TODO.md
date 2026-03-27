@@ -29,3 +29,16 @@
 [x] TODO is result of copt.xyz used in next steps?
 [] Save at least ine example structure (per ingredient combination) in 'specials'
 [] Grouping products by number of atoms is not enough for RMSD - different amino acids can have same number of atoms
+
+All notes about ORCA's restraints' quirks:
+# it matters whether they are between host-host (old) or host-guest (new)
+# old: geom KEEP, new: geom SCAN for angle and distance, docker BIAS for distance?
+# host-guest restraints in SCAN can be defined by adding n atoms of guest to host
+# host-guest restraints in BIAS can be defined as HOST_IDX, GUEST_IDX (absolute)
+---
+# After several requests from our users ORCA now allows up to three coordinates to be scanned within one calculation
+---
+# for KEEP and SCAN - need to know what is the currentValue value; it is possible to start the relaxed surface scan with a different scan parameter than the value present in your molecule, but this value should not be too far away from the initial structure
+# for SCAN and BIAS - need only know what is the ending value
+---
+# %docker block allows only bond bias (no angles or torsions) and overrides any restraints from %geom block
