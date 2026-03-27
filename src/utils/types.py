@@ -1,6 +1,6 @@
 import logging
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Literal
 
 ########################
 ## LOGGING
@@ -33,16 +33,21 @@ class Ingredient:
     name: str
     charge: int
     multiplicity: int
-    filepath: str  # ← add this
+    filepath: str
     atoms: Dict[str, Atom]
 
+# Inter-host/guest (new) restraints are introduced as BIAS in orca's %docker block 
+# Other (old) restraints are written in orca's %geom block
+# guest-guest restraints need to be considered in subsequent docker steps where guest has become host
+Scope = Literal["host-guest", "host-host", "guest-guest"]
 
 @dataclass
 class Restraint:
     type: str
-    value: Optional[float]
+    value: float
     connections: List[str]
-
+    connectionsTranslated: Optional[List[int]] = field(default_factory=list)
+    currentValue: Optional[float] = None
 
 @dataclass
 class RecipeEntry:
