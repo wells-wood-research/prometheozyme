@@ -237,9 +237,8 @@ def write_docker_block(f, docker):
         biases = docker.get("bias", [])
         for bias in biases:
             f.write(f"{' '*4}BIAS\n")
-            atoms = bias.get("atoms", [])
-            guest_idx = atoms[0]
-            host_idx = atoms[1]
+            guest_idx = bias.get("guest_atom_idx", 0)
+            host_idx = bias.get("host_atom_idx", 0)
             val = bias.get("val", 0.0)
             force = bias.get("force", 100)
             f.write(f"{' '*8}{{ B {guest_idx} {host_idx} {val} {force} }}\n")
