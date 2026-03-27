@@ -247,24 +247,24 @@ def dag_levels(dag, roots):
             queue.append((child, lvl + 1))
     return levels
 
-def visualize_dag(dag, roots, rows):
+def visualize_dag(dag, roots, rows, logger=None):
     n_cols = len(rows[0])
     levels = dag_levels(dag, roots)
-    print("\nDAG LEVELS:\n")
+    logger.debug("\nDAG LEVELS:\n")
     for lvl in sorted(levels):
-        print(f"Level {lvl}:")
+        logger.debug(f"Level {lvl}:")
         for node in levels[lvl]:
-            print(" ", motif_to_row(node, n_cols))
-        print()
-    print("\nEDGES:\n")
+            logger.debug(f" {motif_to_row(node, n_cols)}")
+        logger.debug("")
+    logger.debug("\nEDGES:\n")
     for parent, children in dag.items():
         for child in children:
-            print(motif_to_row(parent, n_cols), "->", motif_to_row(child, n_cols), "|", describe_step(parent, child))
+            logger.debug(f"{motif_to_row(parent, n_cols)} -> {motif_to_row(child, n_cols)} | {describe_step(parent, child)}")
 
 # ----------------------------
 # STEP 8 — Verification
 # ----------------------------
-def verify_all_reached(dag, roots, rows):
+def verify_all_reached(dag, roots, rows, logger=None):
     final_motifs = {frozenset((i, v) for i, v in enumerate(row)) for row in rows}
     visited = set()
     queue = deque(roots)
@@ -277,9 +277,9 @@ def verify_all_reached(dag, roots, rows):
             queue.append(child)
     missing = final_motifs - visited
     if missing:
-        print("\nMissing solutions:") # TODO log instead
+        logger.warning("\nMissing solutions:")
         for m in missing:
-            print(motif_to_row(m, len(rows[0])))
+            logger.warning(motif_to_row(m, len(rows[0])))
 
 # ----------------------------
 # Main pipeline
@@ -301,23 +301,22 @@ def build_execution_plan(recipes):
 # ----------------------------
 # Pretty printing
 # ----------------------------
-def print_execution_steps(steps, rows):
+def print_execution_steps(steps, rows, logger=None):
     n_cols = len(rows[0])
     for i, (parent, child) in enumerate(steps, 1):
-        print(f"Step {i}: {describe_step(parent, child)}")
-        print("  From:", motif_to_row(parent, n_cols))
-        print("  To:  ", motif_to_row(child, n_cols))
-        print()
+        logger.debug(f"""Step {i}: {describe_step(parent, child)}
+                    From: {motif_to_row(parent, n_cols)}
+                    To:   {motif_to_row(child, n_cols)}\n""")
 
-def print_parallel_batches(dag, roots):
+def print_parallel_batches(dag, roots, logger=None):
     levels = dag_levels(dag, roots)
-    print("\nPARALLEL EXECUTION PLAN:\n")
+    logger.debug("\nPARALLEL EXECUTION PLAN:\n")
     for lvl in sorted(levels):
         if lvl == 0:
             continue
-        print(f"Batch {lvl}:")
+        logger.debug(f"Batch {lvl}:")
         for node in levels[lvl]:
             for parent, children in dag.items():
                 if node in children:
-                    print(" ", describe_step(parent, node))
-        print()
+                    logger.debug(f" {describe_step(parent, node)}")
+        logger.debug("")
