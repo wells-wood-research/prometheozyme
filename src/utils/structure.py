@@ -164,6 +164,38 @@ def xyz2pdb(pathXYZ: str, outPDB: str, logger: Optional[logging.Logger] = None) 
 def read_xyz(file_path, logger=None):
     """Read an XYZ file and return a list of (atom_count, comment, coordinates, atom_types) where coordinates is a numpy array."""
     with open(file_path, 'r') as f:
+        # Read atom count
+        line = f.readline().strip()
+        if not line:
+            raise ValueError("File is empty")
+        atom_count = int(line)
+
+        # Read comment line
+        comment = f.readline().strip()
+
+        # Read coordinates and types
+        atom_types = []
+        coords = []
+        
+        for _ in range(atom_count):
+            line = f.readline()
+            if not line:
+                break
+            
+            parts = line.split()
+            if len(parts) < 4:
+                continue # Or raise an error if strictness is needed
+            
+            atom_types.append(parts[0])
+            coords.append([float(parts[1]), float(parts[2]), float(parts[3])])
+
+    coordinates = np.array(coords)
+    
+    return atom_count, comment, coordinates, atom_types
+
+def read_multi_xyz(file_path, logger=None):
+    """Read an XYZ file and return a list of (atom_count, comment, coordinates, atom_types) where coordinates is a numpy array."""
+    with open(file_path, 'r') as f:
         lines = [line.strip() for line in f.readlines()]
     
     structures = []
