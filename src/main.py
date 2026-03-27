@@ -186,98 +186,53 @@ def assign_chain_ids(df):
 # DOCKING
 # ----------------------------
 
-def calculate_charge(charges):
-    return int(sum(charges))
-    
-def calculate_multiplicity(multiplicities):
-    # Assume molecules are weakly or non-interacting
-    spin = int(sum(m - 1 for m in multiplicities) / 2)
-    multiplicity = 2*spin + 1
-    return multiplicity
-
-def define_orca_params(orca, course_desc=None):
-    # Define default ORCA settings
-    default_orca_settings = {
-        "orcapath": "./orca",
-        "qmMethod_dock": "XTB2",
-        "qmMethod_opt": "XTB2",
-        "strategy": "NORMAL",
-        "optLevel": "sloppyopt",
-        "nOpt": 5,
-        "fixHost": True,
-        "gridExtent": 15,
-        "nprocs": 8
-    }
-
-    # Merge global ORCA config (orca dict from config file)
-    # This overrides defaults with general config-level values
-    merged_orca_settings = {**default_orca_settings, **orca}
-
-    # Check if this course defines specific ORCA overrides
-    if course_desc:
-        course_orca_settings = course_desc.orcaSettings
-        if course_orca_settings:
-            # Only overwrite recognized keys
-            for key in default_orca_settings.keys():
-                if key in course_orca_settings:
-                    merged_orca_settings[key] = course_orca_settings[key]
-
-    # Extract final ORCA parameters
-    orcapath = merged_orca_settings["orcapath"]
-    qmMethod_dock = merged_orca_settings["qmMethod_dock"]
-    qmMethod_opt = merged_orca_settings["qmMethod_opt"]
-    strategy = merged_orca_settings["strategy"]
-    optLevel = merged_orca_settings["optLevel"]
-    nOpt = merged_orca_settings["nOpt"]
-    fixHost = merged_orca_settings["fixHost"]
-    gridExtent = merged_orca_settings["gridExtent"]
-    nprocs = merged_orca_settings["nprocs"]
-
-    return orcapath, qmMethod_dock, qmMethod_opt, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
-
-def dock(host_input_file, guest_input_file, new_restraints, old_restraints, output_dir, orca):
-    return None
-
-def dock_old(outdir, course_key, course_desc, orca):
+def assemble(host_file, host_charge, host_multiplicity, guest_file, guest_charge, guest_multiplicity, relevant_restraints, host_assembly_n_atoms, assembly_output_dir, orca_params):
+    # dock - host frozen, distances between host and guest as bias
     try:
-        orcapath, qmMethod_dock, qmMethod_opt, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs = define_orca_params(orca, course_desc)
-        
-        workdir = os.path.join(outdir, *course_key[1:])
-        os.makedirs(workdir, exist_ok=True)
-
-        host_n_atoms = course_desc.host.n_atoms
-        current_step_restraints = process_restraints_for_docking(course_desc.restraints, host_n_atoms)
-        restraints_abs = course_desc.host.restraints + current_step_restraints
-
-        inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
-            course_key[0], course_desc.guests[0], course_desc.host, current_step_restraints,
-            workdir, qmMethod_dock, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
-        )
-        logging.info(f"Docking input written at path: {inp_file_path}.inp")
+        orca_dock_input_path = orca.write_docking_input(assembly_output_dir, host_file, host_charge, host_multiplicity, guest_file, guest_charge, guest_multiplicity, relevant_restraints, orca_params["qmMethod_dock"], orca_params["strategy"], orca_params["optLevel"], orca_params["nOpt"], orca_params["fixHost"], orca_params["gridExtent"], orca_params["nprocs"])
+        logging.info(f"Docking input written at path: {orca_dock_input_path}")
         logging.info(f"Running docking...")
-        result = run_orca(inp_file_path, orcapath, timeout=None)
-        logging.info(f"Docking complete. See details at path: {inp_file_path}.out")
+        result = run_orca(orca_dock_input_path, orca_params["orcapath"], timeout=None) # TODO orca needs to be a dataclass not dict
+        logging.info(f"Docking complete. See details at path: {Path(orca_dock_input_path).with_suffix('.out')}")
         if result != 0 :
             logging.error(f"Docking returned status code {result}. Skip to next theozyme...")
             return {} # TODO is this the right error handling?
-
-
-        results_map = process_docking_output(
-            inp_file_path, curr_charge, curr_multiplicity,
-            course_desc.guests[0], course_desc.host, restraints_abs, course_key
-        )
-        if not results_map:
-            logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
-            return {}
-        
-        return results_map
 
     except subprocess.CalledProcessError as e:
         logging.exception(f"Critical error during ORCA run: {e}")
         return {}
     except Exception as e:
         logging.exception(f"Unexpected error in docking step: {e}")
+        return {}    
+    # optimise
+    # scan bonds, angles, dihedrals between host and guest (starting values from end of dock)
+    # keep bonds, angles, dihedrals of host frozen
+    # 3 scans at a time
+
+    # check against restraints - passed become potential hosts for next steps
+
+def dock_old(outdir, course_key, course_desc, orca):
+
+    current_step_restraints = process_restraints_for_docking(course_desc.restraints, host_n_atoms)
+    restraints_abs = course_desc.host.restraints + current_step_restraints
+
+    inp_file_path, curr_charge, curr_multiplicity = write_docking_input(
+        course_key[0], course_desc.guests[0], course_desc.host, current_step_restraints,
+        workdir, qmMethod_dock, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs
+    )
+    logging.info(f"Docking input written at path: {inp_file_path}.inp")
+    logging.info(f"Running docking...")
+    
+
+    results_map = process_docking_output(
+        inp_file_path, curr_charge, curr_multiplicity,
+        course_desc.guests[0], course_desc.host, restraints_abs, course_key
+    )
+    if not results_map:
+        logging.warning(f"Docking at {os.path.dirname(inp_file_path)} produced no usable results.")
         return {}
+    
+    return results_map
 
 def process_restraints_for_docking(restraints, host_n_atoms):
     """
@@ -294,58 +249,7 @@ def process_restraints_for_docking(restraints, host_n_atoms):
         restraints_abs.append(r_new)
     return restraints_abs
 
-def write_docking_input(course_name, guest, host, restraints_abs, workdir, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
-    inp_file_path = os.path.join(workdir, f"dock")
-    title = f"ORCA DOCKER: Automated Docking Algorithm for\n # course: {course_name}\n # host: {host.name}\n # guest: {guest.name}"
 
-    # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
-    moleculeInfo = {"charge": host.charge, "multiplicity": host.multiplicity}
-    
-    docker_biases = []
-    geom_biases = []
-    for r in restraints_abs:
-        if r.property == "distance":
-            a_abs = r.sele[0].idx
-            b_abs = r.sele[1].idx
-            p = [s.parent for s in r.sele]
-
-            if set(p) == {"guest", "host"}:
-                # ensure guest first
-
-                if r.sele[0].parent == "host":
-                    a_abs, b_abs = b_abs, a_abs
-                a_rel = a_abs - host.n_atoms
-                docker_biases.append({
-                    "atoms": [a_rel,b_abs],
-                    "val": r.params.val,
-                    "uptol": r.params.uptol,
-                    "downtol": r.params.downtol,
-                    "force": r.params.force
-                })
-            elif set(p) == {"host"}:
-                geom_biases.append({
-                    "atoms": [a_abs,b_abs],
-                    "val": r.params.val,
-                    "uptol": r.params.uptol,
-                    "downtol": r.params.downtol,
-                })
-    
-    docker = {"guestPath": guest.pathXYZ, "guestCharge": guest.charge, "guestMultiplicity": guest.multiplicity, "fixHost": fixHost, "bias": docker_biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
-    geom = None if not geom_biases else {"keep": geom_biases}
-
-    # Use the updated XYZ file for optimization
-    make_orca_input(orcaInput=inp_file_path,
-                    title=title,
-                    simpleInputLine=[qmMethod],
-                    inputFormat="xyzfile",
-                    inputFile=host.pathXYZ,
-                    moleculeInfo=moleculeInfo,
-                    parallelize=nprocs,
-                    docker=docker,
-                    geom=geom)
-    
-    # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
-    return inp_file_path, calculate_charge([guest.charge, host.charge]), calculate_multiplicity([guest.multiplicity, host.multiplicity])
 
 def process_docking_output(inp_file_path, curr_charge, curr_multiplicity, guest, host, restraints_abs, course_key):
     course_name = course_key[0]
@@ -539,14 +443,14 @@ def process_optimisation_output(pathXYZ, ing):
     return ing
 
 def run_orca(input, orcapath, timeout):
-    stdout_file = Path(f"{input}.out")
-    stderr_file = Path(f"{input}.err")
+    stdout_file = Path(input).with_suffix('.out')
+    stderr_file = Path(input).with_suffix('.err')
 
     try:
         with stdout_file.open("w") as out, stderr_file.open("w") as err:
             # IMPORTANT: remove check=True
             result = subprocess.run(
-                [orcapath, f"{input}.inp"],
+                [orcapath, input],
                 check=False,
                 timeout=timeout,
                 stdout=out,
@@ -731,7 +635,7 @@ def is_first_step(step):
     return False
 
 def row_to_signature(row, lookup):
-    return "|".join(
+    return "-".join(
         "x" if site is None else lookup.get_site_token(site)
         for site in row
     )
@@ -749,10 +653,12 @@ def motif_to_signature(motif, n_cols, lookup):
 
 def main(configPath):
     allOk = True
-    logging.info(f"Cooking begins ({os.path.abspath(configPath)})")
-    # Read config file
-    outdir, verbosity, rmsd_threshold, orca = parse.get_default_parameters() # TODO write parameters on export from frontend
     
+    # Read config file
+    outdir, verbosity, rmsd_threshold, orca_params = parse.get_parameters() # TODO write parameters on export from frontend
+    setup_logging(outdir, verbosity)
+    logging.info(f"Cooking begins ({os.path.abspath(configPath)})")
+
     config = parse.load_config(configPath)
     
     # ID lookups
@@ -766,7 +672,7 @@ def main(configPath):
     
     
     steps, dag, roots, rows = workflow.build_execution_plan(config.recipes)
-    workflow.print_execution_steps(steps, rows)
+    workflow.print_execution_steps(steps, rows, logging)
     if len(roots) > 1:
         # TODO what to do then?
         print(f"Warning: {len(roots)} roots determined.")
@@ -781,17 +687,18 @@ def main(configPath):
             host_row = workflow.motif_to_row(host, n_cols)
             host_signature = row_to_signature(host_row, lookUp)
             host_dir = structure.prep_assembly_dir(outdir, host_signature)
-            host_files = [host_dir / "best.xyz"] # TODO in the future do list(host_dir.glob("passed_*.xyz"))
+            host_files = [host_dir / "dock.docker.xyz"] # TODO in the future do list(host_dir.glob("passed_*.xyz"))
             host_flav_cols = [i for i, col in enumerate(host_row) if col != 'x']
             
         # Find guest file
         guest_id, guest_flav_cols = workflow.determine_guest(host, guest)
         guest_file = structure.get_molec_xyz_path(cwd, config.ingredients[guest_id.molecule_id].filepath)
-        
+
         # Dock dir (for output of this assembly)
         guest_row = workflow.motif_to_row(guest, n_cols)
-        print(guest_row)
         guest_signature = row_to_signature(guest_row, lookUp)
+        # Used to map restrained connections to molecId, atomId sites
+        flavour_map = lookup.build_flavour_map(guest_row, idx_to_flavour)
         
         assembly_output_dir = structure.prep_assembly_dir(outdir, guest_signature)
 
@@ -803,34 +710,35 @@ def main(configPath):
             restr for restr in config.restraints.values()
             if all(connection in flavours for connection in restr.connections)
         ]
-        # New restraints are introduced as inter-host/guest bias in orca's %docker block 
-        new_restraints = [
-            restr for restr in relevant_restraints
-            if any(connection in host_flavours for connection in restr.connections)
-            and any(connection in guest_flavours for connection in restr.connections)
-        ]
-        # Other restraints are written in orca's %geom block
-        # guest-guest restraints need to be considered in subsequent docker steps where guest has become host
-        old_restraints = [
-            restr for restr in relevant_restraints
-            if restr in host_flavours
-        ]
 
-        flavour_map = lookup.build_flavour_map(guest_row, idx_to_flavour)
-        for restr in old_restraints:
-            old_atom_pairs = [
-                flavour_map[fid] for fid in restr.connections
-            ]
-        for restr in new_restraints:
-            new_atom_pairs = [
-                flavour_map[fid] for fid in restr.connections
-            ]
-        print(new_atom_pairs)
-        
+        host_assembly_n_atoms, host_assembly_comment, _, _ = structure.read_xyz(host_files[0]) # TODO host_files are multiple...
+        host_assembly_species = {entry.split(':')[0]: int(entry.split(':')[1]) for entry in host_assembly_comment.split(';')}
+        # What do I need for the restraints?
+        for restr in relevant_restraints:
+            # what type: distance, angle, torsion
+            sites = [flavour_map[fid] for fid in restr.connections]
+            for site in sites:
+                molecId = site[0]
+                atomId = site[1]
+                # whether they are between host-host, or host-guest, or guest-guest
+                if molecId == guest_id.molecule_id:
+                    scope =  "guest"
+                    # or absolute assembly atom idxs to restrain simply add the number of atoms as guest is added to the end of the host file when making the assembly
+                    atom_idx = config.ingredients[molecId].atoms[atomId].atomId
+                else:
+                    scope = "host"
+                    # for absolute assembly atom idxs to restrain add firstAtomIdx of that molec in that assembly file described in xyz file's comment as {molecId: firstAtomIdx}
+                    atom_idx = config.ingredients[molecId].atoms[atomId].atomId + host_assembly_species.get(molecId, 0)
+                restr.connectionsTranslated.append((scope, atom_idx))
+            print(restr)
+        host_charge = orca.calculate_charge([config.ingredients.get(molec, host_id.molecule_id).charge for molec in host_assembly_species.keys()])
+        host_multiplicity = orca.calculate_multiplicity([config.ingredients.get(molec, host_id.molecule_id).multiplicity for molec in host_assembly_species.keys()])
+        guest_charge = config.ingredients[guest_id.molecule_id].charge
+        guest_multiplicity = config.ingredients[guest_id.molecule_id].multiplicity
         # dock
         for host_file in host_files:
-            dock(host_file, guest_file, new_restraints, old_restraints, assembly_output_dir, orca)
-        sys.exit(1)
+            assemble(host_file, host_charge, host_multiplicity, guest_file, guest_charge, guest_multiplicity, relevant_restraints, host_assembly_n_atoms, assembly_output_dir, orca_params)
+        
 
         # check against restraints
         
