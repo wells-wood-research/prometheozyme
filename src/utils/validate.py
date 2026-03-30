@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import re
-from utils.structure import read_xyz, write_xyz
+from utils import structure
 import pandas as pd
 
 def calculate_distance(coord1, coord2):
@@ -57,10 +57,10 @@ def parse_energy_comment(comment):
         if einter_match: einter = float(einter_match.group(1))
     return eopt, einter
 
-def evaluate_restraints(coords, restraints_abs, logger=None):
+def evaluate_restraints(coords, restraints):
     allOk = True
-    for r in restraints_abs:
-        if r.property == "distance":
+    for restr in restraints:
+        if restr.property == "distance":
             a = int(r.sele[0].idx)
             b = int(r.sele[1].idx)
             val  = r.params.val
@@ -74,7 +74,7 @@ def evaluate_restraints(coords, restraints_abs, logger=None):
             if not isOk:
                 allOk = False
                 break
-        elif r.property == "angle":
+        elif restr.property == "angle":
             a = int(r.sele[0].idx)
             b = int(r.sele[1].idx)
             c = int(r.sele[2].idx)
@@ -91,10 +91,11 @@ def evaluate_restraints(coords, restraints_abs, logger=None):
                 break
     return allOk
 
-def extract_ok_docker_results(multi_xyz_path, n_atoms_host, restraints_abs, logger=None):
+def extract_docker_results(multi_xyz_path, assembly_metadata_comment, logger=None):
     """
     - Split a multi-structure XYZ file.
     - Extract Eopt/Einter from the comment line.
+    - Add assembly's metadata in the comment line.
     - Save each as a single XYZ file.
     - Return list of (Result, DataFrame).
     """
@@ -102,7 +103,7 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, restraints_abs, logg
     base_name = os.path.basename(multi_xyz_path)
 
     # Reuse universal parser
-    structures = read_xyz(multi_xyz_path, logger=logger)
+    structures = structure.read_multi_xyz(multi_xyz_path, logger=logger)
 
     results = []
 
@@ -114,6 +115,7 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, restraints_abs, logg
         eopt = einter = None
         if comment:
             eopt, einter = parse_energy_comment(comment)
+            new_comment = f"{assembly_metadata_comment}||Eopt={eopt}|Einter={einter}"
 
         # --- Create dataframe ---
         df = pd.DataFrame({
@@ -124,11 +126,11 @@ def extract_ok_docker_results(multi_xyz_path, n_atoms_host, restraints_abs, logg
         })
 
         # --- Construct new output filename ---
-        new_name = re.sub(r"\.all\.optimized\.xyz$", "", base_name)
+        new_name = re.sub(r"\.docker\.struc1\.all\.preoptimized\.xyz$", "", base_name)
         new_path = os.path.join(base_dir, f"{new_name}.result.{i}.xyz")
 
         # --- Reuse write_xyz() ---
-        write_xyz(new_path, comment, coords, atom_types)
+        structure.write_xyz(new_path, new_comment, coords, atom_types)
 
         results.append((new_path, eopt, einter, df))
 
@@ -171,7 +173,7 @@ def read_score(filepath, logger=None):
     return affinity_array
 
 def append_scores(xyz_file, scores_file, logger=None):
-    structures = read_xyz(xyz_file, logger=logger)
+    structures = structure.read_xyz(xyz_file, logger=logger)
     scores = read_score(scores_file, logger=logger)
 
     if len(structures) != len(scores):
@@ -186,7 +188,7 @@ def append_scores(xyz_file, scores_file, logger=None):
         for i, (atom_count, comment, coordinates, atom_types) in enumerate(structures):
             score = scores[i]
             new_comment = f"{score:.7f}"
-            write_xyz(f, new_comment, coordinates, atom_types)
+            structure.write_xyz(f, new_comment, coordinates, atom_types)
 
     # Replace original file only after successful write
     os.replace(temp_output, xyz_file)
