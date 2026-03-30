@@ -27,7 +27,7 @@ def get_parameters():
         "qmMethod_opt": "XTB2",
         "strategy": "NORMAL",
         "optLevel": "sloppyopt",
-        "nOpt": 5,
+        "nOpt": 0,
         "fixHost": True,
         "gridExtent": 15,
         "nprocs": 8
