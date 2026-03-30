@@ -6,6 +6,8 @@ import pandas as pd
 from pdbUtils import pdbUtils
 from typing import Tuple, Optional, Any
 
+from utils import workflow
+
 ########################
 ## FILE TYPE CONVERSION
 ########################
@@ -269,6 +271,13 @@ def write_xyz(file, comment, coords, atom_types):
     elif isinstance(file, str):
         with open(file, 'w') as f:
             write_to_file(f)
+
+def write_xyz_comment(file_path, comment):
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+    lines[1] = comment if comment.endswith('\n') else comment + '\n'
+    with open(file_path, 'w') as f:
+        f.writelines(lines)
 
 def split_multi_xyz(multi_xyz_path, output_dir, logger=None):
     """
