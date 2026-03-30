@@ -36,18 +36,21 @@ class Ingredient:
     filepath: str
     atoms: Dict[str, Atom]
 
-# Inter-host/guest (new) restraints are introduced as BIAS in orca's %docker block 
-# Other (old) restraints are written in orca's %geom block
-# guest-guest restraints need to be considered in subsequent docker steps where guest has become host
-Scope = Literal["host-guest", "host-host", "guest-guest"]
+# Allowed restraint types:
+RestrType = Literal["distance", "angle", "dihedral"]
 
 @dataclass
 class Restraint:
-    type: str
+    type: RestrType
     value: float
+    tolerance: float = field(init=False)
     connections: List[str]
-    connectionsTranslated: Optional[List[int]] = field(default_factory=list)
+    connectionsDocking: Optional[List[int]] = field(default_factory=list)
+    connectionsOpt: Optional[List[int]] = field(default_factory=list)
     currentValue: Optional[float] = None
+    
+    def __post_init__(self):
+        self.tolerance = 0.1 if self.type == "distance" else 3.0 # TODO assign in config
 
 @dataclass
 class RecipeEntry:
