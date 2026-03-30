@@ -21,13 +21,10 @@ def describe_step(parent, child):
     cols = sorted(added.keys())
     return f"Add molecule {mol} at columns {cols}"
 
-def determine_host(parent, child):
+def determine_host(parent):
     parent_dict = dict(parent)
-    added = {c: v for c, v in parent_dict.items()}
-    if not added:
-        return None, []
-    mol = next(iter(set(added.values())))
-    cols = sorted(added.keys())
+    mol = next(iter(set(parent_dict.values())))
+    cols = sorted(parent_dict.keys())
     return mol, cols
 
 def determine_guest(parent, child):
@@ -197,8 +194,9 @@ def find_best_root(motifs, rows):
         cols = len(m)
         mols = len(set(v for _, v in m))
         return (cols, -mols)
-    best = max(candidates, key=score)
-    return [best]
+    best_score = max(score(m) for m in candidates)
+    best_roots = [m for m in candidates if score(m) == best_score]
+    return best_roots
 
 # ----------------------------
 # BFS execution plan
