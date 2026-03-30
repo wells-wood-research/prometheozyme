@@ -1,4 +1,6 @@
 import re
+
+from utils import validate
 class FilePath:
     pass
 class DirectoryPath:
@@ -16,7 +18,15 @@ def calculate_multiplicity(multiplicities):
     multiplicity = 2*spin + 1
     return multiplicity
 def write_docking_input(workdir, host_file, host_charge, host_multiplicity, guest_file, guest_charge, guest_multiplicity, restraints, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
-    inp_file_path = Path(workdir / "dock").with_suffix(".inp")
+    base_path = workdir / "dock"
+    extension = ".inp"
+    inp_file_path = base_path.with_suffix(extension)
+    counter = 1
+    # Keep incrementing if the file already exists
+    while inp_file_path.exists():
+        inp_file_path = base_path.with_name(f"{base_path.stem}_{counter}").with_suffix(extension)
+        counter += 1
+        
     title = f"ORCA DOCKER: Automated Docking Algorithm"
     # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
     moleculeInfo = {"charge": host_charge, "multiplicity": host_multiplicity}
@@ -24,10 +34,10 @@ def write_docking_input(workdir, host_file, host_charge, host_multiplicity, gues
     docker_biases = []
     for restr in restraints:
         if restr.type == "distance":
-            membs = {t for t, _ in restr.connectionsTranslated}
+            membs = {t for t, _ in restr.connectionsDocking}
             if membs == {"host", "guest"}:
-                host_atom_idx = [idx for memb, idx in restr.connectionsTranslated if memb == "host"][0]
-                guest_atom_idx = [idx for memb, idx in restr.connectionsTranslated if memb == "guest"][0]
+                host_atom_idx = [idx for memb, idx in restr.connectionsDocking if memb == "host"][0]
+                guest_atom_idx = [idx for memb, idx in restr.connectionsDocking if memb == "guest"][0]
                 docker_biases.append({
                     "guest_atom_idx": guest_atom_idx,
                     "host_atom_idx": host_atom_idx,
@@ -51,6 +61,99 @@ def write_docking_input(workdir, host_file, host_charge, host_multiplicity, gues
     # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
     return inp_file_path
 
+def chunk_list(lst, n):
+    for i in range(0, len(lst), n):
+        yield lst[i:i+n]
+
+def write_opt_input(workdir, input_file, coords, charge, multiplicity,
+                    restraints, qmMethod, nprocs):
+
+    title = "ORCA Restrained Geometry Optimisation"
+    moleculeInfo = {"charge": charge, "multiplicity": multiplicity}
+
+    keep_base = []
+    scan_all = []
+
+    for restr in restraints:
+        atoms = restr.connectionsOpt
+
+        if restr.type == "distance":
+            restr.currentValue = validate.evaluate_distance(coords, atoms[0], atoms[1])
+
+        elif restr.type == "angle":
+            restr.currentValue = validate.evaluate_angle(coords, atoms[0], atoms[1], atoms[2])
+
+        else:
+            raise ValueError(f"Unknown restraint property: {restr.type}")
+
+        # decide keep vs scan
+        if abs(restr.currentValue - restr.value) <= restr.tolerance:
+            keep_base.append({
+                "atoms": atoms,
+                "val": restr.currentValue   # lock at current geometry
+            })
+        else:
+            scan_all.append({
+                "restraint": restr,
+                "atoms": atoms,
+                "start": restr.currentValue,
+                "end": restr.value,
+                "iter": max(1, round(abs(restr.currentValue - restr.value) / 10))
+            })
+
+    # Batch scanning - orca allows only 3 scans at a time
+    scan_chunks = list(chunk_list(scan_all, 3))
+
+    for i, chunk in enumerate(scan_chunks):
+
+        geom = {
+            "keep": keep_base,
+            "scan": [
+                {
+                    "atoms": item["atoms"],
+                    "start": item["start"],
+                    "end": item["end"],
+                    "iter": item["iter"]
+                }
+                for item in chunk
+            ]
+        }
+
+        inp_file_path = Path(workdir) / "opt" / f"opt_scan_{i}.inp"
+
+        make_orca_input(
+            orcaInput=inp_file_path,
+            title=title,
+            simpleInputLine=[qmMethod],
+            inputFormat="xyzfile",
+            inputFile=input_file,
+            moleculeInfo=moleculeInfo,
+            parallelize=nprocs,
+            docker=None,
+            geom=geom
+        )
+    
+    return [Path(workdir) / "opt" / f"opt_scan_{i}.inp" for i in range(len(scan_chunks))]
+
+def write_copt_input_path(opt_inp_file_path):
+    with open(opt_inp_file_path, 'r') as f:
+        lines = f.readlines()
+
+    # Find the index of the last line starting with "!"
+    # Searching backwards (reversed) is faster if the file is large
+    insert_index = -1
+    for i in range(len(lines) - 1, -1, -1):
+        if lines[i].startswith('!'):
+            insert_index = i + 1
+            break
+
+    # If a match was found, insert the new line and write back
+    if insert_index != -1:
+        lines.insert(insert_index, "!COPT\n")
+        
+        with open(opt_inp_file_path, 'w') as f:
+            f.writelines(lines)
+            
 def write_input(f, inputFormat, moleculeInfo, inputFile):
     qmCharge = moleculeInfo["charge"]
     qmMultiplicity = moleculeInfo["multiplicity"]
@@ -287,7 +390,7 @@ def write_docker_block(f, docker):
             f.write(f"{' '*8}{{ B {guest_idx} {host_idx} {val} {force} }}\n")
             f.write(f"{' '*4}END\n")
     f.write(f"{' '*4}OPTLEVEL {docker.get('optLevel', 'sloppyopt')}\n")
-    f.write(f"{' '*4}NOPT {docker.get('nOpt', 5)}\n")
+    f.write(f"{' '*4}nOpt {docker.get('nOpt', 5)}\n")
     f.write("END\n")
     f.write("\n")
 
