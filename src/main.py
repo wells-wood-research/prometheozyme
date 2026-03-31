@@ -187,7 +187,8 @@ def assign_chain_ids(df):
 # ----------------------------
 
 def assemble(host_files, host_charge, host_multiplicity, guest_id, guest_file, guest_charge, guest_multiplicity, relevant_restraints, host_assembly_n_atoms, host_assembly_metadata_comment, assembly_output_dir, orca_params):
-    
+    new_assembly_metadata_comment = f"{host_assembly_metadata_comment.split('||')[0]};{guest_id.molecule_id}:{host_assembly_n_atoms}"
+
     # dock - host frozen, distances between host and guest as bias
     docked_results = []
     for host_file in host_files:
@@ -204,19 +205,20 @@ def assemble(host_files, host_charge, host_multiplicity, guest_id, guest_file, g
         except Exception as e:
             logging.exception(f"Unexpected error in docking step: {e}")
         # process docking results - extract all possibilities from the multi-xyz output and assign assembly metadata comment
-        new_assembly_metadata_comment = f"{host_assembly_metadata_comment.split('||')[0]};{guest_id.molecule_id}:{host_assembly_n_atoms}"
-        docked_results.append(validate.extract_docker_results(Path(dock_inp_file_path).with_suffix(".docker.struc1.all.preoptimized.xyz"), new_assembly_metadata_comment, logger=logging))
+        docked_results.extend(validate.extract_docker_results(Path(dock_inp_file_path).with_suffix(".docker.struc1.all.optimized.xyz"), new_assembly_metadata_comment, logger=logging)) # TODO use optimised results as can control the number with preOpt
     
     # optimise
     # scan bonds, angles, dihedrals that have starting values from end of dock above tolerance away from target values in restraints - this should help with convergence and avoid issues with orca internal coordinates when angles approach linearity
     # keep other bonds, angles, dihedrals of host frozen
     # 3 scans at a time - batched chunks
     optimised_results = []
+    candidate_id = 0
     for docked_result in docked_results: # each docked_result is (new_path, eopt, einter, df)
         try:
-            file = docked_result[0]
-            coords = docked_result[-1][["X", "Y", "Z"]].to_numpy()
-            opt_output_dir = file.parent
+            file = Path(docked_result[0])
+            coords = docked_result[3].loc[:, ["X", "Y", "Z"]].to_numpy()
+            opt_output_dir = file.parent / f"candidate_{candidate_id}"
+            opt_output_dir.mkdir()
             charge = orca.calculate_charge([host_charge, guest_charge])
             multiplicity = orca.calculate_multiplicity([host_multiplicity, guest_multiplicity])
             opt_restraints = [
@@ -247,14 +249,15 @@ def assemble(host_files, host_charge, host_multiplicity, guest_id, guest_file, g
                         logging.info(f"Retrying optimisation in Cartesian coordinates")
                         copt_inp_file_path = orca.write_copt_input_path(opt_inp_file_path)
                         logging.info(f"Ooptimisation input rewritten in cartesian coordinates: {copt_inp_file_path}")
-                        result = run_orca(copt_inp_file_path, orca_params["orcapath"], timeout=300) # TODO Put timeout in config
+                        result_opt = run_orca(copt_inp_file_path, orca_params["orcapath"], timeout=300) # TODO Put timeout in config
                         logging.info(f"Cartesian optimisation complete: {copt_inp_file_path.with_suffix('.out')}")
                 if result_opt != 0 :
-                    logging.error(f"Optimisation returned status code {result}. Skip to next theozyme...")
-                else:
-                    optimised_results.append((opt_inp_file_path.with_suffix(".xyz")))
+                    logging.error(f"Optimisation returned status code {result_opt}. Skip to next theozyme...")
+                    opt_inp_file_paths.remove(opt_inp_file_path)
         except Exception as e:
             logging.exception(f"Unexpected error in optimisation step: {e}")
+        optimised_results.append((opt_inp_file_paths[-1].with_suffix(".xyz")))
+        candidate_id += 1
     
     # check against restraints - passed become potential hosts for next steps
     for i, optimised_result in enumerate(optimised_results):
