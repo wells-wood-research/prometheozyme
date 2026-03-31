@@ -1,4 +1,5 @@
 import os
+from wsgiref import validate
 import numpy as np
 import re
 from utils import structure
@@ -57,36 +58,23 @@ def parse_energy_comment(comment):
         if einter_match: einter = float(einter_match.group(1))
     return eopt, einter
 
-def evaluate_restraints(coords, restraints):
+def evaluate_restraints(coords, restraints, logger=None):
     allOk = True
     for restr in restraints:
-        if restr.property == "distance":
-            a = int(r.sele[0].idx)
-            b = int(r.sele[1].idx)
-            val  = r.params.val
-            uptol  = r.params.uptol
-            downtol = r.params.downtol
-            dist = evaluate_distance(coords, a, b)
-            lower = val - downtol if downtol is not None else float("-inf")
-            upper = val + uptol   if uptol   is not None else float("inf")
-            isOk = lower <= dist <= upper
-            logger.info(f"Distance between restrained atoms: {dist}, expected {val} within {lower} and {upper} tolerance ({'failed' if not isOk else 'passed'}).")
-            if not isOk:
-                allOk = False
-                break
-        elif restr.property == "angle":
-            a = int(r.sele[0].idx)
-            b = int(r.sele[1].idx)
-            c = int(r.sele[2].idx)
-            val  = r.params.val
-            uptol  = r.params.uptol
-            downtol = r.params.downtol
-            angle = evaluate_angle(coords, a, b, c)
-            lower = val - downtol if downtol is not None else float("-inf")
-            upper = val + uptol   if uptol   is not None else float("inf")
-            isOk = lower <= angle <= upper
-            logger.info(f"Angle between restrained atoms: {angle}, expected {val} within {lower} and {upper} tolerance ({'failed' if not isOk else 'passed'}).")
-            if not isOk:
+        atoms = restr.connectionsOpt
+
+        if restr.type == "distance":
+            currentValue = evaluate_distance(coords, atoms[0], atoms[1])
+
+        elif restr.type == "angle":
+            currentValue = evaluate_angle(coords, atoms[0], atoms[1], atoms[2])
+
+        else:
+            raise ValueError(f"Unknown restraint property: {restr.type}")
+
+        # decide keep vs scan
+        isOk = abs(currentValue - restr.value) <= restr.tolerance
+        if not isOk:
                 allOk = False
                 break
     return allOk
@@ -126,8 +114,7 @@ def extract_docker_results(multi_xyz_path, assembly_metadata_comment, logger=Non
         })
 
         # --- Construct new output filename ---
-        new_name = re.sub(r"\.docker\.struc1\.all\.preoptimized\.xyz$", "", base_name)
-        new_path = os.path.join(base_dir, f"{new_name}.result.{i}.xyz")
+        new_path = os.path.join(base_dir, f"dock.result.{i}.xyz")
 
         # --- Reuse write_xyz() ---
         structure.write_xyz(new_path, new_comment, coords, atom_types)
