@@ -1,13 +1,42 @@
 import re
-
-from utils import validate
 class FilePath:
     pass
 class DirectoryPath:
     pass
 from pathlib import Path
+import subprocess
+from utils import validate
 
 # from https://github.com/wells-wood-research/qmmm/blob/559b8ddf88eaab55f138e4ad2bdc04c3016f1f2d/scripts/drOrca.py
+
+def run_orca(input, orcapath, timeout, logger=None):
+    stdout_file = Path(input).with_suffix('.out')
+    stderr_file = Path(input).with_suffix('.err')
+
+    try:
+        with stdout_file.open("w") as out, stderr_file.open("w") as err:
+            # IMPORTANT: remove check=True
+            result = subprocess.run(
+                [orcapath, input],
+                check=False,
+                timeout=timeout,
+                stdout=out,
+                stderr=err
+            )
+    except subprocess.TimeoutExpired:
+        logger.error(f"Process exceeded {timeout} seconds and was terminated.")
+        return 1
+
+    except Exception as e:
+        # This handles only unexpected exceptions (file IO issues, etc.)
+        logger.error(f"Unexpected exception during ORCA run: {e}")
+        with stdout_file.open("r", errors="ignore") as f:
+            lines = f.readlines()
+        for line in lines[-13:]:
+            logger.error(line.rstrip())
+        return 1
+
+    return result.returncode
 
 def calculate_charge(charges):
     return int(sum(charges))
