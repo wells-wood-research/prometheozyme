@@ -119,21 +119,21 @@ def write_opt_input(workdir, input_file, coords, charge, multiplicity,
             ]
         }
 
-        inp_file_path = Path(workdir) / "opt" / f"opt_scan_{i}.inp"
+        inp_file_path = Path(workdir) / f"opt_scan_{i}.inp"
 
         make_orca_input(
             orcaInput=inp_file_path,
             title=title,
-            simpleInputLine=[qmMethod],
+            simpleInputLine=[qmMethod, "Opt"],
             inputFormat="xyzfile",
-            inputFile=input_file,
+            inputFile=input_file if i == 0 else inp_file_path.with_suffix(".xyz"), # Use the updated XYZ file for subsequent scans
             moleculeInfo=moleculeInfo,
             parallelize=nprocs,
             docker=None,
             geom=geom
         )
     
-    return [Path(workdir) / "opt" / f"opt_scan_{i}.inp" for i in range(len(scan_chunks))]
+    return [Path(workdir) / f"opt_scan_{i}.inp" for i in range(len(scan_chunks))]
 
 def write_copt_input_path(opt_inp_file_path):
     with open(opt_inp_file_path, 'r') as f:
