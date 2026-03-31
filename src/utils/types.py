@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Literal
+from pathlib import Path
 
 ########################
 ## LOGGING
@@ -77,3 +78,11 @@ class Config:
 class Site:
     molecule_id: str
     atom_id: str
+
+@dataclass
+class StepNode:
+    id: str
+    path: Path
+    step: int
+    species: dict[str, int]   # {molecule_id: first_atom_index}
+    n_atoms: int

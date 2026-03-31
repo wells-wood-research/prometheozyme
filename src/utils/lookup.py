@@ -54,3 +54,9 @@ def build_flavour_map(row, idx_to_flavour):
         flavour_id = idx_to_flavour[i]
         mapping[flavour_id] = (site.molecule_id, site.atom_id)
     return mapping
+
+def get_flavours_from_motif(motif, idx_to_flavour):
+    return {
+        idx_to_flavour[col]
+        for col, _ in motif
+    }

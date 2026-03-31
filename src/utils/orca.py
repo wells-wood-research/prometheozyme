@@ -46,123 +46,161 @@ def calculate_multiplicity(multiplicities):
     spin = int(sum(m - 1 for m in multiplicities) / 2)
     multiplicity = 2*spin + 1
     return multiplicity
-def write_docking_input(workdir, host_file, host_charge, host_multiplicity, guest_file, guest_charge, guest_multiplicity, restraints, qmMethod, strategy, optLevel, nOpt, fixHost, gridExtent, nprocs):
-    base_path = workdir / "dock"
-    extension = ".inp"
-    inp_file_path = base_path.with_suffix(extension)
-    counter = 1
-    # Keep incrementing if the file already exists
-    while inp_file_path.exists():
-        inp_file_path = base_path.with_name(f"{base_path.stem}_{counter}").with_suffix(extension)
-        counter += 1
-        
-    title = f"ORCA DOCKER: Automated Docking Algorithm"
-    # charge and multiplicity of host only - guest is defined under %DOCKER GUESTCHARGE and GUESTMULT
-    moleculeInfo = {"charge": host_charge, "multiplicity": host_multiplicity}
-    
+
+def write_docking_input(
+    workdir,
+    job_id,
+    host_file,
+    host_charge,
+    host_multiplicity,
+    guest_file,
+    guest_charge,
+    guest_multiplicity,
+    docking_restraints,
+    qmMethod,
+    strategy,
+    optLevel,
+    nOpt,
+    fixHost,
+    gridExtent,
+    nprocs
+):
+
+    inp_file_path = workdir / f"dock_{job_id}.inp"
+
+    title = "ORCA DOCKER: Automated Docking Algorithm"
+
+    moleculeInfo = {
+        "charge": host_charge,
+        "multiplicity": host_multiplicity
+    }
+
     docker_biases = []
-    for restr in restraints:
-        if restr.type == "distance":
-            membs = {t for t, _ in restr.connectionsDocking}
-            if membs == {"host", "guest"}:
-                host_atom_idx = [idx for memb, idx in restr.connectionsDocking if memb == "host"][0]
-                guest_atom_idx = [idx for memb, idx in restr.connectionsDocking if memb == "guest"][0]
-                docker_biases.append({
-                    "guest_atom_idx": guest_atom_idx,
-                    "host_atom_idx": host_atom_idx,
-                    "val": restr.value,
-                    "uptol": 1.1 * restr.value, # TODO later define tolerance in some settings - for now hardcoded 10%
-                    "downtol": 0.9 * restr.value, # TODO later define tolerance in some settings - for now hardcoded 10%
-                    "force": 100 # TODO later define force in some settings - for now hardcoded 100
-                })    
-    docker = {"guestPath": guest_file, "guestCharge": guest_charge, "guestMultiplicity": guest_multiplicity, "fixHost": fixHost, "bias": docker_biases, "strategy": strategy, "optLevel": optLevel, "nOpt": nOpt, "gridExtent": gridExtent}
-    # Use the updated XYZ file for optimization
-    make_orca_input(orcaInput=inp_file_path,
-                    title=title,
-                    simpleInputLine=[qmMethod],
-                    inputFormat="xyzfile",
-                    inputFile=host_file,
-                    moleculeInfo=moleculeInfo,
-                    parallelize=nprocs,
-                    docker=docker,
-                    geom=None)
-    
-    # Metadata returned to facilitate further docking, reusing products of earlier docking as hosts
+
+    for r in docking_restraints:
+        docker_biases.append({
+            "guest_atom_idx": r["guest_atom"],
+            "host_atom_idx": r["host_atom"],
+            "val": r["value"],
+            "uptol": r["value"] * 1.1,
+            "downtol": r["value"] * 0.9,
+            "force": 100
+        })
+
+    docker = {
+        "guestPath": guest_file,
+        "guestCharge": guest_charge,
+        "guestMultiplicity": guest_multiplicity,
+        "fixHost": fixHost,
+        "bias": docker_biases,
+        "strategy": strategy,
+        "optLevel": optLevel,
+        "nOpt": nOpt,
+        "gridExtent": gridExtent
+    }
+
+    make_orca_input(
+        orcaInput=inp_file_path,
+        title=title,
+        simpleInputLine=[qmMethod],
+        inputFormat="xyzfile",
+        inputFile=host_file,
+        moleculeInfo=moleculeInfo,
+        parallelize=nprocs,
+        docker=docker,
+        geom=None
+    )
+
     return inp_file_path
 
 def chunk_list(lst, n):
     for i in range(0, len(lst), n):
         yield lst[i:i+n]
 
-def write_opt_input(workdir, input_file, coords, charge, multiplicity,
-                    restraints, qmMethod, nprocs):
+def write_opt_input(
+    workdir,
+    input_file,
+    coords,
+    charge,
+    multiplicity,
+    restraints,
+    qmMethod,
+    nprocs
+):
 
     title = "ORCA Restrained Geometry Optimisation"
-    moleculeInfo = {"charge": charge, "multiplicity": multiplicity}
+
+    moleculeInfo = {
+        "charge": charge,
+        "multiplicity": multiplicity
+    }
 
     keep_base = []
     scan_all = []
 
-    for restr in restraints:
-        atoms = restr.connectionsOpt
+    # -------------------------
+    # Evaluate restraints (NO mutation)
+    # -------------------------
+    for r in restraints:
+        atoms = r.connectionsOpt
 
-        if restr.type == "distance":
-            restr.currentValue = validate.evaluate_distance(coords, atoms[0], atoms[1])
-
-        elif restr.type == "angle":
-            restr.currentValue = validate.evaluate_angle(coords, atoms[0], atoms[1], atoms[2])
-
+        if r.type == "distance":
+            current = validate.evaluate_distance(coords, atoms[0], atoms[1])
+        elif r.type == "angle":
+            current = validate.evaluate_angle(coords, atoms[0], atoms[1], atoms[2])
         else:
-            raise ValueError(f"Unknown restraint property: {restr.type}")
+            raise ValueError(f"Unknown restraint type: {r.type}")
 
-        # decide keep vs scan
-        if abs(restr.currentValue - restr.value) <= restr.tolerance:
+        if abs(current - r.value) <= r.tolerance:
             keep_base.append({
                 "atoms": atoms,
-                "val": restr.currentValue   # lock at current geometry
+                "val": current
             })
         else:
             scan_all.append({
-                "restraint": restr,
                 "atoms": atoms,
-                "start": restr.currentValue,
-                "end": restr.value,
-                "iter": max(1, round(abs(restr.currentValue - restr.value) / 10))
+                "start": current,
+                "end": r.value,
+                "iter": max(1, round(abs(current - r.value) / 10))
             })
 
-    # Batch scanning - orca allows only 3 scans at a time
     scan_chunks = list(chunk_list(scan_all, 3))
 
+    inp_paths = []
+    prev_xyz = input_file
+
+    # -------------------------
+    # Generate chained scans
+    # -------------------------
     for i, chunk in enumerate(scan_chunks):
+
+        inp_file_path = workdir / f"opt_scan_{i:03d}.inp"
 
         geom = {
             "keep": keep_base,
-            "scan": [
-                {
-                    "atoms": item["atoms"],
-                    "start": item["start"],
-                    "end": item["end"],
-                    "iter": item["iter"]
-                }
-                for item in chunk
-            ]
+            "scan": chunk
         }
-
-        inp_file_path = Path(workdir) / f"opt_scan_{i}.inp"
 
         make_orca_input(
             orcaInput=inp_file_path,
             title=title,
             simpleInputLine=[qmMethod, "Opt"],
             inputFormat="xyzfile",
-            inputFile=input_file if i == 0 else inp_file_path.with_suffix(".xyz"), # Use the updated XYZ file for subsequent scans
+            inputFile=prev_xyz,
             moleculeInfo=moleculeInfo,
             parallelize=nprocs,
             docker=None,
             geom=geom
         )
-    
-    return [Path(workdir) / f"opt_scan_{i}.inp" for i in range(len(scan_chunks))]
+
+        inp_paths.append(inp_file_path)
+
+        # next step uses output of this one
+        prev_xyz = inp_file_path.with_suffix(".xyz")
+        if not prev_xyz.exists():
+            break
+
+    return inp_paths
 
 def write_copt_input_path(opt_inp_file_path):
     with open(opt_inp_file_path, 'r') as f:
@@ -419,7 +457,7 @@ def write_docker_block(f, docker):
             f.write(f"{' '*8}{{ B {guest_idx} {host_idx} {val} {force} }}\n")
             f.write(f"{' '*4}END\n")
     f.write(f"{' '*4}OPTLEVEL {docker.get('optLevel', 'sloppyopt')}\n")
-    f.write(f"{' '*4}nOpt {docker.get('nOpt', 5)}\n")
+    f.write(f"{' '*4}NOPT {docker.get('nOpt', 5)}\n")
     f.write("END\n")
     f.write("\n")
 

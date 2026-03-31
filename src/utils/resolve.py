@@ -1,6 +1,6 @@
 from utils import structure, types
 
-class StructureFileResolver:
+class StructureFileResolver: # TODO this needs to be fixed to match new dock output structure
     def __init__(self, encoder, config, cwd, outdir, rows):
         """
         Parameters
@@ -48,7 +48,9 @@ class StructureFileResolver:
 
         host_dir = structure.prep_assembly_dir(self.outdir, host_signature)
 
-        return [host_dir / "dock.docker.xyz"]
+        valid_dir = host_dir / "valid"
+
+        return sorted(valid_dir.glob("host_*.xyz"))
 
     # -------------------------
     # Internal
