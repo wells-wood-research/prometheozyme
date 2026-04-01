@@ -27,7 +27,7 @@ def get_parameters():
         "qmMethod_opt": "XTB2",
         "strategy": "NORMAL",
         "optLevel": "sloppyopt",
-        "nOpt": 2, # TODO seems that "dock.docker.struc1.all.preoptimized.xyz" files are empty if there is no optimisation step; on the other hand dock.docker.struc1.all.swarm.xyz contain 1000s structures; and dock.docker.xyz contains only one best structure
+        "nOpt": 1, # TODO seems that "dock.docker.struc1.all.preoptimized.xyz" files are empty if there is no optimisation step; on the other hand dock.docker.struc1.all.swarm.xyz contain 1000s structures; and dock.docker.xyz contains only one best structure
         "fixHost": True,
         "gridExtent": 15,
         "nprocs": 8
@@ -59,6 +59,10 @@ def get_cookbook(config):
     #       }
     #   }
     # }
+    for ingredient in ingredients.values():
+        for atom in ingredient.get("atoms", {}).values():
+            if "atomId" in atom:
+                atom["atomId"] -= 1
 
     flavours = config.get("flavours", {})
     # dict[str, str]
