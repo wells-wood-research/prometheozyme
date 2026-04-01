@@ -50,7 +50,7 @@ def build_comment(species):
     return ";".join(f"{k}:{v}" for k, v in species.items())
 
 
-def get_all_flavours(host, guest, idx_to_flavour):
+def select_relevant_flavours(host, guest, idx_to_flavour):
     return {
         idx_to_flavour[col]
         for motif in (host, guest)
@@ -74,7 +74,7 @@ def select_relevant_restraints(config, flavours):
         if all(conn in flavours for conn in r.connections)
     ]
 
-def build_docking_restraints(base_restraints, flavour_map, guest_id, config):
+def build_docking_restraints(base_restraints, flavour_map, guest_site, config):
     docking = []
 
     for r in base_restraints:
@@ -95,10 +95,10 @@ def build_docking_restraints(base_restraints, flavour_map, guest_id, config):
         idx2 = config.ingredients[mol2].atoms[atom2].atomId
 
         # Identify host vs guest
-        if mol1 == guest_id.molecule_id:
+        if mol1 == guest_site.molecule_id:
             guest_atom = idx1
             host_atom = idx2
-        elif mol2 == guest_id.molecule_id:
+        elif mol2 == guest_site.molecule_id:
             guest_atom = idx2
             host_atom = idx1
         else:
@@ -114,7 +114,7 @@ def build_docking_restraints(base_restraints, flavour_map, guest_id, config):
 
     return docking
 
-def build_opt_restraints(base_restraints, flavour_map, host_node, guest_id, config):
+def build_opt_restraints(base_restraints, flavour_map, host_node, guest_site, config):
     opt = []
 
     for r in base_restraints:
@@ -129,7 +129,7 @@ def build_opt_restraints(base_restraints, flavour_map, host_node, guest_id, conf
             local_idx = config.ingredients[mol_id].atoms[atom_id].atomId
 
             # Convert to assembly index
-            if mol_id == guest_id.molecule_id:
+            if mol_id == guest_site.molecule_id:
                 abs_idx = local_idx + host_node.n_atoms
             else:
                 abs_idx = local_idx + host_node.species.get(mol_id, 0)
@@ -156,7 +156,7 @@ def main(configPath):
 
     n_cols = len(config.flavours)
     lookUp = lookup.IDLookup()
-    flavour_ids = list(config.recipes[0].keys())
+    flavour_ids = list(config.flavours.keys())
     idx_to_flavour = dict(enumerate(flavour_ids))
 
     encoder = signature.SignatureEncoder(lookUp, n_cols)
@@ -204,12 +204,11 @@ def main(configPath):
 
         next_hosts = []
 
-        guest_id, _ = workflow.determine_guest(host, guest)
+        guest_site, _ = workflow.determine_guest(host, guest)
         guest_file = structure.get_molec_xyz_path(
-            cwd, config.ingredients[guest_id.molecule_id].filepath
+            cwd, config.ingredients[guest_site.molecule_id].filepath
         )
 
-        guest_row = workflow.motif_to_row(guest, n_cols)
         guest_signature = encoder.motif_to_signature(guest)
 
         assembly_output_dir = structure.prep_assembly_dir(outdir, guest_signature)
@@ -227,17 +226,17 @@ def main(configPath):
             # -------------------------
             # PREP RESTRAINTS
             # -------------------------
-            flavours = get_all_flavours(host, guest, idx_to_flavour)
+            relevant_flavours = select_relevant_flavours(host, guest, idx_to_flavour)
             flavour_map = build_flavour_map(host, guest, idx_to_flavour)
 
-            base_restraints = select_relevant_restraints(config, flavours)
+            base_restraints = select_relevant_restraints(config, relevant_flavours)
 
             docking_restraints = build_docking_restraints(
-                base_restraints, flavour_map, guest_id, config
+                base_restraints, flavour_map, guest_site, config
             )
 
             opt_restraints = build_opt_restraints(
-                base_restraints, flavour_map, host_node, guest_id, config
+                base_restraints, flavour_map, host_node, guest_site, config
             )
 
             # -------------------------
@@ -253,8 +252,8 @@ def main(configPath):
                 for m in host_node.species.keys()
             ])
 
-            guest_charge = config.ingredients[guest_id.molecule_id].charge
-            guest_multiplicity = config.ingredients[guest_id.molecule_id].multiplicity
+            guest_charge = config.ingredients[guest_site.molecule_id].charge
+            guest_multiplicity = config.ingredients[guest_site.molecule_id].multiplicity
 
             # -------------------------
             # DOCK
@@ -280,11 +279,12 @@ def main(configPath):
 
             orca.run_orca(dock_inp, orca_params["orcapath"], timeout=None)
 
-            dock_xyz = dock_inp.with_suffix(".docker.struc1.all.preoptimized.xyz")
+            dock_xyz = dock_inp.with_suffix(".docker.struc1.all.optimized.xyz")
 
+            host_node.species[guest_site.molecule_id] = host_node.n_atoms
             docked_results = validate.extract_docker_results(
                 dock_xyz,
-                build_comment(host_node.species),
+                build_comment(host_node.species), # TODO add guest as species be
                 logger=logging
             )
 
@@ -314,8 +314,11 @@ def main(configPath):
                 for inp in opt_inputs:
                     result = orca.run_orca(inp, orca_params["orcapath"], timeout=None)
 
-                    if result == 0:
-                        final_xyz = inp.with_suffix(".xyz")
+                    if result != 0:
+                        final_xyz = None
+                        break  # stop chain immediately
+
+                    final_xyz = inp.with_suffix(".xyz")
 
                 if final_xyz is None:
                     continue
@@ -328,7 +331,7 @@ def main(configPath):
                 if validate.evaluate_restraints(coords, opt_restraints):
 
                     new_species = dict(host_node.species)
-                    new_species[guest_id.molecule_id] = host_node.n_atoms
+                    new_species[guest_site.molecule_id] = host_node.n_atoms
 
                     new_comment = build_comment(new_species)
 

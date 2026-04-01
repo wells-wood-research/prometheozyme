@@ -30,7 +30,7 @@ def run_orca(input, orcapath, timeout, logger=None):
                 timeout=timeout,
                 stdout=out,
                 stderr=err,
-                env=clean_env   # 🔥 THIS IS THE KEY
+                env=clean_env
             )
 
     except subprocess.TimeoutExpired:
@@ -165,7 +165,7 @@ def write_opt_input(
         if abs(current - r.value) <= r.tolerance:
             keep_base.append({
                 "atoms": atoms,
-                "val": current
+                "val": r.value
             })
         else:
             scan_all.append({
@@ -176,6 +176,8 @@ def write_opt_input(
             })
 
     scan_chunks = list(chunk_list(scan_all, 3))
+    if not scan_chunks:
+        scan_chunks = [[]]
 
     inp_paths = []
     prev_xyz = input_file
@@ -208,8 +210,6 @@ def write_opt_input(
 
         # next step uses output of this one
         prev_xyz = inp_file_path.with_suffix(".xyz")
-        if not prev_xyz.exists():
-            break
 
     return inp_paths
 
