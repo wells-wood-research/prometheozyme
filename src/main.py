@@ -5,8 +5,7 @@ import shutil
 import sys
 from pathlib import Path
 import rmsd
-from collections import defaultdict
-leftovers_dict = defaultdict(list)
+import copy
 
 from pathlib import Path
 cwd = Path(__file__).resolve().parent
@@ -47,166 +46,327 @@ def setup_logging(workdir, verbosity="info"):
         handlers=handlers,
     )
 
+def build_comment(species):
+    return ";".join(f"{k}:{v}" for k, v in species.items())
+
+
+def get_all_flavours(host, guest, idx_to_flavour):
+    return {
+        idx_to_flavour[col]
+        for motif in (host, guest)
+        for col, _ in motif
+    }
+
+
+def build_flavour_map(host, guest, idx_to_flavour):
+    combined = dict(host)
+    combined.update(dict(guest))
+
+    return {
+        idx_to_flavour[col]: (site.molecule_id, site.atom_id)
+        for col, site in combined.items()
+    }
+
+
+def select_relevant_restraints(config, flavours):
+    return [
+        r for r in config.restraints.values()
+        if all(conn in flavours for conn in r.connections)
+    ]
+
+def build_docking_restraints(base_restraints, flavour_map, guest_id, config):
+    docking = []
+
+    for r in base_restraints:
+
+        # ORCA docker only supports distance restraints
+        if r.type != "distance":
+            continue
+
+        sites = [flavour_map[f] for f in r.connections]
+
+        if len(sites) != 2:
+            continue  # skip invalid
+
+        (mol1, atom1), (mol2, atom2) = sites
+
+        # Convert node IDs → XYZ indices
+        idx1 = config.ingredients[mol1].atoms[atom1].atomId
+        idx2 = config.ingredients[mol2].atoms[atom2].atomId
+
+        # Identify host vs guest
+        if mol1 == guest_id.molecule_id:
+            guest_atom = idx1
+            host_atom = idx2
+        elif mol2 == guest_id.molecule_id:
+            guest_atom = idx2
+            host_atom = idx1
+        else:
+            # skip host-host or guest-guest (not valid for docking)
+            continue
+
+        docking.append({
+            "host_atom": host_atom,
+            "guest_atom": guest_atom,
+            "value": r.value,
+            "tolerance": r.tolerance
+        })
+
+    return docking
+
+def build_opt_restraints(base_restraints, flavour_map, host_node, guest_id, config):
+    opt = []
+
+    for r in base_restraints:
+        new_r = copy.deepcopy(r)
+
+        abs_atoms = []
+
+        for fid in r.connections:
+            mol_id, atom_id = flavour_map[fid]
+
+            # Convert node ID → XYZ index
+            local_idx = config.ingredients[mol_id].atoms[atom_id].atomId
+
+            # Convert to assembly index
+            if mol_id == guest_id.molecule_id:
+                abs_idx = local_idx + host_node.n_atoms
+            else:
+                abs_idx = local_idx + host_node.species.get(mol_id, 0)
+
+            abs_atoms.append(abs_idx)
+
+        new_r.connectionsOpt = abs_atoms
+
+        opt.append(new_r)
+
+    return opt
+
 # ----------------------------
 # MAIN LOOP
 # ----------------------------
 
 def main(configPath):
-    allOk = True
-    
-    # Read config file
-    outdir, verbosity, rmsd_threshold, orca_params = parse.get_parameters() # TODO write parameters on export from frontend
+
+    outdir, verbosity, rmsd_threshold, orca_params = parse.get_parameters()
     setup_logging(outdir, verbosity)
-    logging.info(f"Cooking begins ({os.path.abspath(configPath)})")
 
     config = parse.load_config(configPath)
     steps, dag, roots, rows = workflow.build_execution_plan(config.recipes)
-    workflow.print_execution_steps(steps, rows, logging)
-    
-    # Set up lookups etc
+
     n_cols = len(config.flavours)
     lookUp = lookup.IDLookup()
     flavour_ids = list(config.recipes[0].keys())
-    idx_to_flavour = dict(enumerate(flavour_ids)) # flavour_to_idx = {v: k for k, v in idx_to_flavour.items()}
-    def get_flav_ids(flavour_columns):
-        return [idx_to_flavour[flav] for flav in flavour_columns]
+    idx_to_flavour = dict(enumerate(flavour_ids))
+
     encoder = signature.SignatureEncoder(lookUp, n_cols)
     resolver = resolve.StructureFileResolver(encoder, config, cwd, outdir, rows)
-    
-    for host, guest in steps:
-        # Find host file
-        host_files = resolver.resolve(host)
-        host_id, host_flav_cols = workflow.determine_host(host) # TODO must check that there is only one unique
-            
-        # Find guest file
-        guest_id, guest_flav_cols = workflow.determine_guest(host, guest)
-        guest_file = structure.get_molec_xyz_path(cwd, config.ingredients[guest_id.molecule_id].filepath)
 
-        # Dock dir (for output of this assembly)
+    # -------------------------
+    # INITIAL HOSTS
+    # -------------------------
+    current_hosts = []
+
+    initial_files = resolver.resolve(steps[0][0])
+
+    for i, hf in enumerate(initial_files):
+        _, _, coords, _ = structure.read_xyz(hf)
+
+        mol_ids = {site.molecule_id for _, site in steps[0][0]}
+        mol_id = next(iter(mol_ids))
+
+        species = {mol_id: 0}
+
+        current_hosts.append(
+            types.StepNode(
+                id=f"host_{i:03d}",
+                path=Path(hf),
+                step=0,
+                species=species,
+                n_atoms=len(coords)
+            )
+        )
+
+    # -------------------------
+    # MAIN LOOP - Track failed hosts for dependency skipping
+    # -------------------------
+    failed_host_motifs = set()
+    
+    for step_idx, (host, guest) in enumerate(steps):
+
+        # Skip steps where the parent host motif has no valid candidates
+        if host in failed_host_motifs:
+            logging.warning(
+                f"Skipping step {step_idx} (parent motif has no valid hosts): "
+                f"{workflow.motif_to_row(host, n_cols)} -> {workflow.motif_to_row(guest, n_cols)}"
+            )
+            continue
+
+        next_hosts = []
+
+        guest_id, _ = workflow.determine_guest(host, guest)
+        guest_file = structure.get_molec_xyz_path(
+            cwd, config.ingredients[guest_id.molecule_id].filepath
+        )
+
         guest_row = workflow.motif_to_row(guest, n_cols)
-        guest_signature = encoder.motif_to_signature(guest)      
+        guest_signature = encoder.motif_to_signature(guest)
+
         assembly_output_dir = structure.prep_assembly_dir(outdir, guest_signature)
 
-        # Used to map restrained connections to molecId, atomId sites
-        flavour_map = lookup.build_flavour_map(guest_row, idx_to_flavour)
-        # Find restraints to apply in this step
-        host_flavours = get_flav_ids(host_flav_cols)
-        guest_flavours = get_flav_ids(guest_flav_cols)
-        flavours = host_flavours + guest_flavours
-        relevant_restraints = [
-            restr for restr in config.restraints.values()
-            if all(connection in flavours for connection in restr.connections)
-        ]
+        for host_idx, host_node in enumerate(current_hosts):
 
-        host_assembly_n_atoms, host_assembly_metadata_comment, _, _ = structure.read_xyz(host_files[0]) # TODO host_files are multiple...
-        host_assembly_species = {entry.split(':')[0]: int(entry.split(':')[1]) for entry in host_assembly_metadata_comment.split('||')[0].split(';')}
-        # What do I need for the restraints?
-        for restr in relevant_restraints:
-            # what type: distance, angle, torsion
-            sites = [flavour_map[fid] for fid in restr.connections]
-            for site in sites:
-                molecId = site[0]
-                atomId = site[1]
-                # whether they are between host-host, or host-guest, or guest-guest
-                if molecId == guest_id.molecule_id:
-                    scope =  "guest"
-                    # or absolute assembly atom idxs to restrain simply add the number of atoms as guest is added to the end of the host file when making the assembly
-                    atom_idx = config.ingredients[molecId].atoms[atomId].atomId
-                else:
-                    scope = "host"
-                    # for absolute assembly atom idxs to restrain add firstAtomIdx of that molec in that assembly file described in xyz file's comment as {molecId: firstAtomIdx}
-                    atom_idx = config.ingredients[molecId].atoms[atomId].atomId + host_assembly_species.get(molecId, 0)
-                restr.connectionsDocking.append((scope, atom_idx))
-            print(restr)
-        host_charge = orca.calculate_charge([config.ingredients.get(molec, host_id.molecule_id).charge for molec in host_assembly_species.keys()])
-        host_multiplicity = orca.calculate_multiplicity([config.ingredients.get(molec, host_id.molecule_id).multiplicity for molec in host_assembly_species.keys()])
-        guest_charge = config.ingredients[guest_id.molecule_id].charge
-        guest_multiplicity = config.ingredients[guest_id.molecule_id].multiplicity
+            host_dir = assembly_output_dir / f"host_{host_idx:03d}"
+            dock_dir = host_dir / "dock"
+            opt_dir = host_dir / "opt"
+            valid_dir = host_dir / "valid"
 
-        # assemble: dock, optimise, validate for success
-        new_assembly_metadata_comment = f"{host_assembly_metadata_comment.split('||')[0]};{guest_id.molecule_id}:{host_assembly_n_atoms}"
+            for d in [dock_dir, opt_dir, valid_dir]:
+                d.mkdir(parents=True, exist_ok=True)
 
-        # dock - host frozen, distances between host and guest as bias
-        docked_results = []
-        for host_file in host_files:
-            try:
-                dock_inp_file_path = orca.write_docking_input(assembly_output_dir, host_file, host_charge, host_multiplicity, guest_file, guest_charge, guest_multiplicity, relevant_restraints, orca_params["qmMethod_dock"], orca_params["strategy"], orca_params["optLevel"], orca_params["nOpt"], orca_params["fixHost"], orca_params["gridExtent"], orca_params["nprocs"])
-                logging.info(f"Docking input written at path: {dock_inp_file_path}")
-                logging.info(f"Running docking...")
-                result_dock = orca.run_orca(dock_inp_file_path, orca_params["orcapath"], timeout=None) # TODO orca needs to be a dataclass not dict
-                logging.info(f"Docking complete. See details at path: {Path(dock_inp_file_path).with_suffix('.out')}")
-                if result_dock != 0 :
-                    logging.error(f"Docking returned status code {result_dock}. Skip to next theozyme...")
-            except subprocess.CalledProcessError as e:
-                logging.exception(f"Critical error during ORCA run: {e}")
-            except Exception as e:
-                logging.exception(f"Unexpected error in docking step: {e}")
-            # process docking results - extract all possibilities from the multi-xyz output and assign assembly metadata comment
-            docked_results.extend(validate.extract_docker_results(Path(dock_inp_file_path).with_suffix(".docker.struc1.all.optimized.xyz"), new_assembly_metadata_comment, logger=logging)) # TODO use optimised results as can control the number with preOpt
-        
-        # optimise
-        # scan bonds, angles, dihedrals that have starting values from end of dock above tolerance away from target values in restraints - this should help with convergence and avoid issues with orca internal coordinates when angles approach linearity
-        # keep other bonds, angles, dihedrals of host frozen
-        # 3 scans at a time - batched chunks
-        optimised_results = []
-        candidate_id = 0
-        for docked_result in docked_results: # each docked_result is (new_path, eopt, einter, df)
-            try:
-                file = Path(docked_result[0])
-                coords = docked_result[3].loc[:, ["X", "Y", "Z"]].to_numpy()
-                opt_output_dir = file.parent / f"candidate_{candidate_id}"
-                opt_output_dir.mkdir()
-                charge = orca.calculate_charge([host_charge, guest_charge])
-                multiplicity = orca.calculate_multiplicity([host_multiplicity, guest_multiplicity])
-                opt_restraints = [
-                    types.Restraint(
-                        type=r.type,
-                        value=r.value,
-                        connections=r.connections,
-                        connectionsDocking=r.connectionsDocking,
-                        connectionsOpt=[
-                            b + host_assembly_n_atoms if a == "guest" else b
-                            for a, b in r.connectionsDocking
-                        ],
-                        currentValue=r.currentValue
+            # -------------------------
+            # PREP RESTRAINTS
+            # -------------------------
+            flavours = get_all_flavours(host, guest, idx_to_flavour)
+            flavour_map = build_flavour_map(host, guest, idx_to_flavour)
+
+            base_restraints = select_relevant_restraints(config, flavours)
+
+            docking_restraints = build_docking_restraints(
+                base_restraints, flavour_map, guest_id, config
+            )
+
+            opt_restraints = build_opt_restraints(
+                base_restraints, flavour_map, host_node, guest_id, config
+            )
+
+            # -------------------------
+            # PREP CHARGES AND MULTIPLICITIES
+            # -------------------------
+            host_charge = orca.calculate_charge([
+                config.ingredients[m].charge
+                for m in host_node.species.keys()
+            ])
+
+            host_multiplicity = orca.calculate_multiplicity([
+                config.ingredients[m].multiplicity
+                for m in host_node.species.keys()
+            ])
+
+            guest_charge = config.ingredients[guest_id.molecule_id].charge
+            guest_multiplicity = config.ingredients[guest_id.molecule_id].multiplicity
+
+            # -------------------------
+            # DOCK
+            # -------------------------
+            dock_inp = orca.write_docking_input(
+                dock_dir,
+                host_idx,
+                host_node.path,
+                host_charge,
+                host_multiplicity,
+                guest_file,
+                guest_charge,
+                guest_multiplicity,
+                docking_restraints,
+                orca_params["qmMethod_dock"],
+                orca_params["strategy"],
+                orca_params["optLevel"],
+                orca_params["nOpt"],
+                orca_params["fixHost"],
+                orca_params["gridExtent"],
+                orca_params["nprocs"]
+            )
+
+            orca.run_orca(dock_inp, orca_params["orcapath"], timeout=None)
+
+            dock_xyz = dock_inp.with_suffix(".docker.struc1.all.preoptimized.xyz")
+
+            docked_results = validate.extract_docker_results(
+                dock_xyz,
+                build_comment(host_node.species),
+                logger=logging
+            )
+
+            # -------------------------
+            # OPTIMISE
+            # -------------------------
+            for cand_idx, (path, _, _, df) in enumerate(docked_results):
+
+                candidate_dir = opt_dir / f"candidate_{cand_idx:03d}"
+                candidate_dir.mkdir(exist_ok=True)
+
+                coords = df[["X", "Y", "Z"]].to_numpy()
+
+                opt_inputs = orca.write_opt_input(
+                    candidate_dir,
+                    path,
+                    coords,
+                    orca.calculate_charge([host_charge, guest_charge]),
+                    orca.calculate_multiplicity([host_multiplicity, guest_multiplicity]),
+                    opt_restraints,
+                    orca_params["qmMethod_opt"],
+                    orca_params["nprocs"]
+                )
+
+                final_xyz = None
+
+                for inp in opt_inputs:
+                    result = orca.run_orca(inp, orca_params["orcapath"], timeout=None)
+
+                    if result == 0:
+                        final_xyz = inp.with_suffix(".xyz")
+
+                if final_xyz is None:
+                    continue
+
+                # -------------------------
+                # VALIDATE
+                # -------------------------
+                coords = structure.read_xyz(final_xyz)[2]
+
+                if validate.evaluate_restraints(coords, opt_restraints):
+
+                    new_species = dict(host_node.species)
+                    new_species[guest_id.molecule_id] = host_node.n_atoms
+
+                    new_comment = build_comment(new_species)
+
+                    out_path = valid_dir / f"host_{cand_idx:03d}.xyz"
+                    shutil.copy(final_xyz, out_path)
+                    structure.write_xyz_comment(out_path, new_comment)
+
+                    next_hosts.append(
+                        types.StepNode(
+                            id=f"{host_node.id}_c{cand_idx:03d}",
+                            path=out_path,
+                            step=step_idx + 1,
+                            species=new_species,
+                            n_atoms=host_node.n_atoms + len(coords)
+                        )
                     )
-                    for r in relevant_restraints
-                ]
-                opt_inp_file_paths = orca.write_opt_input(opt_output_dir, file, coords, charge, multiplicity, opt_restraints, orca_params["qmMethod_opt"], orca_params["nprocs"])
-                logging.info(f"Restrained optimisation input written at path(s): {opt_inp_file_paths}")
-                logging.info(f"Running restrained optimisation...")
-                for opt_inp_file_path in opt_inp_file_paths:
-                    result_opt = orca.run_orca(opt_inp_file_path, orca_params["orcapath"], timeout=None)
-                    logging.info(f"Optimisation complete: {opt_inp_file_path.with_suffix('.out')}")
-                    if result_opt == 25: # issue with internal coordinates breaking when angle approaches linear
-                        # check if opt.xyz exists - if yes, use, and maybe even proceed
-                        logging.info("Optimisation failed due to issues with ORCA internal coordinates as the angle approaches linearity. Evaluating outputs for usability.")
-                        if not os.path.exists(opt_inp_file_path.with_suffix(".xyz")):                    
-                            # Rerun with COPT (in cartesian coordinates) - but then can't restrain anything
-                            logging.info(f"Retrying optimisation in Cartesian coordinates")
-                            copt_inp_file_path = orca.write_copt_input_path(opt_inp_file_path)
-                            logging.info(f"Ooptimisation input rewritten in cartesian coordinates: {copt_inp_file_path}")
-                            result_opt = orca.run_orca(copt_inp_file_path, orca_params["orcapath"], timeout=300) # TODO Put timeout in config
-                            logging.info(f"Cartesian optimisation complete: {copt_inp_file_path.with_suffix('.out')}")
-                    if result_opt != 0 :
-                        logging.error(f"Optimisation returned status code {result_opt}. Skip to next theozyme...")
-                        opt_inp_file_paths.remove(opt_inp_file_path)
-            except Exception as e:
-                logging.exception(f"Unexpected error in optimisation step: {e}")
-            optimised_results.append((opt_inp_file_paths[-1].with_suffix(".xyz")))
-            candidate_id += 1
-        
-        # check against restraints - passed become potential hosts for next steps
-        for i, optimised_result in enumerate(optimised_results):
-            coords = structure.read_xyz(optimised_result)[2]
-            base_path = assembly_output_dir / "valid_result"
-            extension = ".xyz"
-            if validate.evaluate_restraints(coords, opt_restraints):
-                dest_path = base_path.with_name(f"{base_path.stem}_{i}").with_suffix(extension)
-                shutil.copy(optimised_result, dest_path)
-                structure.write_xyz_comment(dest_path, new_assembly_metadata_comment)
 
-    sys.exit(1) # TODO later add filtering based on rmsds
+        current_hosts = next_hosts
+
+        if not current_hosts:
+            logging.warning(
+                f"No valid hosts produced in step {step_idx}: "
+                f"{workflow.motif_to_row(host, n_cols)} -> {workflow.motif_to_row(guest, n_cols)}. "
+                f"Marking guest motif as failed and skipping dependent steps."
+            )
+            failed_host_motifs.add(guest)
+            continue
+
+        logging.info(
+            f"Step {step_idx} complete: produced {len(current_hosts)} valid host(s)"
+        )
+
+    logging.info(f"Workflow complete. Processing results...")
+    if failed_host_motifs:
+        logging.warning(
+            f"Failed to produce valid hosts for {len(failed_host_motifs)} motif(s). "
+            f"Some recipe combinations could not be completed."
+        )
     # Create output directory
     results_dir = os.path.join(outdir, "results")
     specials_dir = os.path.join(outdir, "specials")
