@@ -58,7 +58,7 @@ def parse_energy_comment(comment):
         if einter_match: einter = float(einter_match.group(1))
     return eopt, einter
 
-def evaluate_restraints(coords, restraints, logger=None):
+def evaluate_restraints(coords, restraints):
     allOk = True
     for restr in restraints:
         atoms = restr.connectionsOpt
