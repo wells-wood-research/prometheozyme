@@ -1,10 +1,11 @@
 import re
+import os
+import subprocess
 class FilePath:
     pass
 class DirectoryPath:
     pass
 from pathlib import Path
-import subprocess
 from utils import validate
 
 # from https://github.com/wells-wood-research/qmmm/blob/559b8ddf88eaab55f138e4ad2bdc04c3016f1f2d/scripts/drOrca.py
@@ -13,27 +14,37 @@ def run_orca(input, orcapath, timeout, logger=None):
     stdout_file = Path(input).with_suffix('.out')
     stderr_file = Path(input).with_suffix('.err')
 
+    # --- CLEAN ENVIRONMENT ---
+    clean_env = {
+        "PATH": "/usr/bin:/bin:/home/mchrnwsk/tools/orca_6_1_1_linux_x86-64_shared_openmpi418",
+        "HOME": os.environ.get("HOME", ""),
+        "USER": os.environ.get("USER", ""),
+        "TMPDIR": "/tmp",  # important for ORCA
+    }
+
     try:
         with stdout_file.open("w") as out, stderr_file.open("w") as err:
-            # IMPORTANT: remove check=True
             result = subprocess.run(
                 [orcapath, input],
                 check=False,
                 timeout=timeout,
                 stdout=out,
-                stderr=err
+                stderr=err,
+                env=clean_env   # 🔥 THIS IS THE KEY
             )
+
     except subprocess.TimeoutExpired:
-        logger.error(f"Process exceeded {timeout} seconds and was terminated.")
+        if logger:
+            logger.error(f"Process exceeded {timeout} seconds and was terminated.")
         return 1
 
     except Exception as e:
-        # This handles only unexpected exceptions (file IO issues, etc.)
-        logger.error(f"Unexpected exception during ORCA run: {e}")
-        with stdout_file.open("r", errors="ignore") as f:
-            lines = f.readlines()
-        for line in lines[-13:]:
-            logger.error(line.rstrip())
+        if logger:
+            logger.error(f"Unexpected exception during ORCA run: {e}")
+            with stdout_file.open("r", errors="ignore") as f:
+                lines = f.readlines()
+            for line in lines[-13:]:
+                logger.error(line.rstrip())
         return 1
 
     return result.returncode
@@ -84,7 +95,7 @@ def write_docking_input(
             "val": r["value"],
             "uptol": r["value"] * 1.1,
             "downtol": r["value"] * 0.9,
-            "force": 100
+            "force": 1000
         })
 
     docker = {
@@ -453,7 +464,7 @@ def write_docker_block(f, docker):
             guest_idx = bias.get("guest_atom_idx", 0)
             host_idx = bias.get("host_atom_idx", 0)
             val = bias.get("val", 0.0)
-            force = bias.get("force", 100)
+            force = bias.get("force", 1000)
             f.write(f"{' '*8}{{ B {guest_idx} {host_idx} {val} {force} }}\n")
             f.write(f"{' '*4}END\n")
     f.write(f"{' '*4}OPTLEVEL {docker.get('optLevel', 'sloppyopt')}\n")
