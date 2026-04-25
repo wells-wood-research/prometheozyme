@@ -42,3 +42,6 @@ All notes about ORCA's restraints' quirks:
 # for SCAN and BIAS - need only know what is the ending value
 ---
 # %docker block allows only bond bias (no angles or torsions) and overrides any restraints from %geom block
+
+Other notes:
+# don't keep anything important in xyz files comment lines - they get overwritten with assembly metadata
