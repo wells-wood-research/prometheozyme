@@ -6,29 +6,17 @@
       "multiplicity": 1,
       "file": "/molecules/5-nitrobenzisoxazole.mol2",
       "atoms": {
-        "a83e530c-03fb-4a14-b6ca-a24a8f0351c5": {
+        "475797c4-834d-4e4c-adb9-f594169b1f24": {
           "elem": "CC",
-          "atomId": 0
+          "atomId": 9
         },
-        "9a943980-8664-49b7-94e8-22428dfccb91": {
+        "41243a04-35dd-4b25-996b-b813be668bbd": {
           "elem": "HCN",
-          "atomId": 1
+          "atomId": 16
         },
-        "eb4862e0-ecd1-449d-b395-98938cf96d82": {
+        "0f46ed05-cec4-4de8-ac6b-d5eacaee8888": {
           "elem": "OCN",
-          "atomId": 2
-        }
-      }
-    },
-    "1": {
-      "name": "Tryptophan",
-      "charge": 0,
-      "multiplicity": 1,
-      "file": "/molecules/cb_tryptophan.mol2",
-      "atoms": {
-        "2d6d1e8f-5ced-419f-9e0f-96c4c1f2f07b": {
-          "elem": "CG",
-          "atomId": 0
+          "atomId": 1
         }
       }
     },
@@ -38,9 +26,9 @@
       "multiplicity": 1,
       "file": "/molecules/cb_tyrosine_protonated.mol2",
       "atoms": {
-        "60a063cf-c68b-4334-a994-7e99c78c9c9b": {
+        "b6eda05f-9585-4d1d-b525-c068dce14b71": {
           "elem": "CG",
-          "atomId": 0
+          "atomId": 2
         }
       }
     },
@@ -50,9 +38,9 @@
       "multiplicity": 1,
       "file": "/molecules/cb_phenylalanine.mol2",
       "atoms": {
-        "c4e61159-f07d-4406-8556-ee49f8ed9bd2": {
+        "c351417c-ee97-4731-b780-32bc2f44d9a8": {
           "elem": "CG",
-          "atomId": 0
+          "atomId": 2
         }
       }
     },
@@ -62,9 +50,9 @@
       "multiplicity": 1,
       "file": "/molecules/cb_histidine_hia.mol2",
       "atoms": {
-        "7837f5f3-f6b9-4e69-a444-27d4157495a0": {
+        "33ed57a8-38a0-459f-a719-c41caae68e32": {
           "elem": "NE2",
-          "atomId": 0
+          "atomId": 6
         }
       }
     },
@@ -74,9 +62,9 @@
       "multiplicity": 1,
       "file": "/molecules/cb_aspartate_deprotonated.mol2",
       "atoms": {
-        "b5627041-2b88-4013-b3ed-c5411757a2dd": {
+        "93441f47-cbb7-4bc5-a91d-16e8ebe331c8": {
           "elem": "OD2",
-          "atomId": 0
+          "atomId": 4
         }
       }
     },
@@ -86,9 +74,9 @@
       "multiplicity": 1,
       "file": "/molecules/cb_serine_protonated.mol2",
       "atoms": {
-        "dad5073f-6849-4734-8393-e94765aa3496": {
+        "29f27bf1-1e1e-4dc2-8c3d-d3b3beb305b5": {
           "elem": "OG",
-          "atomId": 0
+          "atomId": 2
         }
       }
     },
@@ -98,750 +86,518 @@
       "multiplicity": 1,
       "file": "/molecules/cb_lysine_protonated.mol2",
       "atoms": {
-        "4c93eda3-f16c-4cd2-8f54-5e858e5d4fb7": {
+        "a8adde44-d73b-4e01-9155-a37a1dca94d1": {
           "elem": "NZ",
-          "atomId": 0
+          "atomId": 5
         }
       }
     }
   },
   "flavours": {
-    "cabb653c-3212-4b61-8685-75c376220ea7": "pi-stacking",
-    "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": "1*-base",
-    "6502acbe-e48b-4923-8f48-c5ad0a539379": "2*-base",
-    "df6808e4-fb26-4408-817f-bac9a48acd35": "H-don",
-    "a18dd672-5495-4c47-9ec2-ba245f93b335": "pi-stacking",
-    "7eadef9a-6a5e-4399-af3a-a935b247ea26": "acid",
-    "e6ef3860-e197-4d00-993a-0c15ab32249f": "H-acc"
+    "df6f6882-85ec-4169-aaa0-47847e779ca0": "pi-stacking",
+    "ceeafb02-6480-43f5-9e19-1b5384df4eb8": "1*-base",
+    "5237df00-4076-4e22-ba68-c8476ee46e1a": "2*-base",
+    "2982a2cd-3d05-4a3f-838f-8960f54a2544": "H-don",
+    "daff510c-4001-4975-a73f-9a6ce490b49a": "pi-stacking",
+    "d1100d1b-f989-4ef6-961b-390bffd988b0": "acid",
+    "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": "H-acc"
   },
   "restraints": {
-    "1c639a5e-da2a-4776-8fe7-36c54b4b2014": {
+    "a8424a35-2cec-4819-a69b-6793570edfb4": {
       "type": "distance",
       "value": 3.5,
       "connections": [
-        "a18dd672-5495-4c47-9ec2-ba245f93b335",
-        "cabb653c-3212-4b61-8685-75c376220ea7"
+        "daff510c-4001-4975-a73f-9a6ce490b49a",
+        "df6f6882-85ec-4169-aaa0-47847e779ca0"
       ]
     },
-    "938f8a5c-b807-429c-8ed5-4353adde66fa": {
+    "25e88931-8300-4a73-afe2-0dc6ae131740": {
       "type": "distance",
       "value": 2.7,
       "connections": [
-        "7eadef9a-6a5e-4399-af3a-a935b247ea26",
-        "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036"
+        "d1100d1b-f989-4ef6-961b-390bffd988b0",
+        "ceeafb02-6480-43f5-9e19-1b5384df4eb8"
       ]
     },
-    "23e77c6b-2ca8-4867-8c24-b6fc88030c97": {
+    "ade41144-a8e7-44bd-93e5-37872081c6d1": {
       "type": "distance",
       "value": 2.7,
       "connections": [
-        "6502acbe-e48b-4923-8f48-c5ad0a539379",
-        "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036"
+        "5237df00-4076-4e22-ba68-c8476ee46e1a",
+        "ceeafb02-6480-43f5-9e19-1b5384df4eb8"
       ]
     },
-    "736a4f2c-3db8-434c-8ed5-ac1e003a87c0": {
+    "32df6acf-29fa-4ff8-aa05-bc1cb6300c01": {
       "type": "distance",
       "value": 2.7,
       "connections": [
-        "e6ef3860-e197-4d00-993a-0c15ab32249f",
-        "df6808e4-fb26-4408-817f-bac9a48acd35"
+        "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec",
+        "2982a2cd-3d05-4a3f-838f-8960f54a2544"
       ]
     }
   },
   "recipes": [
     {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
-        "molecule": {
-          "id": "1"
-        },
-        "atom": {
-          "id": "2d6d1e8f-5ced-419f-9e0f-96c4c1f2f07b"
-        }
-      },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
-        "molecule": {
-          "id": "4"
-        },
-        "atom": {
-          "id": "7837f5f3-f6b9-4e69-a444-27d4157495a0"
-        }
-      },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
-        "molecule": {
-          "id": "5"
-        },
-        "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
-        }
-      },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
-        "molecule": {
-          "id": "6"
-        },
-        "atom": {
-          "id": "dad5073f-6849-4734-8393-e94765aa3496"
-        }
-      },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
-        }
-      },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
-        }
-      },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
-        }
-      }
-    },
-    {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
-        "molecule": {
-          "id": "1"
-        },
-        "atom": {
-          "id": "2d6d1e8f-5ced-419f-9e0f-96c4c1f2f07b"
-        }
-      },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
-        "molecule": {
-          "id": "4"
-        },
-        "atom": {
-          "id": "7837f5f3-f6b9-4e69-a444-27d4157495a0"
-        }
-      },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
-        "molecule": {
-          "id": "5"
-        },
-        "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
-        }
-      },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
-        "molecule": {
-          "id": "7"
-        },
-        "atom": {
-          "id": "4c93eda3-f16c-4cd2-8f54-5e858e5d4fb7"
-        }
-      },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
-        }
-      },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
-        }
-      },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
-        }
-      }
-    },
-    {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
-        "molecule": {
-          "id": "1"
-        },
-        "atom": {
-          "id": "2d6d1e8f-5ced-419f-9e0f-96c4c1f2f07b"
-        }
-      },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
-        "molecule": {
-          "id": "5"
-        },
-        "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
-        }
-      },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
-        "molecule": {
-          "id": "5"
-        },
-        "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
-        }
-      },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
-        "molecule": {
-          "id": "6"
-        },
-        "atom": {
-          "id": "dad5073f-6849-4734-8393-e94765aa3496"
-        }
-      },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
-        }
-      },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
-        }
-      },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
-        }
-      }
-    },
-    {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
-        "molecule": {
-          "id": "1"
-        },
-        "atom": {
-          "id": "2d6d1e8f-5ced-419f-9e0f-96c4c1f2f07b"
-        }
-      },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
-        "molecule": {
-          "id": "5"
-        },
-        "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
-        }
-      },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
-        "molecule": {
-          "id": "5"
-        },
-        "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
-        }
-      },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
-        "molecule": {
-          "id": "7"
-        },
-        "atom": {
-          "id": "4c93eda3-f16c-4cd2-8f54-5e858e5d4fb7"
-        }
-      },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
-        }
-      },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
-        }
-      },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
-        "molecule": {
-          "id": "0"
-        },
-        "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
-        }
-      }
-    },
-    {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
+      "df6f6882-85ec-4169-aaa0-47847e779ca0": {
         "molecule": {
           "id": "2"
         },
         "atom": {
-          "id": "60a063cf-c68b-4334-a994-7e99c78c9c9b"
+          "id": "b6eda05f-9585-4d1d-b525-c068dce14b71"
         }
       },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
+      "ceeafb02-6480-43f5-9e19-1b5384df4eb8": {
         "molecule": {
           "id": "4"
         },
         "atom": {
-          "id": "7837f5f3-f6b9-4e69-a444-27d4157495a0"
+          "id": "33ed57a8-38a0-459f-a719-c41caae68e32"
         }
       },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
+      "5237df00-4076-4e22-ba68-c8476ee46e1a": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
+      "2982a2cd-3d05-4a3f-838f-8960f54a2544": {
         "molecule": {
           "id": "6"
         },
         "atom": {
-          "id": "dad5073f-6849-4734-8393-e94765aa3496"
+          "id": "29f27bf1-1e1e-4dc2-8c3d-d3b3beb305b5"
         }
       },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
+      "daff510c-4001-4975-a73f-9a6ce490b49a": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
+          "id": "475797c4-834d-4e4c-adb9-f594169b1f24"
         }
       },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
+      "d1100d1b-f989-4ef6-961b-390bffd988b0": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
+          "id": "41243a04-35dd-4b25-996b-b813be668bbd"
         }
       },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
+      "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
+          "id": "0f46ed05-cec4-4de8-ac6b-d5eacaee8888"
         }
       }
     },
     {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
+      "df6f6882-85ec-4169-aaa0-47847e779ca0": {
         "molecule": {
           "id": "2"
         },
         "atom": {
-          "id": "60a063cf-c68b-4334-a994-7e99c78c9c9b"
+          "id": "b6eda05f-9585-4d1d-b525-c068dce14b71"
         }
       },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
+      "ceeafb02-6480-43f5-9e19-1b5384df4eb8": {
         "molecule": {
           "id": "4"
         },
         "atom": {
-          "id": "7837f5f3-f6b9-4e69-a444-27d4157495a0"
+          "id": "33ed57a8-38a0-459f-a719-c41caae68e32"
         }
       },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
+      "5237df00-4076-4e22-ba68-c8476ee46e1a": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
+      "2982a2cd-3d05-4a3f-838f-8960f54a2544": {
         "molecule": {
           "id": "7"
         },
         "atom": {
-          "id": "4c93eda3-f16c-4cd2-8f54-5e858e5d4fb7"
+          "id": "a8adde44-d73b-4e01-9155-a37a1dca94d1"
         }
       },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
+      "daff510c-4001-4975-a73f-9a6ce490b49a": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
+          "id": "475797c4-834d-4e4c-adb9-f594169b1f24"
         }
       },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
+      "d1100d1b-f989-4ef6-961b-390bffd988b0": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
+          "id": "41243a04-35dd-4b25-996b-b813be668bbd"
         }
       },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
+      "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
+          "id": "0f46ed05-cec4-4de8-ac6b-d5eacaee8888"
         }
       }
     },
     {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
+      "df6f6882-85ec-4169-aaa0-47847e779ca0": {
         "molecule": {
           "id": "2"
         },
         "atom": {
-          "id": "60a063cf-c68b-4334-a994-7e99c78c9c9b"
+          "id": "b6eda05f-9585-4d1d-b525-c068dce14b71"
         }
       },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
+      "ceeafb02-6480-43f5-9e19-1b5384df4eb8": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
+      "5237df00-4076-4e22-ba68-c8476ee46e1a": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
+      "2982a2cd-3d05-4a3f-838f-8960f54a2544": {
         "molecule": {
           "id": "6"
         },
         "atom": {
-          "id": "dad5073f-6849-4734-8393-e94765aa3496"
+          "id": "29f27bf1-1e1e-4dc2-8c3d-d3b3beb305b5"
         }
       },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
+      "daff510c-4001-4975-a73f-9a6ce490b49a": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
+          "id": "475797c4-834d-4e4c-adb9-f594169b1f24"
         }
       },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
+      "d1100d1b-f989-4ef6-961b-390bffd988b0": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
+          "id": "41243a04-35dd-4b25-996b-b813be668bbd"
         }
       },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
+      "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
+          "id": "0f46ed05-cec4-4de8-ac6b-d5eacaee8888"
         }
       }
     },
     {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
+      "df6f6882-85ec-4169-aaa0-47847e779ca0": {
         "molecule": {
           "id": "2"
         },
         "atom": {
-          "id": "60a063cf-c68b-4334-a994-7e99c78c9c9b"
+          "id": "b6eda05f-9585-4d1d-b525-c068dce14b71"
         }
       },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
+      "ceeafb02-6480-43f5-9e19-1b5384df4eb8": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
+      "5237df00-4076-4e22-ba68-c8476ee46e1a": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
+      "2982a2cd-3d05-4a3f-838f-8960f54a2544": {
         "molecule": {
           "id": "7"
         },
         "atom": {
-          "id": "4c93eda3-f16c-4cd2-8f54-5e858e5d4fb7"
+          "id": "a8adde44-d73b-4e01-9155-a37a1dca94d1"
         }
       },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
+      "daff510c-4001-4975-a73f-9a6ce490b49a": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
+          "id": "475797c4-834d-4e4c-adb9-f594169b1f24"
         }
       },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
+      "d1100d1b-f989-4ef6-961b-390bffd988b0": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
+          "id": "41243a04-35dd-4b25-996b-b813be668bbd"
         }
       },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
+      "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
+          "id": "0f46ed05-cec4-4de8-ac6b-d5eacaee8888"
         }
       }
     },
     {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
+      "df6f6882-85ec-4169-aaa0-47847e779ca0": {
         "molecule": {
           "id": "3"
         },
         "atom": {
-          "id": "c4e61159-f07d-4406-8556-ee49f8ed9bd2"
+          "id": "c351417c-ee97-4731-b780-32bc2f44d9a8"
         }
       },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
+      "ceeafb02-6480-43f5-9e19-1b5384df4eb8": {
         "molecule": {
           "id": "4"
         },
         "atom": {
-          "id": "7837f5f3-f6b9-4e69-a444-27d4157495a0"
+          "id": "33ed57a8-38a0-459f-a719-c41caae68e32"
         }
       },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
+      "5237df00-4076-4e22-ba68-c8476ee46e1a": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
+      "2982a2cd-3d05-4a3f-838f-8960f54a2544": {
         "molecule": {
           "id": "6"
         },
         "atom": {
-          "id": "dad5073f-6849-4734-8393-e94765aa3496"
+          "id": "29f27bf1-1e1e-4dc2-8c3d-d3b3beb305b5"
         }
       },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
+      "daff510c-4001-4975-a73f-9a6ce490b49a": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
+          "id": "475797c4-834d-4e4c-adb9-f594169b1f24"
         }
       },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
+      "d1100d1b-f989-4ef6-961b-390bffd988b0": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
+          "id": "41243a04-35dd-4b25-996b-b813be668bbd"
         }
       },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
+      "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
+          "id": "0f46ed05-cec4-4de8-ac6b-d5eacaee8888"
         }
       }
     },
     {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
+      "df6f6882-85ec-4169-aaa0-47847e779ca0": {
         "molecule": {
           "id": "3"
         },
         "atom": {
-          "id": "c4e61159-f07d-4406-8556-ee49f8ed9bd2"
+          "id": "c351417c-ee97-4731-b780-32bc2f44d9a8"
         }
       },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
+      "ceeafb02-6480-43f5-9e19-1b5384df4eb8": {
         "molecule": {
           "id": "4"
         },
         "atom": {
-          "id": "7837f5f3-f6b9-4e69-a444-27d4157495a0"
+          "id": "33ed57a8-38a0-459f-a719-c41caae68e32"
         }
       },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
+      "5237df00-4076-4e22-ba68-c8476ee46e1a": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
+      "2982a2cd-3d05-4a3f-838f-8960f54a2544": {
         "molecule": {
           "id": "7"
         },
         "atom": {
-          "id": "4c93eda3-f16c-4cd2-8f54-5e858e5d4fb7"
+          "id": "a8adde44-d73b-4e01-9155-a37a1dca94d1"
         }
       },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
+      "daff510c-4001-4975-a73f-9a6ce490b49a": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
+          "id": "475797c4-834d-4e4c-adb9-f594169b1f24"
         }
       },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
+      "d1100d1b-f989-4ef6-961b-390bffd988b0": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
+          "id": "41243a04-35dd-4b25-996b-b813be668bbd"
         }
       },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
+      "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
+          "id": "0f46ed05-cec4-4de8-ac6b-d5eacaee8888"
         }
       }
     },
     {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
+      "df6f6882-85ec-4169-aaa0-47847e779ca0": {
         "molecule": {
           "id": "3"
         },
         "atom": {
-          "id": "c4e61159-f07d-4406-8556-ee49f8ed9bd2"
+          "id": "c351417c-ee97-4731-b780-32bc2f44d9a8"
         }
       },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
+      "ceeafb02-6480-43f5-9e19-1b5384df4eb8": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
+      "5237df00-4076-4e22-ba68-c8476ee46e1a": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
+      "2982a2cd-3d05-4a3f-838f-8960f54a2544": {
         "molecule": {
           "id": "6"
         },
         "atom": {
-          "id": "dad5073f-6849-4734-8393-e94765aa3496"
+          "id": "29f27bf1-1e1e-4dc2-8c3d-d3b3beb305b5"
         }
       },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
+      "daff510c-4001-4975-a73f-9a6ce490b49a": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
+          "id": "475797c4-834d-4e4c-adb9-f594169b1f24"
         }
       },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
+      "d1100d1b-f989-4ef6-961b-390bffd988b0": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
+          "id": "41243a04-35dd-4b25-996b-b813be668bbd"
         }
       },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
+      "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
+          "id": "0f46ed05-cec4-4de8-ac6b-d5eacaee8888"
         }
       }
     },
     {
-      "cabb653c-3212-4b61-8685-75c376220ea7": {
+      "df6f6882-85ec-4169-aaa0-47847e779ca0": {
         "molecule": {
           "id": "3"
         },
         "atom": {
-          "id": "c4e61159-f07d-4406-8556-ee49f8ed9bd2"
+          "id": "c351417c-ee97-4731-b780-32bc2f44d9a8"
         }
       },
-      "1d682bcd-3a7f-4202-9fb7-63fe6ae5d036": {
+      "ceeafb02-6480-43f5-9e19-1b5384df4eb8": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "6502acbe-e48b-4923-8f48-c5ad0a539379": {
+      "5237df00-4076-4e22-ba68-c8476ee46e1a": {
         "molecule": {
           "id": "5"
         },
         "atom": {
-          "id": "b5627041-2b88-4013-b3ed-c5411757a2dd"
+          "id": "93441f47-cbb7-4bc5-a91d-16e8ebe331c8"
         }
       },
-      "df6808e4-fb26-4408-817f-bac9a48acd35": {
+      "2982a2cd-3d05-4a3f-838f-8960f54a2544": {
         "molecule": {
           "id": "7"
         },
         "atom": {
-          "id": "4c93eda3-f16c-4cd2-8f54-5e858e5d4fb7"
+          "id": "a8adde44-d73b-4e01-9155-a37a1dca94d1"
         }
       },
-      "a18dd672-5495-4c47-9ec2-ba245f93b335": {
+      "daff510c-4001-4975-a73f-9a6ce490b49a": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "a83e530c-03fb-4a14-b6ca-a24a8f0351c5"
+          "id": "475797c4-834d-4e4c-adb9-f594169b1f24"
         }
       },
-      "7eadef9a-6a5e-4399-af3a-a935b247ea26": {
+      "d1100d1b-f989-4ef6-961b-390bffd988b0": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "9a943980-8664-49b7-94e8-22428dfccb91"
+          "id": "41243a04-35dd-4b25-996b-b813be668bbd"
         }
       },
-      "e6ef3860-e197-4d00-993a-0c15ab32249f": {
+      "83b5e135-a9cd-4d7a-8ba6-0eca4b2e1aec": {
         "molecule": {
           "id": "0"
         },
         "atom": {
-          "id": "eb4862e0-ecd1-449d-b395-98938cf96d82"
+          "id": "0f46ed05-cec4-4de8-ac6b-d5eacaee8888"
         }
       }
     }
