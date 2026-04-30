@@ -374,77 +374,97 @@ def main(configPath):
             f"Failed to produce valid hosts for {len(failed_host_motifs)} motif(s). "
             f"Some recipe combinations could not be completed."
         )
-    # Create output directory
-    results_dir = os.path.join(outdir, "results")
-    specials_dir = os.path.join(outdir, "specials")
-    os.makedirs(results_dir, exist_ok=True)
-    os.makedirs(specials_dir, exist_ok=True)
 
-    logging.info(f"Saving all successfully cooked theozymes to {results_dir}...")
-    # Copy files with renamed names based on order
-    for i, ing in enumerate(leftovers_list, start=1):
-        new_name = f"result{i}"
-        new_pathPDB = os.path.join(results_dir, f"{new_name}.pdb")
-        # Copy and rename files
-        shutil.copy(ing.pathPDB, new_pathPDB)
-        # Log the results
-        logging.info(
-            f"path: {new_pathPDB}, eopt: {ing.eopt} (Eh), einter: {ing.einter} (kcal/mol)"
-        )
-    # Merge into one multi-frame PDB file for easier analysis
-    result_paths = [os.path.join(results_dir, x) for x in os.listdir(results_dir) if x.lower().endswith(".pdb")]
-    write_multi_pdb(result_paths, os.path.join(results_dir, "merged.pdb"))
+    # -------------------------
+    # OUTPUTS
+    # -------------------------
+    results_dir = Path(outdir) / "results_xyz"
+    results_dir.mkdir(exist_ok=True)
 
-    # Reduce on RMSD
-    logging.info(f"Saving diverse theozymes with RMSD >= {rmsd_threshold} to {specials_dir}...")
-    prod_count = 1
-    dish_count = 1
-    for meal in leftovers_dict.values():
-        logging.debug(f"DEBUG processing dish {dish_count}")
-        dish_count += 1
-        diverse = []
-        for ing in meal:
-            logging.debug(f"DEBUG processing ingredient {ing_dish_signature(ing.df)}")
-            # Compare only to already accepted structures
-            isUnique = True
-            min_rmsd = float('inf')
-            for ref_ing in diverse:
-                rmsd_val = float(rmsd.calculate_rmsd.main([ing.pathXYZ, ref_ing.pathXYZ]))
-                if rmsd_val < min_rmsd:
-                    min_rmsd = rmsd_val
-                if rmsd_val < rmsd_threshold:
-                    logging.debug(
-                        f"Not saving {ing.name}: too similar to {ref_ing.name} (RMSD={rmsd_val:.3f})"
-                    )
-                    isUnique = False
-                    break
+    # Define final motifs
+    full_motifs = {
+        frozenset((i, v) for i, v in enumerate(row))
+        for row in rows
+    }
 
-            # If unique relative to ALL saved structures → keep it
-            if isUnique:
-                diverse.append(ing)
-                new_name = f"result{prod_count}"
-                new_pathPDB = os.path.join(specials_dir, f"{new_name}.pdb")
-                shutil.copy(ing.pathPDB, new_pathPDB)
-                logging.info(
-                    f"Unique theozyme found: saved {ing.name} as {new_name}.pdb (Eopt={ing.eopt}, Einter={ing.einter}, min rmsd {min_rmsd})"
-                )
-                prod_count += 1
+    logging.info("Collecting FINAL (fully assembled) structures only...")
 
-    # Merge into one multi-frame PDB file for easier analysis
-    specials_paths = [os.path.join(specials_dir, x) for x in os.listdir(specials_dir) if x.lower().endswith(".pdb")]
-    write_multi_pdb(specials_paths, os.path.join(specials_dir, "merged.pdb"))
+    count = 0
 
-    if allOk:
-        logging.info("""
-            Cooking complete - bon appetit!
-            ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆
-            """)
-    else:
-        logging.info("""
-            Oh, crepe - something's gone wrong.
-                     Try different settings?
-            ☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆
-            """)
+    for motif in full_motifs:
+
+        final_hosts = hosts_by_motif.get(motif, [])
+
+        # Build readable code like "ab-ac-de"
+        motif_dict = dict(motif)
+        code_parts = []
+        for col in sorted(motif_dict):
+            val = motif_dict[col]
+            code_parts.append(str(val))
+        candidate_code = "-".join(code_parts)
+
+        for i, node in enumerate(final_hosts):
+
+            src = node.path
+
+            new_name = f"{candidate_code}_{i:03d}.xyz"
+            dst = results_dir / new_name
+
+            shutil.copy(src, dst)
+            count += 1
+
+    logging.info(f"Saved {count} final structures to {results_dir}")
+
+#    # Reduce on RMSD
+#    logging.info(f"Saving diverse theozymes with RMSD >= {rmsd_threshold} to {specials_dir}...")
+#    prod_count = 1
+#    dish_count = 1
+#    for meal in leftovers_dict.values():
+#        logging.debug(f"DEBUG processing dish {dish_count}")
+#        dish_count += 1
+#        diverse = []
+#        for ing in meal:
+#            logging.debug(f"DEBUG processing ingredient {ing_dish_signature(ing.df)}")
+#            # Compare only to already accepted structures
+#            isUnique = True
+#            min_rmsd = float('inf')
+#            for ref_ing in diverse:
+#                rmsd_val = float(rmsd.calculate_rmsd.main([ing.pathXYZ, ref_ing.pathXYZ]))
+#                if rmsd_val < min_rmsd:
+#                    min_rmsd = rmsd_val
+#                if rmsd_val < rmsd_threshold:
+#                    logging.debug(
+#                        f"Not saving {ing.name}: too similar to {ref_ing.name} (RMSD={rmsd_val:.3f})"
+#                    )
+#                    isUnique = False
+#                    break
+#
+#            # If unique relative to ALL saved structures → keep it
+#            if isUnique:
+#                diverse.append(ing)
+#                new_name = f"result{prod_count}"
+#                new_pathPDB = os.path.join(specials_dir, f"{new_name}.pdb")
+#                shutil.copy(ing.pathPDB, new_pathPDB)
+#                logging.info(
+#                    f"Unique theozyme found: saved {ing.name} as {new_name}.pdb (Eopt={ing.eopt}, Einter={ing.einter}, min rmsd {min_rmsd})"
+#                )
+#                prod_count += 1
+#
+#    # Merge into one multi-frame PDB file for easier analysis
+#    specials_paths = [os.path.join(specials_dir, x) for x in os.listdir(specials_dir) if x.lower().endswith(".pdb")]
+#    write_multi_pdb(specials_paths, os.path.join(specials_dir, "merged.pdb"))
+#
+#    if allOk:
+#        logging.info("""
+#            Cooking complete - bon appetit!
+#            ⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆⚝⭒٭⋆
+#            """)
+#    else:
+#        logging.info("""
+#            Oh, crepe - something's gone wrong.
+#                     Try different settings?
+#            ☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆☠︎︎⭒٭⋆
+#            """)
 
 if __name__ == "__main__":
     import argparse
