@@ -27,8 +27,8 @@ def get_parameters():
         "qmMethod_opt": "XTB2",
         "strategy": "NORMAL",
         "optLevel": "sloppyopt",
-        "nOpt": 1, # TODO seems that "dock.docker.struc1.all.preoptimized.xyz" files are empty if there is no optimisation step; on the other hand dock.docker.struc1.all.swarm.xyz contain 1000s structures; and dock.docker.xyz contains only one best structure
-        "fixHost": True,
+        "nOpt": 3, # TODO seems that "dock.docker.struc1.all.preoptimized.xyz" files are empty if there is no optimisation step; on the other hand dock.docker.struc1.all.swarm.xyz contain 1000s structures; and dock.docker.xyz contains only one best structure
+        "fixHost": False, # TODO could be better as False but keep restraints from previous steps during docker and optimisation
         "gridExtent": 15,
         "nprocs": 8
     }
