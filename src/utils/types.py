@@ -51,7 +51,7 @@ class Restraint:
     currentValue: Optional[float] = None
     
     def __post_init__(self):
-        self.tolerance = 0.1 if self.type == "distance" else 3.0 # TODO assign in config
+        self.tolerance = 0.5 if self.type == "distance" else 80.0 if self.type == "angle" else 100.0  # TODO assign in config
 
 @dataclass
 class RecipeEntry:
