@@ -283,6 +283,9 @@ def main(configPath):
                 orca.run_orca(dock_inp, orca_params["orcapath"], timeout=None)
 
                 dock_xyz = dock_inp.with_suffix(".docker.struc1.all.optimized.xyz")
+                if not dock_xyz.exists():
+                    logging.warning(f"Docking failed for host {host_node.id} in step {step_idx}. No output XYZ found. Skipping.")
+                    continue
 
                 assembly_species = dict(host_node.species)
                 assembly_species[guest_site.molecule_id] = host_node.n_atoms
