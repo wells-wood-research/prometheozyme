@@ -3,3 +3,4 @@ __pycache__/
 docking/
 main.log
 runs/
+tests/
